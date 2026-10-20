@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -424,12 +425,22 @@ func TestMigrationIsIdempotent(t *testing.T) {
 	if err := st.Migrate(ctx, os.DirFS("../../migrations"), testNow.Add(time.Hour)); err != nil {
 		t.Fatalf("second Migrate: %v", err)
 	}
+	entries, err := os.ReadDir("../../migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+			want++
+		}
+	}
 	var count int
 	if err := st.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Fatalf("schema_migrations rows = %d, want 1", count)
+	if count != want {
+		t.Fatalf("schema_migrations rows = %d, want %d", count, want)
 	}
 }
 

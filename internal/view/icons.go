@@ -18,6 +18,9 @@ var icons = map[string]string{
 	"alert":       `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5"/><circle cx="12" cy="16.4" r=".6" fill="currentColor" stroke="none"/>`,
 	"clock":       `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`,
 	"cloud":       `<path d="M7 18h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.6A3.3 3.3 0 0 0 7 18Z"/>`,
+	"diaper":      `<path d="M5 8h14l-1.1 6a4 4 0 0 1-4 3.4h-3.8a4 4 0 0 1-4-3.4L5 8Z"/><path d="M8 8V6.5A1.5 1.5 0 0 1 9.5 5h5A1.5 1.5 0 0 1 16 6.5V8"/>`,
+	"dirty":       `<path d="M7 16h9.5a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.7 1.4A3 3 0 0 0 7 16Z"/><circle cx="9.5" cy="19.4" r=".8" fill="currentColor" stroke="none"/><circle cx="13.2" cy="20.4" r=".6" fill="currentColor" stroke="none"/>`,
+	"plus":        `<path d="M12 5v14M5 12h14"/>`,
 	"arrow-left":  `<path d="M19 12H5M11 6l-6 6 6 6"/>`,
 	"arrow-right": `<path d="M5 12h14M13 6l6 6-6 6"/>`,
 }

@@ -9,10 +9,12 @@ import (
 	"nurtur/internal/view"
 )
 
-var mutationOOB = []string{
+// allOOB is every companion fragment a dashboard mutation may refresh.
+var allOOB = []string{
 	"last-nursed-oob",
 	"status-strip-oob",
 	"timeline-today-oob",
+	"sleep-pill-oob",
 	"toast-oob",
 }
 
@@ -20,6 +22,22 @@ var reconcileOOB = []string{
 	"last-nursed-oob",
 	"status-strip-oob",
 	"timeline-today-oob",
+	"sleep-pill-oob",
+}
+
+// mutationOOB returns the companion fragments for a primary target. The
+// primary is never also sent out-of-band.
+func mutationOOB(primary string) []string {
+	switch primary {
+	case "timer":
+		return allOOB
+	case "status-strip":
+		return []string{"last-nursed-oob", "timeline-today-oob", "sleep-pill-oob", "toast-oob"}
+	case "sleep-pill":
+		return []string{"last-nursed-oob", "status-strip-oob", "timeline-today-oob", "toast-oob"}
+	default:
+		return allOOB
+	}
 }
 
 // mutateResponse describes one HTMX (or no-JS) response.
@@ -33,6 +51,7 @@ type mutateResponse struct {
 	Retarget         string
 	Reswap           string
 	Edit             *view.EditView
+	Apply            func(*view.PageData)
 }
 
 func isHTMX(r *http.Request) bool {
@@ -71,12 +90,26 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, opts mutateResp
 	if opts.Edit != nil {
 		data.Edit = opts.Edit
 	}
+	if opts.Apply != nil {
+		opts.Apply(data)
+	}
 
-	oob := mutationOOB
+	oob := mutationOOB(opts.Primary)
 	if opts.Status >= 400 {
 		oob = nil
 	}
 	s.writeFragments(w, r, opts.Status, opts.Primary, data, opts.TimerOOB, oob, opts.Trigger, opts.TriggerAfterSwap, opts.Retarget, opts.Reswap)
+}
+
+// renderMutation is the standard successful mutation response: a primary
+// fragment plus the OOB companions for that target.
+func (s *Server) renderMutation(w http.ResponseWriter, r *http.Request, primary string, toast *view.Toast) {
+	s.respond(w, r, mutateResponse{
+		Primary:          primary,
+		Toast:            toast,
+		Trigger:          "sheet-saved",
+		TriggerAfterSwap: true,
+	})
 }
 
 func (s *Server) respondEditError(w http.ResponseWriter, r *http.Request, edit *view.EditView) {
@@ -97,6 +130,18 @@ func (s *Server) respondEditConflict(w http.ResponseWriter, r *http.Request, mes
 		Retarget:         "#timer-card",
 		Reswap:           "outerHTML",
 	})
+}
+
+// renderSheet renders one dialog fragment. htmx swaps it into #action-dialog;
+// a no-JS request gets the full dashboard with the sheet open.
+func (s *Server) renderSheet(w http.ResponseWriter, r *http.Request, name string, data *view.PageData) {
+	if isHTMX(r) {
+		s.writeFragments(w, r, http.StatusOK, name, data, false, nil, "", false, "", "")
+		return
+	}
+	data.Sheet = name
+	data.SheetOpen = true
+	s.renderPage(w, r, http.StatusOK, data)
 }
 
 func (s *Server) writeFragments(

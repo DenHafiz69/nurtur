@@ -1,22 +1,19 @@
 {{define "timer"}}
 <div id="timer-card" class="timer-card {{if .Active}}is-nursing{{else}}is-idle{{end}}"{{if .TimerOOB}} hx-swap-oob="outerHTML"{{end}}{{with .Active}} data-feed-id="{{.ID}}" data-side="{{.Side}}" data-started-at="{{iso .StartedAt}}" data-server-now="{{iso .ServerNow}}"{{end}}>
-  <div class="timer-display">
-    <span class="timer-pip">{{if .Active}}{{pip "nursing"}}{{else}}<span class="pip-day">{{pip "awake"}}</span><span class="pip-night">{{pip "sleeping"}}</span>{{end}}</span>
-    <div class="timer-copy">
-      {{if .Active}}
+  {{if .Active}}
+    <div class="timer-display">
+      <span class="timer-pip">{{pip "nursing"}}</span>
+      <div class="timer-copy">
         <p class="timer-label">Nursing <strong>{{.Active.SideTitle}}</strong></p>
         <p class="timer-digits" data-timer-digits>{{timer .Active.Elapsed}}</p>
         <p class="timer-split">{{.Active.SplitLabel}} this feed</p>
         <span class="sr-only" id="timer-announcer" aria-live="polite"></span>
-      {{else}}
-        <p class="timer-label">Nursing</p>
-        <p class="timer-hint">Tap a side to start.</p>
-      {{end}}
-    </div>
-    {{if .Active}}
+      </div>
       <a class="icon-btn timer-adjust" href="/feeds/{{.Active.ID}}/edit" hx-get="/feeds/{{.Active.ID}}/edit" hx-target="#feed-edit-dialog" hx-swap="innerHTML" aria-label="Adjust this feed">{{icon "pencil"}}</a>
-    {{end}}
-  </div>
+    </div>
+  {{else}}
+    <p class="timer-idle-hint">Tap a side to start.</p>
+  {{end}}
 
   <p class="timer-cached" data-cached-timer hidden></p>
   <p class="timer-offline" data-offline-hint hidden>Offline — timer still running</p>

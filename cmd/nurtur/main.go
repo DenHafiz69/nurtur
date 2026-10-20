@@ -92,6 +92,8 @@ func run() error {
 		Logger:     logger,
 		SyncWorker: worker,
 		LocalOnly:  st.SyncDB() == nil,
+		NightStart: cfg.NightStart,
+		NightEnd:   cfg.NightEnd,
 	})
 	if err != nil {
 		return err

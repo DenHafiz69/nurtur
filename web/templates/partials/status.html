@@ -1,14 +1,32 @@
-{{define "status-strip-inner"}}
-<div class="summary-card">
-  <span class="summary-icon" aria-hidden="true">{{icon "clock"}}</span>
-  <div class="summary-body">
-    <p class="summary-label">Today's nursing</p>
-    <p class="summary-count">{{.Today.CountLabel}}</p>
-    <p class="summary-split">{{.Today.SplitLabel}}</p>
-  </div>
-</div>
+{{define "status-cards"}}
+  {{template "status-card" .Status.Nursing}}
+  {{template "status-card" .Status.Diaper}}
+  {{template "status-card" .Status.Sleep}}
+{{end}}
+
+{{define "status-card"}}
+<a class="status-card status-{{.Kind}} tone-{{.Tone}}{{if .Active}} is-active{{end}}" href="{{.Href}}" hx-get="{{.Href}}" hx-target="#action-dialog" hx-swap="innerHTML">
+  <span class="status-icon" aria-hidden="true">{{icon .Icon}}</span>
+  <span class="status-label">{{.Label}}</span>
+  {{if .HasData}}
+    <span class="status-value"{{if not .ValueSince.IsZero}} data-relative-since="{{iso .ValueSince}}" data-relative-mode="{{.ValueMode}}"{{end}}>{{.Value}}</span>
+    {{if .Detail}}<span class="status-detail">{{.Detail}}</span>{{end}}
+    {{if .SecondarySince}}
+      <span class="status-detail status-secondary"><span>{{.Secondary}} · </span><span data-relative-since="{{iso .SecondarySince}}" data-relative-mode="{{.SecondaryMode}}">{{.SecondaryValue}}</span></span>
+    {{else if .Secondary}}
+      <span class="status-detail status-secondary">{{.Secondary}}</span>
+    {{end}}
+  {{else}}
+    <span class="status-value status-value-empty">—</span>
+    {{if .Detail}}<span class="status-detail">{{.Detail}}</span>{{end}}
+  {{end}}
+</a>
+{{end}}
+
+{{define "status-strip"}}
+<div id="status-strip" class="status-strip">{{template "status-cards" .}}</div>
 {{end}}
 
 {{define "status-strip-oob"}}
-<div id="status-strip" class="status-strip" hx-swap-oob="outerHTML">{{template "status-strip-inner" .}}</div>
+<div id="status-strip" class="status-strip" hx-swap-oob="outerHTML">{{template "status-cards" .}}</div>
 {{end}}

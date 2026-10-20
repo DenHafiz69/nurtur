@@ -1,0 +1,51 @@
+{{define "timeline-today"}}
+<div id="timeline-today" class="timeline-today">{{template "timeline-today-inner" .}}</div>
+{{end}}
+
+{{define "timeline-today-oob"}}
+<div id="timeline-today" class="timeline-today" hx-swap-oob="outerHTML">{{template "timeline-today-inner" .}}</div>
+{{end}}
+
+{{define "timeline-today-inner"}}
+  {{if .Today.HasEvents}}
+    <p class="today-summary">
+      <span>{{.Today.CountLabel}}</span>
+      {{if gt .Today.Count 0}}
+        <span class="summary-sep" aria-hidden="true">·</span>
+        <span>{{.Today.SplitLabel}}</span>
+      {{end}}
+      <span class="summary-sep" aria-hidden="true">·</span>
+      <span>{{.Today.DiaperLabel}}</span>
+      <span class="summary-sep" aria-hidden="true">·</span>
+      <span>{{.Today.SleepLabel}}</span>
+    </p>
+    <ul class="feed-list" aria-label="Today's events">
+      {{range .Events}}
+        <li class="feed-row {{.KindClass}}{{if .Active}} is-active{{end}}">
+          <span class="event-icon" aria-hidden="true">{{icon .Icon}}</span>
+          <div class="feed-main">
+            <p class="feed-line">
+              <span class="feed-time">{{.TimeLabel}}</span>
+              <span class="feed-sep" aria-hidden="true">·</span>
+              <span class="event-title">{{.Title}}</span>
+              {{if .Active}}<span class="chip chip-live">now</span>{{end}}
+            </p>
+            {{if .Detail}}<p class="feed-detail">{{.Detail}}</p>{{end}}
+          </div>
+          <div class="feed-actions">
+            <a class="icon-btn" href="{{.EditURL}}" hx-get="{{.EditURL}}" hx-target="{{.EditTarget}}" hx-swap="innerHTML" aria-label="Edit {{.ActionLabel}}">{{icon "pencil"}}</a>
+            <form method="post" action="{{.DeleteURL}}/delete" hx-delete="{{.DeleteURL}}" hx-target="{{.DeleteTarget}}" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+              <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete {{.ActionLabel}}">{{icon "trash"}}</button>
+            </form>
+          </div>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <div class="empty">
+      <span class="pip pip-empty">{{pip "empty"}}</span>
+      <p class="empty-title">Nothing logged yet today.</p>
+      <p class="empty-copy">Tap below when you're ready.</p>
+    </div>
+  {{end}}
+{{end}}

@@ -224,7 +224,25 @@
     return Math.max(0, Date.now() - timerState.offset - timerState.startedAt);
   }
 
+  // Any element with data-live-since ticks using the server's clock offset.
+  // The sleep pill and the sheets use this; the feed card has its own cache.
+  function tickLiveClocks() {
+    document.querySelectorAll("[data-live-since]").forEach(function (el) {
+      var since = Date.parse(el.dataset.liveSince || "");
+      if (!isFinite(since)) return;
+      var digits = el.querySelector("[data-live-digits]");
+      if (!digits) return;
+      if (!isFinite(el.__nurturServerOffset)) {
+        var serverNow = Date.parse(el.dataset.liveServerNow || "");
+        el.__nurturServerOffset = isFinite(serverNow) ? Date.now() - serverNow : labelOffset;
+      }
+      var text = formatTimer(Date.now() - el.__nurturServerOffset - since);
+      if (digits.textContent !== text) digits.textContent = text;
+    });
+  }
+
   function tick() {
+    tickLiveClocks();
     var card = timerCard();
     if (!card) return;
 
@@ -340,14 +358,8 @@
 
   /* ---------- Dialog ---------- */
 
-  function dialogEl() {
-    return document.getElementById("feed-edit-dialog");
-  }
-
-  function openDialog() {
-    var dialog = dialogEl();
+  function openDialog(dialog) {
     if (!dialog || !dialog.querySelector(".sheet-inner")) return;
-
     if (!dialog.open) {
       if (typeof dialog.showModal === "function") {
         dialog.showModal();
@@ -357,8 +369,8 @@
     }
   }
 
-  function closeDialog() {
-    var dialog = dialogEl();
+  function closeDialog(dialog) {
+    if (!dialog) dialog = document.querySelector("dialog.sheet[open]");
     if (!dialog) return;
     if (dialog.open && typeof dialog.close === "function") {
       dialog.close();
@@ -372,43 +384,50 @@
     }
   }
 
-  var dialog = dialogEl();
-  var sheetDragStart = null;
-  if (dialog) {
+  function closeOpenDialogs() {
+    document.querySelectorAll("dialog.sheet[open]").forEach(function (item) {
+      closeDialog(item);
+    });
+  }
+
+  document.querySelectorAll("dialog.sheet").forEach(function (dialog) {
+    var dragStart = null;
     dialog.addEventListener("close", function () { dialog.innerHTML = ""; });
     dialog.addEventListener("click", function (event) {
-      if (event.target === dialog) closeDialog();
+      if (event.target === dialog) closeDialog(dialog);
     });
     dialog.addEventListener("touchstart", function (event) {
       if (event.target.closest && event.target.closest("[data-sheet-drag]")) {
-        sheetDragStart = event.touches[0].clientY;
+        dragStart = event.touches[0].clientY;
       }
     }, { passive: true });
     dialog.addEventListener("touchmove", function (event) {
-      if (sheetDragStart === null) return;
-      if (event.touches[0].clientY - sheetDragStart > 64) {
-        sheetDragStart = null;
-        closeDialog();
+      if (dragStart === null) return;
+      if (event.touches[0].clientY - dragStart > 64) {
+        dragStart = null;
+        closeDialog(dialog);
       }
     }, { passive: true });
-    dialog.addEventListener("touchend", function () { sheetDragStart = null; }, { passive: true });
-    // A no-JS edit page ships the dialog with the open attribute. Upgrade it to
-    // a real modal and keep focus trapped.
+    dialog.addEventListener("touchend", function () { dragStart = null; }, { passive: true });
+
+    // A no-JS sheet ships with the open attribute. Upgrade it to a real modal
+    // and keep focus trapped.
     if (dialog.hasAttribute("open") && dialog.querySelector(".sheet-inner")) {
       dialog.removeAttribute("open");
-      openDialog();
+      openDialog(dialog);
     }
-  }
+  });
 
   document.addEventListener("click", function (event) {
     var trigger = event.target.closest ? event.target.closest("[data-close-dialog]") : null;
     if (trigger) {
       event.preventDefault();
-      closeDialog();
+      closeDialog(trigger.closest("dialog.sheet"));
     }
   });
 
-  document.body.addEventListener("feed-saved", closeDialog);
+  document.body.addEventListener("feed-saved", closeOpenDialogs);
+  document.body.addEventListener("sheet-saved", closeOpenDialogs);
 
   /* ---------- Toasts ---------- */
 
@@ -419,12 +438,39 @@
     if (!toast) return;
     if (toastTimer) window.clearTimeout(toastTimer);
     toast.classList.remove("is-leaving");
-    toastTimer = window.setTimeout(function () {
+
+    var duration = parseInt(toast.getAttribute("data-toast-duration") || "5000", 10);
+    if (!isFinite(duration) || duration <= 0) duration = 5000;
+
+    var dismiss = function () {
       toast.classList.add("is-leaving");
       window.setTimeout(function () {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       }, 250);
-    }, 5000);
+    };
+    var schedule = function () {
+      if (toastTimer) window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(dismiss, duration);
+    };
+    var pause = function () {
+      if (toastTimer) {
+        window.clearTimeout(toastTimer);
+        toastTimer = null;
+      }
+    };
+
+    if (toast.dataset.armed !== "1") {
+      toast.dataset.armed = "1";
+      toast.addEventListener("mouseenter", pause);
+      toast.addEventListener("mouseleave", function () {
+        if (toast.parentNode) schedule();
+      });
+      toast.addEventListener("focusin", pause);
+      toast.addEventListener("focusout", function () {
+        if (toast.parentNode) schedule();
+      });
+    }
+    schedule();
   }
 
   var ALERT_ICON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5"/><circle cx="12" cy="16.4" r=".6" fill="currentColor" stroke="none"/></svg>';
@@ -451,19 +497,20 @@
     var target = event.detail ? event.detail.target : null;
     if (!target) return;
 
+    if (target.tagName === "DIALOG" && target.classList.contains("sheet")) {
+      document.querySelectorAll("dialog.sheet[open]").forEach(function (other) {
+        if (other !== target) closeDialog(other);
+      });
+      openDialog(target);
+    }
     if (target.id === "timer-card") {
       onTimerSwap();
-      updateRelativeLabels();
-    }
-    if (target.id === "feed-edit-dialog") {
-      openDialog();
     }
     if (target.id === "toast-region") {
       armToast();
     }
-    if (target.id === "timeline-today" || target.id === "last-nursed") {
-      updateRelativeLabels();
-    }
+    updateRelativeLabels();
+    tickLiveClocks();
   });
 
   document.body.addEventListener("htmx:responseError", function (event) {

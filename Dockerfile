@@ -32,6 +32,8 @@ WORKDIR /data
 # /tmp is writable for the non-root user and is re-created if the cache clears.
 ENV NURTUR_ADDR=:8080 \
     NURTUR_DB=/data/nurtur.db \
+    NURTUR_NIGHT_START=19:00 \
+    NURTUR_NIGHT_END=07:00 \
     TURSO_GO_CACHE_DIR=/tmp/turso-go
 
 EXPOSE 8080

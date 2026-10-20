@@ -17,6 +17,8 @@ func clearEnv(t *testing.T) {
 		"NURTUR_SYNC_INTERVAL",
 		"NURTUR_TZ",
 		"NURTUR_BABY_NAME",
+		"NURTUR_NIGHT_START",
+		"NURTUR_NIGHT_END",
 		"NURTUR_LOG_LEVEL",
 	} {
 		t.Setenv(key, "")
@@ -40,6 +42,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.SyncInterval != 60*time.Second || cfg.Location != time.Local || cfg.LogLevel != slog.LevelInfo {
 		t.Fatalf("defaults = %+v", cfg)
 	}
+	if cfg.NightStart != 19*time.Hour || cfg.NightEnd != 7*time.Hour {
+		t.Fatalf("night window = %v–%v", cfg.NightStart, cfg.NightEnd)
+	}
 }
 
 func TestLoadOverrides(t *testing.T) {
@@ -51,6 +56,8 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("NURTUR_TZ", "America/New_York")
 	t.Setenv("NURTUR_BABY_NAME", "Pip")
 	t.Setenv("NURTUR_LOG_LEVEL", "debug")
+	t.Setenv("NURTUR_NIGHT_START", "20:30")
+	t.Setenv("NURTUR_NIGHT_END", "06:15")
 
 	cfg, err := Load()
 	if err != nil {
@@ -67,6 +74,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.LogLevel != slog.LevelDebug {
 		t.Fatalf("log level = %v", cfg.LogLevel)
+	}
+	if cfg.NightStart != 20*time.Hour+30*time.Minute || cfg.NightEnd != 6*time.Hour+15*time.Minute {
+		t.Fatalf("night window = %v–%v", cfg.NightStart, cfg.NightEnd)
 	}
 }
 
@@ -105,6 +115,9 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"negative sync interval", "NURTUR_SYNC_INTERVAL", "-5s"},
 		{"bool", "NURTUR_LOCAL_ONLY", "maybe"},
 		{"log level", "NURTUR_LOG_LEVEL", "loud"},
+		{"night start", "NURTUR_NIGHT_START", "25:00"},
+		{"night end", "NURTUR_NIGHT_END", "7pm"},
+		{"night window equal", "NURTUR_NIGHT_START", "07:00"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

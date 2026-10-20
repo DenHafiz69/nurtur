@@ -1,0 +1,125 @@
+{{define "diaper-row"}}
+<section class="diaper-row" aria-label="Log a diaper">
+  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <input type="hidden" name="type" value="wet">
+    <button type="submit" class="diaper-pill diaper-wet">{{icon "drop"}}<span>Wet</span></button>
+  </form>
+  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <input type="hidden" name="type" value="dirty">
+    <button type="submit" class="diaper-pill diaper-dirty">{{icon "dirty"}}<span>Dirty</span></button>
+  </form>
+  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <input type="hidden" name="type" value="both">
+    <button type="submit" class="diaper-pill diaper-both">{{icon "diaper"}}<span>Both</span></button>
+  </form>
+</section>
+{{end}}
+
+{{define "diaper-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Diapers</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+
+  <dl class="sheet-stats">
+    <div class="sheet-stat">
+      <dt>Last wet</dt>
+      <dd>{{if .DiaperSheet.HasWet}}{{.DiaperSheet.LastWet}}{{else}}—{{end}}</dd>
+    </div>
+    <div class="sheet-stat">
+      <dt>Last dirty</dt>
+      <dd>{{if .DiaperSheet.HasDirty}}{{.DiaperSheet.LastDirty}}{{else}}—{{end}}</dd>
+    </div>
+  </dl>
+
+  <p class="sheet-copy">One tap logs it. Details are always optional.</p>
+  <section class="diaper-row sheet-diaper-row" aria-label="Log a diaper">
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="type" value="wet">
+      <button type="submit" class="diaper-pill diaper-wet">{{icon "drop"}}<span>Wet</span></button>
+    </form>
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="type" value="dirty">
+      <button type="submit" class="diaper-pill diaper-dirty">{{icon "dirty"}}<span>Dirty</span></button>
+    </form>
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="type" value="both">
+      <button type="submit" class="diaper-pill diaper-both">{{icon "diaper"}}<span>Both</span></button>
+    </form>
+  </section>
+
+  <h3 class="sheet-subhead">Today</h3>
+  {{if .DiaperSheet.Recent}}
+    <ul class="sheet-list" aria-label="Today's diapers">
+      {{range .DiaperSheet.Recent}}
+        <li class="sheet-row">
+          <span class="sheet-row-time">{{.TimeLabel}}</span>
+          <span class="sheet-row-main"><strong>{{.Title}}</strong><span class="sheet-row-detail">{{.Detail}}</span></span>
+          <a class="icon-btn" href="{{.EditURL}}" hx-get="{{.EditURL}}" hx-target="#action-dialog" hx-swap="innerHTML" aria-label="Edit diaper at {{.TimeLabel}}">{{icon "pencil"}}</a>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="sheet-empty">No diapers yet today.</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "diaper-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">{{.DiaperEdit.KindTitle}} diaper</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+
+  <form class="sheet-form" method="post" action="/diapers/{{.DiaperEdit.ID}}" hx-patch="/diapers/{{.DiaperEdit.ID}}" hx-target="#action-dialog" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+    <p class="sheet-copy">Add as much or as little as you like.</p>
+
+    <label class="field">
+      <span class="field-label">Logged at</span>
+      <input type="datetime-local" step="1" name="logged_at" value="{{.DiaperEdit.TimeInput}}" required>
+      {{if .DiaperEdit.TimeErr}}<span class="field-error" role="alert">{{.DiaperEdit.TimeErr}}</span>{{end}}
+    </label>
+
+    <fieldset class="chip-field">
+      <legend class="field-label">Colour</legend>
+      <div class="chip-options">
+        {{range .DiaperEdit.Colors}}
+          <label class="chip-option">
+            <input type="radio" name="color" value="{{.Value}}"{{if .Selected}} checked{{end}}>
+            <span>{{.Label}}</span>
+          </label>
+        {{end}}
+      </div>
+      {{if .DiaperEdit.ColorErr}}<span class="field-error" role="alert">{{.DiaperEdit.ColorErr}}</span>{{end}}
+    </fieldset>
+
+    <fieldset class="chip-field">
+      <legend class="field-label">Consistency</legend>
+      <div class="chip-options">
+        {{range .DiaperEdit.Consistencies}}
+          <label class="chip-option">
+            <input type="radio" name="consistency" value="{{.Value}}"{{if .Selected}} checked{{end}}>
+            <span>{{.Label}}</span>
+          </label>
+        {{end}}
+      </div>
+      {{if .DiaperEdit.ConsistErr}}<span class="field-error" role="alert">{{.DiaperEdit.ConsistErr}}</span>{{end}}
+    </fieldset>
+
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Anything to remember">{{.DiaperEdit.Notes}}</textarea>
+      {{if .DiaperEdit.NotesErr}}<span class="field-error" role="alert">{{.DiaperEdit.NotesErr}}</span>{{end}}
+    </label>
+
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save details</button>
+    </div>
+  </form>
+</div>
+{{end}}

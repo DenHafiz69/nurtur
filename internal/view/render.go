@@ -17,13 +17,15 @@ type Renderer struct {
 // NewRenderer parses layout.html, dashboard.html, and every partial.
 func NewRenderer(fsys fs.FS) (*Renderer, error) {
 	funcs := template.FuncMap{
-		"icon":      Icon,
-		"pip":       Pip,
-		"duration":  FormatDuration,
-		"timer":     FormatTimer,
-		"iso":       ISO,
-		"minutes":   Minutes,
-		"feedCount": FeedCountLabel,
+		"icon":        Icon,
+		"pip":         Pip,
+		"duration":    FormatDuration,
+		"timer":       FormatTimer,
+		"iso":         ISO,
+		"minutes":     Minutes,
+		"feedCount":   FeedCountLabel,
+		"diaperCount": DiaperCountLabel,
+		"sleepLabel":  SleepTotalLabel,
 	}
 	tmpl, err := template.New("nurtur").Funcs(funcs).ParseFS(fsys, "*.html", "partials/*.html")
 	if err != nil {

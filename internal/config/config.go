@@ -21,6 +21,8 @@ type Config struct {
 	Location     *time.Location
 	BabyName     string
 	LogLevel     slog.Level
+	NightStart   time.Duration
+	NightEnd     time.Duration
 }
 
 // Load reads configuration from the environment and applies defaults.
@@ -34,6 +36,8 @@ func Load() (Config, error) {
 		SyncInterval: 60 * time.Second,
 		Location:     time.Local,
 		LogLevel:     slog.LevelInfo,
+		NightStart:   19 * time.Hour,
+		NightEnd:     7 * time.Hour,
 	}
 
 	localOnly, err := parseBool(os.Getenv("NURTUR_LOCAL_ONLY"))
@@ -67,6 +71,24 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("NURTUR_LOG_LEVEL: %w", err)
 		}
 		cfg.LogLevel = level
+	}
+
+	if raw := strings.TrimSpace(os.Getenv("NURTUR_NIGHT_START")); raw != "" {
+		d, err := parseClock(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("NURTUR_NIGHT_START: %w", err)
+		}
+		cfg.NightStart = d
+	}
+	if raw := strings.TrimSpace(os.Getenv("NURTUR_NIGHT_END")); raw != "" {
+		d, err := parseClock(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("NURTUR_NIGHT_END: %w", err)
+		}
+		cfg.NightEnd = d
+	}
+	if cfg.NightStart == cfg.NightEnd {
+		return Config{}, fmt.Errorf("NURTUR_NIGHT_START and NURTUR_NIGHT_END must differ")
 	}
 
 	if cfg.BabyName == "" {
@@ -115,4 +137,13 @@ func parseLevel(raw string) (slog.Level, error) {
 	default:
 		return 0, fmt.Errorf("must be one of debug, info, warn, error")
 	}
+}
+
+// parseClock reads an HH:MM wall-clock value as a duration since midnight.
+func parseClock(raw string) (time.Duration, error) {
+	parsed, err := time.Parse("15:04", strings.TrimSpace(raw))
+	if err != nil {
+		return 0, fmt.Errorf("must use HH:MM (for example 19:00)")
+	}
+	return time.Duration(parsed.Hour())*time.Hour + time.Duration(parsed.Minute())*time.Minute, nil
 }

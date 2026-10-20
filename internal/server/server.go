@@ -31,20 +31,24 @@ type Config struct {
 	Logger     *slog.Logger
 	SyncWorker *store.SyncWorker
 	LocalOnly  bool
+	NightStart time.Duration
+	NightEnd   time.Duration
 }
 
 // Server holds the router and shared dependencies.
 type Server struct {
-	store    *store.Store
-	clock    clock.Clock
-	loc      *time.Location
-	babyName string
-	version  string
-	log      *slog.Logger
-	renderer *view.Renderer
-	static   http.Handler
-	worker   *store.SyncWorker
-	local    bool
+	store      *store.Store
+	clock      clock.Clock
+	loc        *time.Location
+	babyName   string
+	version    string
+	log        *slog.Logger
+	renderer   *view.Renderer
+	static     http.Handler
+	worker     *store.SyncWorker
+	local      bool
+	nightStart time.Duration
+	nightEnd   time.Duration
 }
 
 // New validates dependencies and parses the embedded templates.
@@ -70,6 +74,10 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Version == "" {
 		cfg.Version = "dev"
 	}
+	if cfg.NightStart <= 0 && cfg.NightEnd <= 0 {
+		cfg.NightStart = 19 * time.Hour
+		cfg.NightEnd = 7 * time.Hour
+	}
 
 	templateFS, err := fs.Sub(cfg.Assets, "web/templates")
 	if err != nil {
@@ -86,16 +94,18 @@ func New(cfg Config) (*Server, error) {
 	}
 
 	return &Server{
-		store:    cfg.Store,
-		clock:    cfg.Clock,
-		loc:      cfg.Location,
-		babyName: cfg.BabyName,
-		version:  cfg.Version,
-		log:      cfg.Logger,
-		renderer: renderer,
-		static:   newStaticHandler(staticFS),
-		worker:   cfg.SyncWorker,
-		local:    cfg.LocalOnly,
+		store:      cfg.Store,
+		clock:      cfg.Clock,
+		loc:        cfg.Location,
+		babyName:   cfg.BabyName,
+		version:    cfg.Version,
+		log:        cfg.Logger,
+		renderer:   renderer,
+		static:     newStaticHandler(staticFS),
+		worker:     cfg.SyncWorker,
+		local:      cfg.LocalOnly,
+		nightStart: cfg.NightStart,
+		nightEnd:   cfg.NightEnd,
 	}, nil
 }
 
@@ -107,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /partials/feed/timer", s.handleTimerFragment)
 
 	mux.HandleFunc("POST /feeds", s.handleStartFeed)
+	mux.HandleFunc("GET /feeds/sheet", s.handleNursingSheet)
 	mux.HandleFunc("POST /feeds/{id}/switch", s.handleSwitchFeed)
 	mux.HandleFunc("POST /feeds/{id}/stop", s.handleStopFeed)
 	mux.HandleFunc("GET /feeds/{id}/edit", s.handleEditPage)
@@ -114,6 +125,25 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /feeds/{id}", s.handleEditFeed) // no-JS fallback
 	mux.HandleFunc("DELETE /feeds/{id}", s.handleDeleteFeed)
 	mux.HandleFunc("POST /feeds/{id}/delete", s.handleDeleteFeed) // no-JS fallback
+
+	mux.HandleFunc("GET /diapers/sheet", s.handleDiaperSheet)
+	mux.HandleFunc("POST /diapers", s.handleCreateDiaper)
+	mux.HandleFunc("GET /diapers/{id}/sheet", s.handleDiaperEditPage)
+	mux.HandleFunc("PATCH /diapers/{id}", s.handleUpdateDiaper)
+	mux.HandleFunc("POST /diapers/{id}", s.handleUpdateDiaper) // no-JS fallback
+	mux.HandleFunc("DELETE /diapers/{id}", s.handleDeleteDiaper)
+	mux.HandleFunc("POST /diapers/{id}/delete", s.handleDeleteDiaper)   // no-JS fallback
+	mux.HandleFunc("POST /diapers/{id}/restore", s.handleRestoreDiaper) // undo
+
+	mux.HandleFunc("GET /sleeps/sheet", s.handleSleepSheet)
+	mux.HandleFunc("POST /sleeps", s.handleCreateSleep)
+	mux.HandleFunc("GET /sleeps/{id}/sheet", s.handleSleepEditPage)
+	mux.HandleFunc("POST /sleeps/{id}/stop", s.handleStopSleep)
+	mux.HandleFunc("PATCH /sleeps/{id}", s.handleUpdateSleep)
+	mux.HandleFunc("POST /sleeps/{id}", s.handleUpdateSleep) // no-JS fallback
+	mux.HandleFunc("DELETE /sleeps/{id}", s.handleDeleteSleep)
+	mux.HandleFunc("POST /sleeps/{id}/delete", s.handleDeleteSleep)   // no-JS fallback
+	mux.HandleFunc("POST /sleeps/{id}/restore", s.handleRestoreSleep) // undo
 
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 

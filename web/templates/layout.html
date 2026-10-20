@@ -57,13 +57,25 @@
       {{template "dashboard" .}}
     </main>
 
-    <footer class="dock" aria-label="Nursing actions">
+    <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
-      {{template "timer" .}}
+      <div class="dock-stack">
+        {{template "timer" .}}
+        {{template "diaper-row" .}}
+        {{template "sleep-pill" .}}
+      </div>
     </footer>
 
     <dialog id="feed-edit-dialog" class="sheet" aria-labelledby="feed-edit-title"{{if .EditOpen}} open{{end}}>
       {{if .Edit}}{{template "feed-edit" .}}{{end}}
+    </dialog>
+
+    <dialog id="action-dialog" class="sheet" aria-labelledby="action-dialog-title"{{if .SheetOpen}} open{{end}}>
+      {{if eq .Sheet "nursing-sheet"}}{{template "nursing-sheet" .}}{{end}}
+      {{if eq .Sheet "diaper-sheet"}}{{template "diaper-sheet" .}}{{end}}
+      {{if eq .Sheet "diaper-edit"}}{{template "diaper-edit" .}}{{end}}
+      {{if eq .Sheet "sleep-sheet"}}{{template "sleep-sheet" .}}{{end}}
+      {{if eq .Sheet "sleep-edit"}}{{template "sleep-edit" .}}{{end}}
     </dialog>
   </div>
 

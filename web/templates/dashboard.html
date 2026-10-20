@@ -1,7 +1,7 @@
 {{define "dashboard"}}
 <section class="summary-section" aria-labelledby="summary-heading">
-  <h2 id="summary-heading" class="sr-only">Today's nursing summary</h2>
-  <div id="status-strip" class="status-strip">{{template "status-strip-inner" .}}</div>
+  <h2 id="summary-heading" class="sr-only">At a glance</h2>
+  <div id="status-strip" class="status-strip">{{template "status-cards" .}}</div>
 </section>
 
 <section class="today" aria-labelledby="today-heading">

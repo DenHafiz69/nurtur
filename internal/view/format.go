@@ -115,6 +115,42 @@ func FeedCountLabel(n int) string {
 	}
 }
 
+// DiaperCountLabel is the diaper count in today's summary line.
+func DiaperCountLabel(n int) string {
+	switch n {
+	case 0:
+		return "No diapers"
+	case 1:
+		return "1 diaper"
+	default:
+		return fmt.Sprintf("%d diapers", n)
+	}
+}
+
+// SleepTotalLabel is the sleep count in today's summary line.
+func SleepTotalLabel(d time.Duration) string {
+	if d <= 0 {
+		return "No sleep"
+	}
+	if d < time.Minute {
+		return "Under a minute sleep"
+	}
+	return FormatDuration(d) + " sleep"
+}
+
+// FormatClock renders a timestamp in the configured timezone.
+func FormatClock(t time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	return t.In(loc).Format("15:04")
+}
+
+// FormatRange renders a local start–end pair.
+func FormatRange(start, end time.Time, loc *time.Location) string {
+	return FormatClock(start, loc) + "–" + FormatClock(end, loc)
+}
+
 // Minutes rounds a duration to whole minutes for edit inputs.
 func Minutes(d time.Duration) int {
 	if d <= 0 {

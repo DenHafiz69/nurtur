@@ -53,7 +53,7 @@ func (s *Server) handleStartFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast})
+	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
 }
 
 func (s *Server) handleSwitchFeed(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +88,7 @@ func (s *Server) handleSwitchFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast})
+	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
 }
 
 func (s *Server) handleStopFeed(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +113,7 @@ func (s *Server) handleStopFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast})
+	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
 }
 
 func (s *Server) handleDeleteFeed(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,7 @@ func (s *Server) handleDeleteFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast})
+	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
 }
 
 func (s *Server) handleEditPage(w http.ResponseWriter, r *http.Request) {

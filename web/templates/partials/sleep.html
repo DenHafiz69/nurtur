@@ -1,0 +1,145 @@
+{{define "sleep-pill"}}
+<div id="sleep-pill" class="sleep-slot">{{template "sleep-pill-inner" .}}</div>
+{{end}}
+
+{{define "sleep-pill-oob"}}
+<div id="sleep-pill" class="sleep-slot" hx-swap-oob="outerHTML">{{template "sleep-pill-inner" .}}</div>
+{{end}}
+
+{{define "sleep-pill-inner"}}
+  {{if .Sleep.Active}}
+    <form method="post" action="/sleeps/{{.Sleep.ID}}/stop" hx-post="/sleeps/{{.Sleep.ID}}/stop" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <button type="submit" class="sleep-pill is-asleep" data-live-since="{{iso .Sleep.StartedAt}}" data-live-server-now="{{iso .Sleep.ServerNow}}">
+        <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
+        <span class="sleep-copy">
+          <span class="sleep-title">Pip is asleep</span>
+          <span class="sleep-sub"><span data-live-digits>{{timer .Sleep.Elapsed}}</span> · tap to wake</span>
+        </span>
+        <span class="sleep-action">Wake up</span>
+      </button>
+    </form>
+  {{else}}
+    <form method="post" action="/sleeps" hx-post="/sleeps" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <button type="submit" class="sleep-pill">
+        <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
+        <span class="sleep-copy">
+          <span class="sleep-title">Start sleep</span>
+          <span class="sleep-sub">Tap when {{.BabyName}} is ready to rest</span>
+        </span>
+        <span class="sleep-action">{{icon "arrow-right"}}</span>
+      </button>
+    </form>
+  {{end}}
+{{end}}
+
+{{define "sleep-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Sleep</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+
+  {{if .SleepSheet.Active}}
+    <div class="sleep-now" data-live-since="{{iso .SleepSheet.StartedAt}}" data-live-server-now="{{iso .SleepSheet.ServerNow}}">
+      <span class="sleep-now-icon" aria-hidden="true">{{icon "moon"}}</span>
+      <div>
+        <p class="sleep-now-title">Asleep</p>
+        <p class="sleep-now-time" data-live-digits>{{timer .SleepSheet.Elapsed}}</p>
+      </div>
+    </div>
+    <form method="post" action="/sleeps/{{.SleepSheet.ID}}/stop" hx-post="/sleeps/{{.SleepSheet.ID}}/stop" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <button type="submit" class="btn btn-done sheet-wide">{{icon "sun"}}<span>Wake up</span></button>
+    </form>
+  {{else}}
+    <form method="post" action="/sleeps" hx-post="/sleeps" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <button type="submit" class="btn btn-sleep-start sheet-wide">{{icon "moon"}}<span>Start sleep</span></button>
+    </form>
+  {{end}}
+
+  <div class="sleep-split" aria-label="Today's sleep">
+    <p class="sleep-split-main">{{.SleepSheet.TotalLabel}} today</p>
+    <p class="sleep-split-detail">Day {{.SleepSheet.DayLabel}} · Night {{.SleepSheet.NightLabel}}</p>
+  </div>
+
+  <h3 class="sheet-subhead">Log an earlier sleep</h3>
+  <form class="sheet-form" method="post" action="/sleeps" hx-post="/sleeps" hx-target="#action-dialog" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field-stack">
+      <label class="field">
+        <span class="field-label">Started</span>
+        <input type="datetime-local" step="1" name="started_at" value="{{.SleepSheet.StartInput}}" required>
+        {{if .SleepSheet.StartErr}}<span class="field-error" role="alert">{{.SleepSheet.StartErr}}</span>{{end}}
+      </label>
+      <label class="field">
+        <span class="field-label">Ended</span>
+        <input type="datetime-local" step="1" name="ended_at" value="{{.SleepSheet.EndInput}}" required>
+        {{if .SleepSheet.EndErr}}<span class="field-error" role="alert">{{.SleepSheet.EndErr}}</span>{{end}}
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional"></textarea>
+      {{if .SleepSheet.NotesErr}}<span class="field-error" role="alert">{{.SleepSheet.NotesErr}}</span>{{end}}
+    </label>
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save sleep</button>
+    </div>
+  </form>
+
+  {{if .SleepSheet.HasRecent}}
+    <h3 class="sheet-subhead">Today</h3>
+    <ul class="sheet-list" aria-label="Today's sleeps">
+      {{range .SleepSheet.Recent}}
+        <li class="sheet-row{{if .Active}} is-active{{end}}">
+          <span class="sheet-row-time">{{.TimeLabel}}</span>
+          <span class="sheet-row-main"><strong>{{.Title}}</strong><span class="sheet-row-detail">{{.Detail}}</span></span>
+          <a class="icon-btn" href="{{.EditURL}}" hx-get="{{.EditURL}}" hx-target="#action-dialog" hx-swap="innerHTML" aria-label="Edit sleep at {{.TimeLabel}}">{{icon "pencil"}}</a>
+        </li>
+      {{end}}
+    </ul>
+  {{end}}
+</div>
+{{end}}
+
+{{define "sleep-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Edit sleep</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+
+  <form class="sheet-form" method="post" action="/sleeps/{{.SleepEdit.ID}}" hx-patch="/sleeps/{{.SleepEdit.ID}}" hx-target="#action-dialog" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+    <p class="sheet-copy">{{if .SleepEdit.Active}}Leave the end time blank while {{$.BabyName}} is still asleep.{{else}}Correct the start, end, or notes.{{end}}</p>
+
+    <div class="field-stack">
+      <label class="field">
+        <span class="field-label">Started</span>
+        <input type="datetime-local" step="1" name="started_at" value="{{.SleepEdit.StartInput}}" required>
+        {{if .SleepEdit.StartErr}}<span class="field-error" role="alert">{{.SleepEdit.StartErr}}</span>{{end}}
+      </label>
+      <label class="field">
+        <span class="field-label">Ended</span>
+        <input type="datetime-local" step="1" name="ended_at" value="{{.SleepEdit.EndInput}}">
+        {{if .SleepEdit.EndErr}}<span class="field-error" role="alert">{{.SleepEdit.EndErr}}</span>{{end}}
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional">{{.SleepEdit.Notes}}</textarea>
+      {{if .SleepEdit.NotesErr}}<span class="field-error" role="alert">{{.SleepEdit.NotesErr}}</span>{{end}}
+    </label>
+
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save changes</button>
+    </div>
+  </form>
+
+  <form method="post" action="/sleeps/{{.SleepEdit.ID}}/delete" hx-delete="/sleeps/{{.SleepEdit.ID}}" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <button type="submit" class="btn btn-danger-ghost sheet-wide">{{icon "trash"}}<span>Delete this sleep</span></button>
+  </form>
+</div>
+{{end}}

@@ -14,6 +14,18 @@ type Clock interface {
 	Now() time.Time
 }
 
+// DayBounds returns the local day containing now as a UTC half-open interval.
+// Building the next midnight with AddDate keeps 23- and 25-hour DST days
+// correct.
+func DayBounds(now time.Time, loc *time.Location) (time.Time, time.Time) {
+	if loc == nil {
+		loc = time.Local
+	}
+	local := now.In(loc)
+	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+	return start.UTC(), start.AddDate(0, 0, 1).UTC()
+}
+
 // Real is the production clock.
 type Real struct{}
 
