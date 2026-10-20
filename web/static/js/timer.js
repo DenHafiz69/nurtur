@@ -493,8 +493,7 @@
 
   /* ---------- HTMX lifecycle ---------- */
 
-  document.body.addEventListener("htmx:afterSwap", function (event) {
-    var target = event.detail ? event.detail.target : null;
+  function handleSwap(target) {
     if (!target) return;
 
     if (target.tagName === "DIALOG" && target.classList.contains("sheet")) {
@@ -511,6 +510,17 @@
     }
     updateRelativeLabels();
     tickLiveClocks();
+  }
+
+  document.body.addEventListener("htmx:afterSwap", function (event) {
+    handleSwap(event.detail ? event.detail.target : null);
+  });
+
+  // Out-of-band fragments (the toast, status strip, timeline, sleep pill) are
+  // swapped with htmx:oobAfterSwap, not htmx:afterSwap. The toast must be armed
+  // here or it would stay on screen forever.
+  document.body.addEventListener("htmx:oobAfterSwap", function (event) {
+    handleSwap(event.detail ? event.detail.target : null);
   });
 
   document.body.addEventListener("htmx:responseError", function (event) {
