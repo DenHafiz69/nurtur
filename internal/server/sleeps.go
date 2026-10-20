@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"nurtur/internal/sleep"
+	"nurtur/internal/timeline"
 	"nurtur/internal/view"
 )
 
@@ -245,6 +246,9 @@ func (s *Server) handleUpdateSleep(w http.ResponseWriter, r *http.Request) {
 	if updated.EndedAt != nil && session.EndedAt == nil {
 		toast.Message = "Awake. That was " + view.FormatDuration(updated.Duration(now)) + "."
 	}
+	if s.respondTimelineRow(w, r, timeline.Sleep, id, toast) {
+		return
+	}
 	s.respond(w, r, mutateResponse{
 		Primary:          "sleep-pill",
 		Toast:            toast,
@@ -314,11 +318,12 @@ func (s *Server) buildSleepSheet(ctx context.Context, now time.Time) (*view.Slee
 	if err != nil {
 		return nil, err
 	}
+	nightStart, nightEnd := s.nightWindow(ctx)
 	sheet := &view.SleepSheetView{ServerNow: now}
 	page := &view.PageData{Location: s.loc}
 	sheet.StartInput = page.DateInput(now.Add(-time.Hour))
 	sheet.EndInput = page.DateInput(now)
-	split := sleep.SplitRange(sessions, from, to, now, s.loc, s.nightStart, s.nightEnd)
+	split := sleep.SplitRange(sessions, from, to, now, s.loc, nightStart, nightEnd)
 	sheet.TotalLabel = view.FormatDuration(split.Total)
 	sheet.DayLabel = view.FormatDuration(split.Day)
 	sheet.NightLabel = view.FormatDuration(split.Night)

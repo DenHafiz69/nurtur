@@ -1,0 +1,73 @@
+{{define "timeline-page"}}
+<section class="page-head">
+  <div class="page-head-row">
+    <a class="back-link" href="/">{{icon "arrow-left"}}<span>Today</span></a>
+    <h2 class="page-title">History</h2>
+  </div>
+  <p class="page-sub">Every feed, diaper, and sleep.</p>
+</section>
+
+<div id="timeline-list" class="timeline-list">
+  {{if .Timeline.HasDays}}
+    {{template "timeline-days" .}}
+  {{else if .Timeline.HasMore}}
+    {{template "timeline-days" .}}
+  {{else}}
+    <div class="empty">
+      <span class="pip pip-empty">{{pip "empty"}}</span>
+      <p class="empty-title">Nothing logged yet.</p>
+      <p class="empty-copy">Your history will grow here, one calm day at a time.</p>
+    </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "timeline-days"}}
+  {{range .Timeline.Days}}{{template "timeline-day" .}}{{end}}
+  {{if .Timeline.HasMore}}
+    <div id="timeline-more" class="timeline-more">
+      <a class="btn btn-ghost" href="/timeline?before={{.Timeline.NextCursor}}" hx-get="/timeline/partial?before={{.Timeline.NextCursor}}" hx-target="#timeline-more" hx-swap="outerHTML">Load earlier days</a>
+    </div>
+  {{end}}
+{{end}}
+
+{{define "timeline-day"}}
+<section class="timeline-day" aria-labelledby="day-{{.Key}}">
+  <div class="timeline-day-head">
+    <h3 id="day-{{.Key}}" class="timeline-day-title">{{.Label}}</h3>
+    <p class="timeline-day-summary">{{.Summary}}</p>
+  </div>
+  <ul class="timeline-events">
+    {{range .Rows}}{{template "timeline-row" .}}{{end}}
+  </ul>
+</section>
+{{end}}
+
+{{define "timeline-row"}}
+<li id="{{.RowID}}" class="feed-row timeline-row {{.KindClass}}{{if .Active}} is-active{{end}}">
+  <a class="timeline-row-main" href="{{.EditURL}}" hx-get="{{.EditURL}}" hx-target="{{.EditTarget}}" hx-swap="innerHTML" aria-label="Open {{.ActionLabel}}">
+    <span class="event-icon" aria-hidden="true">{{icon .Icon}}</span>
+    <div class="feed-main">
+      <p class="feed-line">
+        <span class="feed-time">{{.TimeLabel}}</span>
+        <span class="feed-sep" aria-hidden="true">·</span>
+        <span class="event-title">{{.Title}}</span>
+        {{if .Active}}<span class="chip chip-live">now</span>{{end}}
+      </p>
+      {{if .Detail}}<p class="feed-detail">{{.Detail}}</p>{{end}}
+    </div>
+  </a>
+  <div class="feed-actions">
+    <a class="icon-btn" href="{{.EditURL}}" hx-get="{{.EditURL}}" hx-target="{{.EditTarget}}" hx-swap="innerHTML" aria-label="Edit {{.ActionLabel}}">{{icon "pencil"}}</a>
+    <form method="post" action="{{.DeleteURL}}/delete" hx-delete="{{.DeleteURL}}" hx-target="{{.DeleteTarget}}" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <button type="submit" class="icon-btn icon-btn-danger" aria-label="Delete {{.ActionLabel}}">{{icon "trash"}}</button>
+    </form>
+  </div>
+</li>
+{{end}}
+
+{{define "timeline-row-fragment"}}{{with .Row}}{{template "timeline-row" .}}{{end}}{{end}}
+
+{{define "timeline-placeholder"}}
+<li id="deleted-{{.DeletedKey}}" class="timeline-placeholder" hidden aria-hidden="true"></li>
+{{end}}

@@ -7,13 +7,21 @@
   <meta name="description" content="A calm little nursery companion for nursing, diapers, and sleep.">
   <meta name="theme-color" content="#fff8f0">
   <meta name="color-scheme" content="light dark">
+  <link rel="manifest" href="/static/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Nurtur">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script nonce="{{.Nonce}}">
     (function () {
       try {
         var mode = localStorage.getItem("nurtur.theme") || "auto";
         var hour = new Date().getHours();
-        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var nightHours = (hour >= 21 || hour < 7);
+        var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var stored = localStorage.getItem("nurtur.theme");
+        var auto = (nightHours || (!stored && prefersDark)) ? "night" : "day";
         var theme = (mode === "day" || mode === "night") ? mode : auto;
         var root = document.documentElement;
         root.dataset.theme = theme;
@@ -30,7 +38,7 @@
   <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/app.css">
 </head>
-<body data-server-now="{{iso .Now}}">
+<body data-server-now="{{iso .Now}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="app">
     <header class="app-header">
@@ -45,18 +53,26 @@
             <h1 class="baby-name">{{.BabyName}}</h1>
           </div>
         </div>
-        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Theme: automatic. Activate to change.">
-          <span class="theme-icon theme-icon-day">{{icon "sun"}}</span>
-          <span class="theme-icon theme-icon-night">{{icon "moon"}}</span>
-        </button>
+        <div class="header-actions">
+          {{template "sync-chip" .}}
+          <button type="button" class="theme-toggle" data-theme-toggle aria-label="Theme: automatic. Activate to change.">
+            <span class="theme-icon theme-icon-day">{{icon "sun"}}</span>
+            <span class="theme-icon theme-icon-night">{{icon "moon"}}</span>
+          </button>
+        </div>
       </div>
       {{template "last-nursed" .}}
     </header>
 
+    <div id="offline-banner" class="offline-banner" hidden role="status">Offline — showing the last saved screen. New logs will wait for the connection.</div>
+
     <main id="main" class="app-main" tabindex="-1">
-      {{template "dashboard" .}}
+      {{if eq .View "timeline"}}{{template "timeline-page" .}}
+      {{else if eq .View "settings"}}{{template "settings-page" .}}
+      {{else}}{{template "dashboard" .}}{{end}}
     </main>
 
+    {{if ne .View "settings"}}
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
       <div class="dock-stack">
@@ -65,6 +81,7 @@
         {{template "sleep-pill" .}}
       </div>
     </footer>
+    {{end}}
 
     <dialog id="feed-edit-dialog" class="sheet" aria-labelledby="feed-edit-title"{{if .EditOpen}} open{{end}}>
       {{if .Edit}}{{template "feed-edit" .}}{{end}}

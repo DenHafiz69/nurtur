@@ -30,6 +30,11 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
+	return newTestEnvConfig(t, nil)
+}
+
+func newTestEnvConfig(t *testing.T, mutate func(*Config)) *testEnv {
+	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 	st, err := store.Open(context.Background(), store.Options{
 		Path:      filepath.Join(t.TempDir(), "nurtur.db"),
@@ -45,16 +50,21 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 
 	fakeClock := clock.NewFake(testNow)
-	srv, err := New(Config{
-		Store:     st,
-		Clock:     fakeClock,
-		Location:  time.UTC,
-		BabyName:  "Pip",
-		Version:   "test",
-		Assets:    os.DirFS("../.."),
-		Logger:    logger,
-		LocalOnly: true,
-	})
+	cfg := Config{
+		Store:      st,
+		Clock:      fakeClock,
+		Location:   time.UTC,
+		BabyName:   "Pip",
+		Version:    "test",
+		Assets:     os.DirFS("../.."),
+		Migrations: os.DirFS("../../migrations"),
+		Logger:     logger,
+		LocalOnly:  true,
+	}
+	if mutate != nil {
+		mutate(&cfg)
+	}
+	srv, err := New(cfg)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}

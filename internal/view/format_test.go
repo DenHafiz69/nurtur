@@ -101,3 +101,47 @@ func TestGreeting(t *testing.T) {
 		}
 	}
 }
+
+func TestDayLabelRelative(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, loc)
+
+	today := time.Date(2026, 10, 20, 8, 0, 0, 0, loc)
+	if got := DayLabelRelative(today, now, loc); got != "Today" {
+		t.Errorf("today = %q", got)
+	}
+	yesterday := time.Date(2026, 10, 19, 8, 0, 0, 0, loc)
+	if got := DayLabelRelative(yesterday, now, loc); got != "Yesterday" {
+		t.Errorf("yesterday = %q", got)
+	}
+	earlier := time.Date(2026, 10, 12, 8, 0, 0, 0, loc)
+	if got := DayLabelRelative(earlier, now, loc); got != "Monday, October 12" {
+		t.Errorf("earlier = %q", got)
+	}
+	if got := DateKey(yesterday, loc); got != "2026-10-19" {
+		t.Errorf("date key = %q", got)
+	}
+}
+
+func TestTimelineSummary(t *testing.T) {
+	if got := TimelineSummary(0, 0, 0); got != "No events" {
+		t.Errorf("empty = %q", got)
+	}
+	if got := TimelineSummary(2, 1, 3*time.Hour+20*time.Minute); got != "2 feeds · 1 diaper · 3h 20m sleep" {
+		t.Errorf("summary = %q", got)
+	}
+}
+
+func TestFormatBytes(t *testing.T) {
+	cases := map[int64]string{
+		0:                     "0 KB",
+		4 * 1024:              "4 KB",
+		2 << 20:               "2.0 MB",
+		(3 << 30) + (1 << 29): "3.5 GB",
+	}
+	for input, want := range cases {
+		if got := FormatBytes(input); got != want {
+			t.Errorf("FormatBytes(%d) = %q, want %q", input, got, want)
+		}
+	}
+}

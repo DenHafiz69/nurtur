@@ -174,3 +174,65 @@ func Greeting(hour int) string {
 		return "Good night"
 	}
 }
+
+// DayLabelRelative names a local day: Today, Yesterday, or a written date.
+func DayLabelRelative(day, now time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	local := day.In(loc)
+	nowLocal := now.In(loc)
+	key := local.Format("2006-01-02")
+	todayKey := nowLocal.Format("2006-01-02")
+	yesterdayKey := nowLocal.AddDate(0, 0, -1).Format("2006-01-02")
+	switch key {
+	case todayKey:
+		return "Today"
+	case yesterdayKey:
+		return "Yesterday"
+	}
+	if local.Year() == nowLocal.Year() {
+		return local.Format("Monday, January 2")
+	}
+	return local.Format("Monday, January 2, 2006")
+}
+
+// DateKey is a stable DOM id fragment for a local date.
+func DateKey(day time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	return day.In(loc).Format("2006-01-02")
+}
+
+// TimelineSummary is the count line under a history date header.
+func TimelineSummary(feeds, diapers int, sleep time.Duration) string {
+	parts := make([]string, 0, 3)
+	if feeds > 0 {
+		parts = append(parts, FeedCountLabel(feeds))
+	}
+	if diapers > 0 {
+		parts = append(parts, DiaperCountLabel(diapers))
+	}
+	if sleep >= time.Minute {
+		parts = append(parts, FormatDuration(sleep)+" sleep")
+	}
+	if len(parts) == 0 {
+		return "No events"
+	}
+	return strings.Join(parts, " · ")
+}
+
+// FormatBytes renders a compact file size.
+func FormatBytes(n int64) string {
+	switch {
+	case n <= 0:
+		return "0 KB"
+	case n < 1<<20:
+		return fmt.Sprintf("%d KB", (n+1023)/1024)
+	case n < 1<<30:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	default:
+		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+	}
+}

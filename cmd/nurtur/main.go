@@ -83,17 +83,21 @@ func run() error {
 	}
 
 	srv, err := server.New(server.Config{
-		Store:      st,
-		Clock:      clock.Real{},
-		Location:   cfg.Location,
-		BabyName:   cfg.BabyName,
-		Version:    version,
-		Assets:     nurtur.Assets,
-		Logger:     logger,
-		SyncWorker: worker,
-		LocalOnly:  st.SyncDB() == nil,
-		NightStart: cfg.NightStart,
-		NightEnd:   cfg.NightEnd,
+		Store:         st,
+		Clock:         clock.Real{},
+		Location:      cfg.Location,
+		BabyName:      cfg.BabyName,
+		Version:       version,
+		Assets:        nurtur.Assets,
+		Migrations:    migrations,
+		Logger:        logger,
+		SyncWorker:    worker,
+		LocalOnly:     st.SyncDB() == nil,
+		NightStart:    cfg.NightStart,
+		NightEnd:      cfg.NightEnd,
+		Passcode:      cfg.Passcode,
+		SessionSecret: cfg.SessionSecret,
+		SecureCookie:  cfg.SecureCookie,
 	})
 	if err != nil {
 		return err

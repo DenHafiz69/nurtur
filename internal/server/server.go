@@ -13,6 +13,7 @@ import (
 	"path"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"nurtur/internal/clock"
@@ -28,11 +29,16 @@ type Config struct {
 	BabyName   string
 	Version    string
 	Assets     fs.FS
+	Migrations fs.FS
 	Logger     *slog.Logger
 	SyncWorker *store.SyncWorker
 	LocalOnly  bool
 	NightStart time.Duration
 	NightEnd   time.Duration
+
+	Passcode      string
+	SessionSecret string
+	SecureCookie  bool
 }
 
 // Server holds the router and shared dependencies.
@@ -49,6 +55,12 @@ type Server struct {
 	local      bool
 	nightStart time.Duration
 	nightEnd   time.Duration
+	migrations fs.FS
+	assets     fs.FS
+	auth       *auth
+
+	nightMu     sync.RWMutex
+	nightLoaded bool
 }
 
 // New validates dependencies and parses the embedded templates.
@@ -106,6 +118,9 @@ func New(cfg Config) (*Server, error) {
 		local:      cfg.LocalOnly,
 		nightStart: cfg.NightStart,
 		nightEnd:   cfg.NightEnd,
+		migrations: cfg.Migrations,
+		assets:     cfg.Assets,
+		auth:       newAuth(cfg.Passcode, cfg.SessionSecret, cfg.SecureCookie),
 	}, nil
 }
 
@@ -125,6 +140,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /feeds/{id}", s.handleEditFeed) // no-JS fallback
 	mux.HandleFunc("DELETE /feeds/{id}", s.handleDeleteFeed)
 	mux.HandleFunc("POST /feeds/{id}/delete", s.handleDeleteFeed) // no-JS fallback
+	mux.HandleFunc("POST /feeds/{id}/restore", s.handleRestoreFeed)
 
 	mux.HandleFunc("GET /diapers/sheet", s.handleDiaperSheet)
 	mux.HandleFunc("POST /diapers", s.handleCreateDiaper)
@@ -145,11 +161,30 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sleeps/{id}/delete", s.handleDeleteSleep)   // no-JS fallback
 	mux.HandleFunc("POST /sleeps/{id}/restore", s.handleRestoreSleep) // undo
 
+	mux.HandleFunc("GET /timeline", s.handleTimelinePage)
+	mux.HandleFunc("GET /timeline/partial", s.handleTimelinePartial)
+	mux.HandleFunc("DELETE /timeline/{kind}/{id}", s.handleTimelineDelete)
+	mux.HandleFunc("POST /timeline/{kind}/{id}/delete", s.handleTimelineDelete)   // no-JS fallback
+	mux.HandleFunc("POST /timeline/{kind}/{id}/restore", s.handleTimelineRestore) // undo
+
+	mux.HandleFunc("GET /settings", s.handleSettingsPage)
+	mux.HandleFunc("POST /settings", s.handleSaveSettings)
+	mux.HandleFunc("GET /export.csv", s.handleExportCSV)
+	mux.HandleFunc("GET /export.json", s.handleExportJSON)
+	mux.HandleFunc("GET /export.sql", s.handleExportSQL)
+
+	mux.HandleFunc("GET /login", s.handleLoginPage)
+	mux.HandleFunc("POST /login", s.handleLogin)
+	mux.HandleFunc("POST /logout", s.handleLogout)
+	mux.HandleFunc("GET /offline", s.handleOffline)
+	mux.HandleFunc("GET /sw.js", s.handleServiceWorker)
+	mux.HandleFunc("GET /partials/sync", s.handleSyncChip)
+
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", s.static))
 
-	return s.recoverer(s.logRequests(s.security(s.limitBody(mux))))
+	return s.recoverer(s.logRequests(s.security(s.limitBody(s.auth.middleware(mux)))))
 }
 
 /* ---------- Middleware ---------- */
@@ -273,6 +308,9 @@ func newStaticHandler(fsys fs.FS) http.Handler {
 		switch path.Ext(r.URL.Path) {
 		case ".woff2":
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		case ".webmanifest":
+			w.Header().Set("Content-Type", "application/manifest+json; charset=utf-8")
+			w.Header().Set("Cache-Control", "public, max-age=3600")
 		case ".css", ".js", ".svg":
 			w.Header().Set("Cache-Control", "public, max-age=300")
 		default:

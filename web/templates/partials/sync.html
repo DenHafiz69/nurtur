@@ -1,0 +1,1 @@
+{{define "sync-chip"}}{{with .SyncChip}}<a class="sync-chip sync-{{.Tone}}" href="/settings" title="{{.Title}}" aria-label="Sync status: {{.Label}}" hx-get="/partials/sync" hx-trigger="every 90s" hx-swap="outerHTML"><span class="sync-dot" aria-hidden="true"></span><span class="sync-label">{{.Label}}</span></a>{{end}}{{end}}

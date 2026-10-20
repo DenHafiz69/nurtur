@@ -25,12 +25,15 @@ func DayBounds(now time.Time, loc *time.Location) (time.Time, time.Time) {
 func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast) (*view.PageData, error) {
 	now := s.clock.Now().UTC()
 	p := &view.PageData{
-		Nonce:    nonce,
-		Version:  s.version,
-		BabyName: s.babyName,
-		Now:      now,
-		Location: s.loc,
-		Toast:    toast,
+		Nonce:       nonce,
+		Version:     s.version,
+		BabyName:    s.babyName,
+		Now:         now,
+		Location:    s.loc,
+		Toast:       toast,
+		CSRF:        csrfFrom(ctx),
+		AuthEnabled: s.auth.enabled(),
+		SyncChip:    s.syncChip(),
 	}
 	if p.BabyName == "" {
 		p.BabyName = "Baby"
@@ -38,7 +41,8 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 	p.Greeting = view.Greeting(now.In(s.loc).Hour())
 	p.TodayLabel = now.In(s.loc).Format("Monday, January 2")
 
-	snap, err := status.Build(ctx, s.store, now, s.loc, s.nightStart, s.nightEnd)
+	nightStart, nightEnd := s.nightWindow(ctx)
+	snap, err := status.Build(ctx, s.store, now, s.loc, nightStart, nightEnd)
 	if err != nil {
 		return nil, fmt.Errorf("server: build status: %w", err)
 	}

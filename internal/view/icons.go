@@ -23,6 +23,11 @@ var icons = map[string]string{
 	"plus":        `<path d="M12 5v14M5 12h14"/>`,
 	"arrow-left":  `<path d="M19 12H5M11 6l-6 6 6 6"/>`,
 	"arrow-right": `<path d="M5 12h14M13 6l6 6-6 6"/>`,
+	"history":     `<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/><path d="M12 8.2V12l3.2 2"/>`,
+	"settings":    `<path d="M3.5 7.5h9M17 7.5h3.5M3.5 16.5h4M12 16.5h8.5"/><circle cx="14.6" cy="7.5" r="2.4"/><circle cx="9.6" cy="16.5" r="2.4"/>`,
+	"download":    `<path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/>`,
+	"logout":      `<path d="M14.5 4.5H6a1.5 1.5 0 0 0-1.5 1.5v12A1.5 1.5 0 0 0 6 19.5h8.5"/><path d="M18 12H9.5"/><path d="m15 9 3 3-3 3"/>`,
+	"lock":        `<rect x="5" y="10.5" width="14" height="9" rx="2.4"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><circle cx="12" cy="15" r="1"/>`,
 }
 
 // Icon returns an inline SVG for the named icon. Unknown names render nothing;

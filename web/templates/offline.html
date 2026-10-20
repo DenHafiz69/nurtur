@@ -1,0 +1,33 @@
+{{define "offline"}}<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nurtur — offline</title>
+  <meta name="theme-color" content="#fff8f0">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
+  <script nonce="{{.Nonce}}">
+    (function () {
+      try {
+        var mode = localStorage.getItem("nurtur.theme") || "auto";
+        var hour = new Date().getHours();
+        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var theme = (mode === "day" || mode === "night") ? mode : auto;
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="auth-body">
+  <main class="auth-card">
+    <span class="pip auth-pip">{{pip "sleeping"}}</span>
+    <h1 class="auth-title">Still here</h1>
+    <p class="auth-copy">The network is away. Your logs are safe on the server, and new ones will land as soon as it's back.</p>
+    <a class="btn btn-primary auth-submit" href="/">{{icon "arrow-right"}}<span>Try again</span></a>
+  </main>
+</body>
+</html>{{end}}

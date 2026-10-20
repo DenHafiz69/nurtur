@@ -3,7 +3,7 @@ SHELL := /bin/sh
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BIN     := bin/nurtur
 
-.PHONY: dev build test race vet staticcheck fmt clean
+.PHONY: dev build test race vet staticcheck fmt clean e2e
 
 # Local development uses the same Turso engine, without cloud sync.
 dev:
@@ -23,6 +23,9 @@ vet:
 
 staticcheck:
 	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+e2e:
+	cd e2e && npm test
 
 fmt:
 	gofmt -w $$(find . -name '*.go' -not -path './.git/*')

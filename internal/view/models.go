@@ -17,12 +17,32 @@ type PageData struct {
 	Now        time.Time
 	Location   *time.Location
 
+	// View selects the page body inside layout.html: "" or "dashboard",
+	// "timeline", "settings".
+	View string
+
 	Active *ActiveView
 	Last   *LastView
 	Status StatusView
 	Sleep  SleepView
 	Today  TodaySummary
 	Events []EventRow
+
+	Timeline *TimelinePageView
+	Settings *SettingsView
+	Row      *EventRow
+
+	// DeletedKey is the DOM id suffix for a deleted timeline row's placeholder.
+	DeletedKey string
+
+	// CSRF is set only when the optional passcode gate is enabled.
+	CSRF        string
+	AuthEnabled bool
+	SyncChip    *SyncChipView
+
+	// Login page state.
+	LoginError string
+	Next       string
 
 	Toast     *Toast
 	Edit      *EditView
@@ -107,7 +127,7 @@ type TodaySummary struct {
 	HasEvents   bool
 }
 
-// EventRow is one entry in today's unified list.
+// EventRow is one entry in today's unified list or the full timeline.
 type EventRow struct {
 	Kind         string // feed, diaper, sleep
 	ID           int64
@@ -123,6 +143,57 @@ type EventRow struct {
 	DeleteTarget string
 	ActionLabel  string
 	KindClass    string
+
+	// Timeline rows are deleted in place and can be restored into the same
+	// spot during the undo window.
+	Timeline  bool
+	RowID     string
+	DeleteKey string
+}
+
+// TimelinePageView is one page of the unified history, grouped by local day.
+type TimelinePageView struct {
+	Days       []TimelineDay
+	HasDays    bool
+	HasMore    bool
+	NextCursor string
+	Count      int
+}
+
+// TimelineDay is one local-date group with its own summary.
+type TimelineDay struct {
+	Key     string
+	Label   string
+	Summary string
+	Rows    []EventRow
+}
+
+// SyncChipView is the header's sync state indicator.
+type SyncChipView struct {
+	Label string
+	Tone  string // ok, pending, warn, local
+	Title string
+}
+
+// SettingsView backs the settings page.
+type SettingsView struct {
+	BabyName    string
+	Timezone    string
+	DBPath      string
+	DBSize      string
+	Version     string
+	AuthEnabled bool
+	NightStart  string
+	NightEnd    string
+	NightErr    string
+	SyncMode    string
+	SyncStatus  string
+	SyncDetail  string
+	LastPush    string
+	LastPull    string
+	Pending     string
+	Degraded    bool
+	ThemeNote   string
 }
 
 // Toast is a transient mutation result. An action turns it into a quick

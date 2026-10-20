@@ -4,9 +4,10 @@ A calm, one-thumb baby tracker for nursing, diapers, and sleep. One Go service,
 server-rendered with HTMX, backed by a local [Turso](https://turso.tech) database
 that syncs to Turso Cloud when configured.
 
-This repository currently ships **Phase 2 — Diapers, Sleep + At-a-Glance
-Dashboard**: one-tap diaper and sleep logging, a live three-card status strip,
-wake windows, day/night sleep totals, and the Phase 1 nursing timer. See
+This repository ships **Phase 3 — Timeline, Undo + Ship**: the Phase 1 nursing
+timer, the Phase 2 diaper/sleep dashboard, plus a unified history page, in-place
+undo, night-mode polish, a PWA shell, JSON/CSV/SQL export, a documented restore
+drill, an optional passcode gate, and a repeatable deployment. See
 [`PLANS.md`](./PLANS.md) for the full roadmap and [`FEATURES.md`](./FEATURES.md)
 for the product brief.
 
@@ -51,6 +52,12 @@ the one binary.
 | `NURTUR_NIGHT_START` | `19:00` | Local night window start (`HH:MM`) |
 | `NURTUR_NIGHT_END` | `07:00` | Local night window end (`HH:MM`) |
 | `NURTUR_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
+| `NURTUR_PASSCODE` | — | Enables the optional single-user passcode gate |
+| `NURTUR_SESSION_SECRET` | derived | HMAC key for session cookies (set this to survive passcode changes) |
+| `NURTUR_COOKIE_SECURE` | `false` | Set `true` when serving over HTTPS (also auto-detected per request) |
+
+The night window can also be changed at runtime on the **Settings** page. Values
+stored there take precedence over `NURTUR_NIGHT_START` / `NURTUR_NIGHT_END`.
 
 If sync is not configured you must set `NURTUR_LOCAL_ONLY=true`. The app fails
 at startup rather than silently pretending to sync.
@@ -132,6 +139,57 @@ service.
 - The sleep sheet shows today's total split into day and night using the
   `NURTUR_NIGHT_START` / `NURTUR_NIGHT_END` window.
 
+### History and undo
+
+- `/timeline` unions feeds, diapers, and sleeps, newest first, and groups rows by
+  **local** date. Each date header carries that day's feed, diaper, and sleep
+  totals.
+- Paging is by whole local days: `GET /timeline/partial?before=<RFC3339>` loads
+  the seven days before the cursor (up to 50 events, capped at 200). A day header
+  never splits across pages.
+- Deleting a row is a soft delete and is optimistic: the row is replaced by a
+  hidden placeholder so the Undo action can restore it into the exact same spot.
+  The toast's Undo lasts 8 seconds.
+- Deleting an active feed or sleep closes it first, in one transaction, and the
+  timer/localStorage cache clears through the timer OOB fragment or the
+  `timer-cleared` client event.
+- Restoring re-validates the domain: a sleep that would overlap another sleep is
+  refused with a plain-language message, and restoring an open feed while
+  another feed is running is refused.
+- Undo is also available on the dashboard's today list for all three event types.
+
+### Night mode, install, and offline
+
+- The inline head script applies `data-theme` before first paint. **Auto** is
+  night from 21:00–07:00 local (and follows `prefers-color-scheme` on a first
+  visit); the header toggle cycles auto → day → night and stores `nurtur.theme`.
+- The Settings page can change the night window; sleep totals and the auto theme
+  both use it.
+- `GET /sw.js` is served from the domain root so it controls the whole app. Static
+  assets are cache-first; navigation is network-first and never cached (a cached
+  authenticated page could outlive the passcode gate). Offline navigation falls
+  back to `/offline`.
+- A header chip shows sync state separately from network connectivity: `Synced`,
+  `Syncing…`, `Local copy`, or `Local`.
+- The `localStorage` timer recovery keeps working with the service worker
+  installed.
+
+### Settings and export
+
+- `/settings` shows the baby name and timezone (from the environment), the
+  editable night window, theme help, sync state, database path/size, and backup
+  links.
+- `GET /export.json` is a structured copy with feeds (and segments), diapers,
+  sleeps, settings, and per-side minute totals.
+- `GET /export.csv` is one row per event. Columns:
+  `kind,id,started_at,ended_at,left_minutes,right_minutes,last_side,type,color,consistency,notes,created_at,deleted_at`.
+  Feed rows use `started_at`/`ended_at`; diaper rows use `started_at` for the
+  logged time and `type` for `wet|dirty|both`; sleep rows use the times.
+- `GET /export.sql` streams the schema plus `INSERT` statements, including
+  `schema_migrations`, so it replays into a **fresh** Turso/SQLite database
+  without re-running migrations. Soft-deleted rows are included so a restore is
+  faithful.
+
 ---
 
 ## Progressive enhancement
@@ -181,12 +239,14 @@ internal/feed/       sides, segments, derived durations, edit validation
 internal/diaper/     kinds, details, validation
 internal/sleep/      sessions, wake windows, overlap, day/night split
 internal/status/     dashboard aggregation snapshot
-internal/store/      Turso open/migrations, feed/diaper/sleep queries, sync worker
-internal/server/     routes, handlers, middleware, page view models
+internal/timeline/   unified event kinds, entries, day summaries
+internal/store/      Turso open/migrations, queries, settings, sync worker
+internal/server/     routes, handlers, middleware, auth, export, page view models
 internal/view/       renderer, formatting, icons, Pip poses
 migrations/          0001_init.sql, 0002_phase2_indexes.sql
-web/templates/       layout, dashboard, partials
-web/static/          CSS, timer.js, vendored htmx, fonts, icons, images
+web/templates/       layout, dashboard, timeline, settings, login, offline, partials
+web/static/          CSS, timer.js, sw.js, manifest, vendored htmx, fonts, icons
+deploy/              systemd unit and environment example
 ```
 
 ---
@@ -198,7 +258,12 @@ make test        # unit + integration
 make race        # go test -race ./...
 make vet
 make staticcheck
+
+cd e2e && npm install && npx playwright install chromium && npm test
 ```
+
+The Playwright suite runs at 390×844, reloads mid-feed, logs diapers and sleep,
+deletes and undoes a history row in place, and downloads all three exports.
 
 The suites cover:
 
@@ -215,6 +280,10 @@ The suites cover:
   day/night splits across the night boundary and both DST transitions;
 - sync debounce, coalescing, retry/backoff, pull-on-startup, shutdown flush,
   and "a failed push does not fail the mutation";
+- timeline ordering, soft-delete exclusion, whole-day pagination, day summaries
+  with sleeps that overlap local midnight, and delete/restore-in-place;
+- settings persistence, night-window validation, all three export formats, and
+  the passcode gate (session cookie, rate limit, Origin check, HTMX CSRF token);
 - timezone and DST day boundaries (23/25-hour days), and formatting.
 
 The real-phone checklist in `PLANS.md` §2.5 is still the release gate:
@@ -256,20 +325,118 @@ keeps the database in the `nurtur-data` volume. To use Turso Cloud instead, set
 `NURTUR_LOCAL_ONLY=false` plus `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in
 the environment before `docker compose up`.
 
-### Backups (Phase 1)
+### Backups and restore
 
-Stop the service cleanly (which flushes sync and checkpoints), then copy
-`NURTUR_DB` and its `-wal`/`-shm` siblings if present. Full JSON/CSV/SQL export
-and a tested restore drill arrive in Phase 3.
+Nurtur is local-first, so there are two useful copies: the Turso Cloud copy
+(configured in the Turso dashboard) and the logical exports from Settings.
+
+**Manual snapshot.** Stop the service cleanly first — this flushes the push queue
+and checkpoints the WAL — then copy `NURTUR_DB` plus any `-wal`/`-shm` siblings:
+
+```sh
+docker compose stop
+docker run --rm -v nurtur-data:/data -v "$PWD":/backup debian:bookworm-slim \
+  tar czf /backup/nurtur-$(date +%F).tgz -C /data .
+docker compose start
+```
+
+**Restore drill** (do this before you need it):
+
+1. Create a fresh Turso database or an empty local directory.
+2. Replay the logical dump:
+
+   ```sh
+   turso db shell <new-db> < nurtur-2026-10-20.sql
+   ```
+
+   or start Nurtur with `NURTUR_LOCAL_ONLY=true` and an empty `NURTUR_DB`, then
+   pipe the same file through the local engine.
+3. Verify row counts:
+
+   ```sql
+   SELECT (SELECT COUNT(*) FROM feeds)   AS feeds,
+          (SELECT COUNT(*) FROM diapers) AS diapers,
+          (SELECT COUNT(*) FROM sleeps)  AS sleeps;
+   ```
+
+4. Open a few durations and confirm they match the export/CSV.
+5. Re-enable sync with the new credentials and confirm the header chip reaches
+   `Synced`, then check `/healthz?verbose=1` for the last push/pull.
+
+The SQL export includes `schema_migrations`, so the app will not try to recreate
+tables on first start. Replaying into a database that already has tables will
+fail; restore into a fresh one.
+
+Turso Cloud backup/retention windows are configured in the Turso dashboard rather
+than by Nurtur. Record the chosen retention in your deployment notes.
+
+---
+
+## Deployment
+
+The single binary embeds templates, static assets, migrations, and fonts.
+
+```sh
+make build            # bin/nurtur
+docker build -t nurtur .
+docker run --rm -p 8080:8080 -v nurtur-data:/data --env-file .env nurtur
+```
+
+Build both architectures if the target is not the build host:
+
+```sh
+docker buildx build --platform linux/amd64,linux/arm64 -t nurtur .
+```
+
+Runtime requirements: glibc (Debian slim, not Alpine), a writable `/data` volume,
+and `TZ`/`NURTUR_TZ`. The container runs as UID 10001 and uses `/healthz` as its
+healthcheck. Startup order is: open local DB → migrate → connect/verify sync →
+serve. Missing Turso credentials fail loudly unless `NURTUR_LOCAL_ONLY=true`.
+
+### systemd
+
+`deploy/nurtur.service` and `deploy/nurtur.env.example` are a starting point:
+
+```sh
+sudo cp bin/nurtur /usr/local/bin/nurtur
+sudo useradd --system --home /var/lib/nurtur --shell /usr/sbin/nologin nurtur
+sudo install -d -o nurtur -g nurtur /var/lib/nurtur
+sudo cp deploy/nurtur.service /etc/systemd/system/
+sudo cp deploy/nurtur.env.example /etc/nurtur/nurtur.env   # then edit it
+sudo systemctl daemon-reload
+sudo systemctl enable --now nurtur
+```
+
+`StateDirectory=nurtur` creates `/var/lib/nurtur`; point `NURTUR_DB` there.
 
 ---
 
 ## Security
 
-There is no authentication in Phase 2. Run Nurtur on a trusted LAN or behind a
-private network tunnel; do not expose it to the public internet until the Phase 3
-passcode gate and TLS are in place.
+Authentication is **optional and off by default** for a solo user on a trusted
+LAN. Set `NURTUR_PASSCODE` before exposing Nurtur beyond that LAN:
 
-The server sets a restrictive CSP, `nosniff`, `Referrer-Policy: same-origin`,
-`X-Frame-Options: DENY`, and a permissions policy. There are no third-party
-runtime requests.
+```sh
+NURTUR_PASSCODE='a long passphrase' \
+NURTUR_SESSION_SECRET='a random 32+ byte value' \
+NURTUR_COOKIE_SECURE=true \
+nurtur
+```
+
+- The passcode is compared as SHA-256 digests in constant time.
+- Sessions are signed `HttpOnly`, `SameSite=Lax` cookies valid for 30 days.
+  `NURTUR_SESSION_SECRET` keeps sessions alive across passcode changes; without
+  it the key is derived from the passcode, so changing the passcode signs everyone
+  out.
+- Login attempts are limited to five per IP per 15 minutes (in memory).
+- Mutations verify `Origin`/`Sec-Fetch-Site`; HTMX mutations also carry a
+  per-session `X-CSRF-Token` (rendered into the page as `hx-headers`). Classic
+  no-JS form posts rely on the same-origin check.
+- `GET /healthz`, `/login`, `/offline`, `/sw.js`, and `/static/*` stay public so
+  container healthchecks and the installable shell work before sign-in.
+- The server sets a restrictive CSP, `nosniff`, `Referrer-Policy: same-origin`,
+  `X-Frame-Options: DENY`, and a permissions policy. There are no third-party
+  runtime requests.
+
+TLS is still your responsibility: terminate it at a reverse proxy and set
+`NURTUR_COOKIE_SECURE=true`.

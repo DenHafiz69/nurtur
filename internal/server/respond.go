@@ -51,6 +51,8 @@ type mutateResponse struct {
 	Retarget         string
 	Reswap           string
 	Edit             *view.EditView
+	Row              *view.EventRow
+	Redirect         string
 	Apply            func(*view.PageData)
 }
 
@@ -78,7 +80,11 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, opts mutateResp
 			s.renderPage(w, r, opts.Status, data)
 			return
 		}
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		redirect := opts.Redirect
+		if redirect == "" {
+			redirect = "/"
+		}
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
 		return
 	}
 
@@ -89,6 +95,9 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, opts mutateResp
 	}
 	if opts.Edit != nil {
 		data.Edit = opts.Edit
+	}
+	if opts.Row != nil {
+		data.Row = opts.Row
 	}
 	if opts.Apply != nil {
 		opts.Apply(data)

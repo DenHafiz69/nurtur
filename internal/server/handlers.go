@@ -2,12 +2,14 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"nurtur/internal/feed"
+	"nurtur/internal/timeline"
 	"nurtur/internal/view"
 )
 
@@ -123,10 +125,17 @@ func (s *Server) handleDeleteFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := s.store.DeleteFeed(r.Context(), id, s.clock.Now())
-	var toast *view.Toast
+	toast := &view.Toast{
+		Message:      "Feed deleted.",
+		Kind:         "success",
+		ActionLabel:  "Undo",
+		ActionURL:    fmt.Sprintf("/feeds/%d/restore", id),
+		ActionMethod: "post",
+		ActionTarget: "#timer-card",
+		DurationMS:   8000,
+	}
 	switch {
 	case err == nil:
-		toast = &view.Toast{Message: "Feed deleted.", Kind: "success"}
 	case errors.Is(err, feed.ErrAlreadyDeleted):
 		toast = &view.Toast{Message: "That feed was already deleted.", Kind: "info"}
 	case errors.Is(err, feed.ErrNotFound):
@@ -136,7 +145,38 @@ func (s *Server) handleDeleteFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
+	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "timer-cleared", TriggerAfterSwap: true})
+}
+
+func (s *Server) handleRestoreFeed(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.feedID(w, r)
+	if !ok {
+		return
+	}
+	_, restored, err := s.store.RestoreFeed(r.Context(), id)
+	var toast *view.Toast
+	switch {
+	case err == nil && restored:
+		toast = &view.Toast{Message: "Feed restored.", Kind: "success"}
+	case err == nil:
+		toast = &view.Toast{Message: "That feed is already back.", Kind: "info"}
+	case errors.Is(err, feed.ErrAlreadyActive):
+		toast = &view.Toast{Message: "Another feed is running, so that one can't come back as active.", Kind: "info"}
+	case errors.Is(err, feed.ErrNotFound):
+		s.notFound(w)
+		return
+	default:
+		s.serverError(w, r, err)
+		return
+	}
+	s.respond(w, r, mutateResponse{
+		Primary:          "timer",
+		Toast:            toast,
+		Trigger:          "sheet-saved",
+		TriggerAfterSwap: true,
+		Retarget:         "#timer-card",
+		Reswap:           "outerHTML",
+	})
 }
 
 func (s *Server) handleEditPage(w http.ResponseWriter, r *http.Request) {
@@ -213,6 +253,9 @@ func (s *Server) handleActiveEdit(w http.ResponseWriter, r *http.Request, f *fee
 			return
 		}
 		ev := s.buildEditView(&updated, now)
+		if s.respondTimelineRow(w, r, timeline.Feed, f.ID, &view.Toast{Message: "Timer adjusted.", Kind: "success"}) {
+			return
+		}
 		s.respond(w, r, mutateResponse{
 			Primary:  "feed-edit",
 			Toast:    &view.Toast{Message: "Timer adjusted.", Kind: "success"},
@@ -243,6 +286,9 @@ func (s *Server) handleActiveEdit(w http.ResponseWriter, r *http.Request, f *fee
 		return
 	}
 
+	if s.respondTimelineRow(w, r, timeline.Feed, f.ID, &view.Toast{Message: "Start time updated.", Kind: "success"}) {
+		return
+	}
 	s.respond(w, r, mutateResponse{
 		Toast:            &view.Toast{Message: "Start time updated.", Kind: "success"},
 		Trigger:          "feed-saved",
@@ -318,6 +364,9 @@ func (s *Server) handleCompletedEdit(w http.ResponseWriter, r *http.Request, f *
 		return
 	}
 
+	if s.respondTimelineRow(w, r, timeline.Feed, f.ID, &view.Toast{Message: "Feed updated.", Kind: "success"}) {
+		return
+	}
 	s.respond(w, r, mutateResponse{
 		Toast:            &view.Toast{Message: "Feed updated.", Kind: "success"},
 		Trigger:          "feed-saved",

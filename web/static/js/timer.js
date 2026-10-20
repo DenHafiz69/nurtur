@@ -38,7 +38,12 @@
   function resolveTheme(mode) {
     if (mode === "day" || mode === "night") return mode;
     var hour = new Date().getHours();
-    return hour >= 21 || hour < 7 ? "night" : "day";
+    if (hour >= 21 || hour < 7) return "night";
+    var stored = null;
+    try { stored = localStorage.getItem(THEME_KEY); } catch (e) {}
+    var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (!stored && prefersDark) return "night";
+    return "day";
   }
 
   function applyTheme(mode, persist) {
@@ -50,13 +55,12 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "night" ? "#08080c" : "#fff8f0");
 
-    var button = document.querySelector("[data-theme-toggle]");
-    if (button) {
-      var index = THEME_MODES.indexOf(mode);
-      var next = THEME_MODES[(index + 1) % THEME_MODES.length];
+    var index = THEME_MODES.indexOf(mode);
+    var next = THEME_MODES[(index + 1) % THEME_MODES.length];
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
       button.setAttribute("aria-label", "Theme: " + mode + ". Activate for " + next + ".");
       button.setAttribute("title", "Theme: " + mode);
-    }
+    });
 
     if (persist) {
       try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
@@ -68,13 +72,12 @@
     return THEME_MODES.indexOf(mode) >= 0 ? mode : "auto";
   }
 
-  var themeButton = document.querySelector("[data-theme-toggle]");
-  if (themeButton) {
-    themeButton.addEventListener("click", function () {
+  document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
+    button.addEventListener("click", function () {
       var index = THEME_MODES.indexOf(currentThemeMode());
       applyTheme(THEME_MODES[(index + 1) % THEME_MODES.length], true);
     });
-  }
+  });
   applyTheme(currentThemeMode(), false);
   window.setInterval(function () {
     if (currentThemeMode() === "auto") applyTheme("auto", false);
@@ -428,6 +431,13 @@
 
   document.body.addEventListener("feed-saved", closeOpenDialogs);
   document.body.addEventListener("sheet-saved", closeOpenDialogs);
+  document.body.addEventListener("timer-cleared", function () {
+    timerState.key = null;
+    timerState.feedId = null;
+    timerState.side = null;
+    clearCache();
+    updateOfflineHint();
+  });
 
   /* ---------- Toasts ---------- */
 
@@ -568,13 +578,26 @@
   window.addEventListener("online", function () {
     isOffline = false;
     updateOfflineHint();
+    updateConnectivity();
     reconcile(true);
   });
 
   window.addEventListener("offline", function () {
     isOffline = true;
     updateOfflineHint();
+    updateConnectivity();
   });
+
+  function updateConnectivity() {
+    var banner = document.getElementById("offline-banner");
+    if (banner) banner.hidden = navigator.onLine !== false;
+  }
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js").catch(function () {});
+    });
+  }
 
   /* ---------- Boot ---------- */
 
@@ -588,6 +611,7 @@
 
   updateRelativeLabels();
   armToast();
+  updateConnectivity();
   tick();
   window.setInterval(tick, 250);
   window.setInterval(updateRelativeLabels, 30000);

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"nurtur/internal/diaper"
+	"nurtur/internal/timeline"
 	"nurtur/internal/view"
 )
 
@@ -163,6 +164,9 @@ func (s *Server) handleUpdateDiaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.respondTimelineRow(w, r, timeline.Diaper, id, &view.Toast{Message: "Diaper details saved.", Kind: "success"}) {
+		return
+	}
 	s.respond(w, r, mutateResponse{
 		Primary:          "status-strip",
 		Toast:            &view.Toast{Message: "Diaper details saved.", Kind: "success"},

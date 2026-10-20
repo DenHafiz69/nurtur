@@ -18,6 +18,9 @@ services:
       NURTUR_NIGHT_END: "${NURTUR_NIGHT_END:-07:00}"
       TURSO_DATABASE_URL: "${TURSO_DATABASE_URL:-}"
       TURSO_AUTH_TOKEN: "${TURSO_AUTH_TOKEN:-}"
+      NURTUR_PASSCODE: "${NURTUR_PASSCODE:-}"
+      NURTUR_SESSION_SECRET: "${NURTUR_SESSION_SECRET:-}"
+      NURTUR_COOKIE_SECURE: "${NURTUR_COOKIE_SECURE:-false}"
     volumes:
       - nurtur-data:/data
     restart: unless-stopped

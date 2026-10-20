@@ -12,17 +12,20 @@ import (
 
 // Config is the fully validated runtime configuration.
 type Config struct {
-	Addr         string
-	DBPath       string
-	LocalOnly    bool
-	TursoURL     string
-	TursoToken   string
-	SyncInterval time.Duration
-	Location     *time.Location
-	BabyName     string
-	LogLevel     slog.Level
-	NightStart   time.Duration
-	NightEnd     time.Duration
+	Addr          string
+	DBPath        string
+	LocalOnly     bool
+	TursoURL      string
+	TursoToken    string
+	SyncInterval  time.Duration
+	Location      *time.Location
+	BabyName      string
+	LogLevel      slog.Level
+	NightStart    time.Duration
+	NightEnd      time.Duration
+	Passcode      string
+	SessionSecret string
+	SecureCookie  bool
 }
 
 // Load reads configuration from the environment and applies defaults.
@@ -45,6 +48,17 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("NURTUR_LOCAL_ONLY: %w", err)
 	}
 	cfg.LocalOnly = localOnly
+
+	secureCookie, err := parseBool(os.Getenv("NURTUR_COOKIE_SECURE"))
+	if err != nil {
+		return Config{}, fmt.Errorf("NURTUR_COOKIE_SECURE: %w", err)
+	}
+	cfg.SecureCookie = secureCookie
+	cfg.Passcode = strings.TrimSpace(os.Getenv("NURTUR_PASSCODE"))
+	cfg.SessionSecret = strings.TrimSpace(os.Getenv("NURTUR_SESSION_SECRET"))
+	if cfg.Passcode == "" && cfg.SessionSecret != "" {
+		return Config{}, fmt.Errorf("NURTUR_SESSION_SECRET is set but NURTUR_PASSCODE is empty")
+	}
 
 	if raw := strings.TrimSpace(os.Getenv("NURTUR_SYNC_INTERVAL")); raw != "" {
 		d, err := time.ParseDuration(raw)

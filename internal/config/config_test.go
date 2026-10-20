@@ -20,6 +20,9 @@ func clearEnv(t *testing.T) {
 		"NURTUR_NIGHT_START",
 		"NURTUR_NIGHT_END",
 		"NURTUR_LOG_LEVEL",
+		"NURTUR_PASSCODE",
+		"NURTUR_SESSION_SECRET",
+		"NURTUR_COOKIE_SECURE",
 	} {
 		t.Setenv(key, "")
 	}
@@ -128,5 +131,28 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 				t.Fatalf("Load accepted %s=%q", tt.key, tt.val)
 			}
 		})
+	}
+}
+
+func TestLoadPasscodeConfiguration(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("NURTUR_LOCAL_ONLY", "true")
+	t.Setenv("NURTUR_PASSCODE", "let-me-in")
+	t.Setenv("NURTUR_SESSION_SECRET", "a-long-random-secret")
+	t.Setenv("NURTUR_COOKIE_SECURE", "true")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Passcode != "let-me-in" || cfg.SessionSecret != "a-long-random-secret" || !cfg.SecureCookie {
+		t.Fatalf("passcode config = %+v", cfg)
+	}
+
+	clearEnv(t)
+	t.Setenv("NURTUR_LOCAL_ONLY", "true")
+	t.Setenv("NURTUR_SESSION_SECRET", "orphan-secret")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted a session secret without a passcode")
 	}
 }
