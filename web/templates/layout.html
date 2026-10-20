@@ -1,0 +1,73 @@
+{{define "layout"}}<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nurtur</title>
+  <meta name="description" content="A calm little nursery companion for nursing, diapers, and sleep.">
+  <meta name="theme-color" content="#fff8f0">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
+  <script nonce="{{.Nonce}}">
+    (function () {
+      try {
+        var mode = localStorage.getItem("nurtur.theme") || "auto";
+        var hour = new Date().getHours();
+        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var theme = (mode === "day" || mode === "night") ? mode : auto;
+        var root = document.documentElement;
+        root.dataset.theme = theme;
+        root.dataset.themeMode = mode;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "night" ? "#08080c" : "#fff8f0");
+      } catch (e) {
+        var fallbackHour = new Date().getHours();
+        document.documentElement.dataset.theme = (fallbackHour >= 21 || fallbackHour < 7) ? "night" : "day";
+      }
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-server-now="{{iso .Now}}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-row">
+        <div class="brand">
+          <span class="pip pip-header">
+            <span class="pip-day">{{pip "awake"}}</span>
+            <span class="pip-night">{{pip "sleeping"}}</span>
+          </span>
+          <div class="brand-copy">
+            <p class="greeting">{{.Greeting}}</p>
+            <h1 class="baby-name">{{.BabyName}}</h1>
+          </div>
+        </div>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Theme: automatic. Activate to change.">
+          <span class="theme-icon theme-icon-day">{{icon "sun"}}</span>
+          <span class="theme-icon theme-icon-night">{{icon "moon"}}</span>
+        </button>
+      </div>
+      {{template "last-nursed" .}}
+    </header>
+
+    <main id="main" class="app-main" tabindex="-1">
+      {{template "dashboard" .}}
+    </main>
+
+    <footer class="dock" aria-label="Nursing actions">
+      <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
+      {{template "timer" .}}
+    </footer>
+
+    <dialog id="feed-edit-dialog" class="sheet" aria-labelledby="feed-edit-title"{{if .EditOpen}} open{{end}}>
+      {{if .Edit}}{{template "feed-edit" .}}{{end}}
+    </dialog>
+  </div>
+
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/js/timer.js"></script>
+</body>
+</html>{{end}}

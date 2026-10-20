@@ -1,0 +1,14 @@
+{{define "dashboard"}}
+<section class="summary-section" aria-labelledby="summary-heading">
+  <h2 id="summary-heading" class="sr-only">Today's nursing summary</h2>
+  <div id="status-strip" class="status-strip">{{template "status-strip-inner" .}}</div>
+</section>
+
+<section class="today" aria-labelledby="today-heading">
+  <div class="today-head">
+    <h2 id="today-heading" class="today-title">Today</h2>
+    <p class="today-date">{{.TodayLabel}}</p>
+  </div>
+  {{template "timeline-today" .}}
+</section>
+{{end}}

@@ -1,0 +1,12 @@
+{{define "toast"}}
+<div class="toast toast-{{if .Kind}}{{.Kind}}{{else}}info{{end}}" data-toast>
+  <span class="toast-icon" aria-hidden="true">
+    {{if or (eq .Kind "error") (eq .Kind "warn")}}{{icon "alert"}}{{else}}{{icon "star"}}{{end}}
+  </span>
+  <p class="toast-text">{{.Message}}</p>
+</div>
+{{end}}
+
+{{define "toast-oob"}}
+<div id="toast-region" class="toast-region" hx-swap-oob="innerHTML" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
+{{end}}

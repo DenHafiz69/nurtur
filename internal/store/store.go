@@ -1,0 +1,329 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"io/fs"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	turso "turso.tech/database/tursogo"
+)
+
+// Options configures how the local database is opened.
+type Options struct {
+	Path        string
+	LocalOnly   bool
+	RemoteURL   string
+	AuthToken   string
+	BusyTimeout time.Duration
+	Logger      *slog.Logger
+}
+
+// Store owns the local Turso database. Local SQLite-compatible writes are the
+// only write path; the optional sync worker pushes them to Turso Cloud.
+type Store struct {
+	db       *sql.DB
+	syncDB   *turso.TursoSyncDb
+	log      *slog.Logger
+	path     string
+	onChange func()
+
+	changeMu sync.RWMutex
+}
+
+// Open creates the data directory if needed and opens the local Turso database.
+// In sync mode it bootstraps from Turso Cloud when the local file is empty.
+func Open(ctx context.Context, opts Options) (*Store, error) {
+	if strings.TrimSpace(opts.Path) == "" {
+		return nil, fmt.Errorf("store: empty database path")
+	}
+	if opts.Logger == nil {
+		opts.Logger = slog.Default()
+	}
+	busy := opts.BusyTimeout
+	if busy <= 0 {
+		busy = 5 * time.Second
+	}
+
+	if opts.Path != ":memory:" {
+		dir := filepath.Dir(opts.Path)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return nil, fmt.Errorf("store: create data directory: %w", err)
+		}
+	}
+
+	var (
+		db     *sql.DB
+		syncDB *turso.TursoSyncDb
+		err    error
+	)
+
+	if opts.LocalOnly || opts.RemoteURL == "" {
+		if !opts.LocalOnly {
+			return nil, fmt.Errorf("store: sync requested but no remote URL was provided")
+		}
+		dsn := opts.Path
+		if strings.Contains(dsn, "?") {
+			dsn += fmt.Sprintf("&_busy_timeout=%d", busy.Milliseconds())
+		} else {
+			dsn += fmt.Sprintf("?_busy_timeout=%d", busy.Milliseconds())
+		}
+		db, err = sql.Open("turso", dsn)
+		if err != nil {
+			return nil, fmt.Errorf("store: open local database: %w", err)
+		}
+	} else {
+		syncDB, err = turso.NewTursoSyncDb(ctx, turso.TursoSyncDbConfig{
+			Path:              opts.Path,
+			RemoteUrl:         opts.RemoteURL,
+			AuthToken:         opts.AuthToken,
+			ClientName:        "nurtur",
+			BusyTimeout:       int(busy.Milliseconds()),
+			LongPollTimeoutMs: 5000,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("store: open synced database: %w", err)
+		}
+		db, err = syncDB.Connect(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("store: connect synced database: %w", err)
+		}
+	}
+
+	// One connection serialises writers inside this single-instance app and
+	// makes read-then-write transitions deterministic. The partial unique
+	// indexes remain the database-level backstop.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxIdleTime(0)
+
+	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("store: ping database: %w", err)
+	}
+
+	s := &Store{db: db, syncDB: syncDB, log: opts.Logger, path: opts.Path}
+	return s, nil
+}
+
+// SetOnChange registers a callback fired after every successful write
+// transaction. The sync worker uses it to schedule a debounced push.
+func (s *Store) SetOnChange(fn func()) {
+	s.changeMu.Lock()
+	defer s.changeMu.Unlock()
+	s.onChange = fn
+}
+
+func (s *Store) notifyChange() {
+	s.changeMu.RLock()
+	fn := s.onChange
+	s.changeMu.RUnlock()
+	if fn != nil {
+		fn()
+	}
+}
+
+// SyncDB returns the synced database handle, or nil in local-only mode.
+func (s *Store) SyncDB() *turso.TursoSyncDb { return s.syncDB }
+
+// Path is the local database file path.
+func (s *Store) Path() string { return s.path }
+
+// Ping checks the local database.
+func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
+
+// Close closes the database. Flush and checkpoint the sync worker first.
+func (s *Store) Close() error { return s.db.Close() }
+
+// WithTx runs fn in a database/sql transaction. fn must use the supplied *sql.Tx
+// for every statement; the store holds a single connection.
+func (s *Store) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: commit: %w", err)
+	}
+	s.notifyChange()
+	return nil
+}
+
+type queryer interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func encodeTime(t time.Time) string {
+	return t.UTC().Truncate(time.Second).Format(time.RFC3339)
+}
+
+func normalizeTime(t time.Time) time.Time {
+	return t.UTC().Truncate(time.Second)
+}
+
+func decodeTime(raw string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("store: parse timestamp %q: %w", raw, err)
+	}
+	return t.UTC(), nil
+}
+
+func decodeNullTime(raw sql.NullString) (*time.Time, error) {
+	if !raw.Valid || raw.String == "" {
+		return nil, nil
+	}
+	t, err := decodeTime(raw.String)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func isUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint") || strings.Contains(msg, "constraint failed")
+}
+
+// Migrate applies embedded SQL files in name order. It is idempotent: applied
+// versions are recorded in schema_migrations and skipped on later starts.
+func (s *Store) Migrate(ctx context.Context, fsys fs.FS, now time.Time) error {
+	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+		version    TEXT PRIMARY KEY,
+		applied_at TEXT NOT NULL
+	)`); err != nil {
+		return fmt.Errorf("store: create schema_migrations: %w", err)
+	}
+
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return fmt.Errorf("store: read migrations: %w", err)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		var applied int
+		if err := s.db.QueryRowContext(ctx,
+			`SELECT COUNT(1) FROM schema_migrations WHERE version = ?`,
+			entry.Name(),
+		).Scan(&applied); err != nil {
+			return fmt.Errorf("store: check migration %s: %w", entry.Name(), err)
+		}
+		if applied > 0 {
+			continue
+		}
+
+		body, err := fs.ReadFile(fsys, entry.Name())
+		if err != nil {
+			return fmt.Errorf("store: read migration %s: %w", entry.Name(), err)
+		}
+		statements := splitSQL(string(body))
+		if len(statements) == 0 {
+			return fmt.Errorf("store: migration %s has no statements", entry.Name())
+		}
+
+		err = s.WithTx(ctx, func(tx *sql.Tx) error {
+			for _, stmt := range statements {
+				if _, err := tx.ExecContext(ctx, stmt); err != nil {
+					return fmt.Errorf("apply %s: %w", entry.Name(), err)
+				}
+			}
+			_, err := tx.ExecContext(ctx,
+				`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`,
+				entry.Name(), encodeTime(now))
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("store: migrate %s: %w", entry.Name(), err)
+		}
+		s.log.Info("migration applied", "version", entry.Name())
+	}
+	return nil
+}
+
+// splitSQL splits a SQLite script on semicolons outside strings and comments.
+// tursogo accepts multi-statement Exec, but executing each statement separately
+// produces far better errors when a migration fails.
+func splitSQL(script string) []string {
+	var (
+		statements []string
+		current    strings.Builder
+		inString   bool
+		hasContent bool
+	)
+	flush := func() {
+		if hasContent {
+			statements = append(statements, strings.TrimSpace(current.String()))
+		}
+		current.Reset()
+		hasContent = false
+	}
+
+	for i := 0; i < len(script); i++ {
+		c := script[i]
+		if inString {
+			current.WriteByte(c)
+			if c == '\'' {
+				if i+1 < len(script) && script[i+1] == '\'' {
+					current.WriteByte(script[i+1])
+					i++
+					continue
+				}
+				inString = false
+			}
+			continue
+		}
+		switch {
+		case c == '\'':
+			inString = true
+			hasContent = true
+			current.WriteByte(c)
+		case c == '-' && i+1 < len(script) && script[i+1] == '-':
+			for i < len(script) && script[i] != '\n' {
+				i++
+			}
+			current.WriteByte('\n')
+		case c == '/' && i+1 < len(script) && script[i+1] == '*':
+			i += 2
+			for i+1 < len(script) && !(script[i] == '*' && script[i+1] == '/') {
+				i++
+			}
+			i++
+			current.WriteByte(' ')
+		case c == ';':
+			flush()
+		default:
+			if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+				hasContent = true
+			}
+			current.WriteByte(c)
+		}
+	}
+	flush()
+	return statements
+}

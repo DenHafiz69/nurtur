@@ -1,0 +1,66 @@
+{{define "feed-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="feed-edit-title">{{.Edit.Title}}</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+
+  {{if .Edit.Active}}
+    <form class="sheet-form" method="post" action="/feeds/{{.Edit.ID}}" hx-patch="/feeds/{{.Edit.ID}}" hx-target="#feed-edit-dialog" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+      <p class="sheet-copy">Adjust when {{.Edit.SideTitle}} started. It can't be in the future.</p>
+      <label class="field">
+        <span class="field-label">Started at</span>
+        <input type="datetime-local" step="1" name="segment_started_at" value="{{.Edit.StartInput}}" required>
+      </label>
+      {{if .Edit.StartErr}}<p class="field-error" role="alert">{{.Edit.StartErr}}</p>{{end}}
+
+      <div class="adjust-row">
+        <button type="submit" class="btn btn-ghost" name="adjust" value="-5">−5 min</button>
+        <button type="submit" class="btn btn-ghost" name="adjust" value="5">+5 min</button>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  {{else}}
+    <form class="sheet-form" method="post" action="/feeds/{{.Edit.ID}}" hx-patch="/feeds/{{.Edit.ID}}" hx-target="#feed-edit-dialog" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+      <p class="sheet-copy">Fix the times or side totals. Segments are rebuilt left, then right.</p>
+
+      <div class="field-stack">
+        <label class="field">
+          <span class="field-label">Started</span>
+          <input type="datetime-local" step="1" name="started_at" value="{{.Edit.StartInput}}" required>
+          {{if .Edit.StartErr}}<span class="field-error" role="alert">{{.Edit.StartErr}}</span>{{end}}
+        </label>
+        <label class="field">
+          <span class="field-label">Ended</span>
+          <input type="datetime-local" step="1" name="ended_at" value="{{.Edit.EndInput}}" required>
+          {{if .Edit.EndErr}}<span class="field-error" role="alert">{{.Edit.EndErr}}</span>{{end}}
+        </label>
+      </div>
+
+      <div class="field-pair">
+        <label class="field">
+          <span class="field-label">Left minutes</span>
+          <input type="number" name="left_minutes" min="0" max="1440" step="1" inputmode="numeric" value="{{.Edit.LeftMinutes}}">
+          {{if .Edit.LeftErr}}<span class="field-error" role="alert">{{.Edit.LeftErr}}</span>{{end}}
+        </label>
+        <label class="field">
+          <span class="field-label">Right minutes</span>
+          <input type="number" name="right_minutes" min="0" max="1440" step="1" inputmode="numeric" value="{{.Edit.RightMinutes}}">
+          {{if .Edit.RightErr}}<span class="field-error" role="alert">{{.Edit.RightErr}}</span>{{end}}
+        </label>
+      </div>
+      {{if .Edit.TotalsErr}}<p class="field-error" role="alert">{{.Edit.TotalsErr}}</p>{{end}}
+
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+    </form>
+  {{end}}
+</div>
+{{end}}

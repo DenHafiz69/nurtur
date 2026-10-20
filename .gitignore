@@ -1,0 +1,9 @@
+/data/
+/bin/
+*.db
+*.db-shm
+*.db-wal
+*.db-revert
+*.log
+.env
+nurtur-dev

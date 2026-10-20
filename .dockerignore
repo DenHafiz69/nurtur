@@ -1,0 +1,11 @@
+.git
+.gitignore
+data
+bin
+*.db
+*.db-shm
+*.db-wal
+.env
+README.md
+PLANS.md
+FEATURES.md

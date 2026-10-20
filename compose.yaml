@@ -1,0 +1,31 @@
+name: nurtur
+
+services:
+  app:
+    build:
+      context: .
+    image: nurtur:local
+    ports:
+      - "8005:8080"
+    environment:
+      # Local-only by default so this runs without Turso credentials.
+      # To sync to Turso Cloud, set NURTUR_LOCAL_ONLY=false and provide both
+      # TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.
+      NURTUR_LOCAL_ONLY: "${NURTUR_LOCAL_ONLY:-true}"
+      NURTUR_TZ: "${NURTUR_TZ:-Asia/Kuala_Lumpur}"
+      NURTUR_BABY_NAME: "${NURTUR_BABY_NAME:-Baby}"
+      TURSO_DATABASE_URL: "${TURSO_DATABASE_URL:-}"
+      TURSO_AUTH_TOKEN: "${TURSO_AUTH_TOKEN:-}"
+    volumes:
+      - nurtur-data:/data
+    restart: unless-stopped
+    stop_grace_period: 35s
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  nurtur-data:

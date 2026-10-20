@@ -1,0 +1,14 @@
+{{define "status-strip-inner"}}
+<div class="summary-card">
+  <span class="summary-icon" aria-hidden="true">{{icon "clock"}}</span>
+  <div class="summary-body">
+    <p class="summary-label">Today's nursing</p>
+    <p class="summary-count">{{.Today.CountLabel}}</p>
+    <p class="summary-split">{{.Today.SplitLabel}}</p>
+  </div>
+</div>
+{{end}}
+
+{{define "status-strip-oob"}}
+<div id="status-strip" class="status-strip" hx-swap-oob="outerHTML">{{template "status-strip-inner" .}}</div>
+{{end}}

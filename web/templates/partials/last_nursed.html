@@ -1,0 +1,26 @@
+{{define "last-nursed"}}
+<div id="last-nursed" class="sticker-holder">{{template "last-nursed-inner" .}}</div>
+{{end}}
+
+{{define "last-nursed-inner"}}
+  {{if .Active}}
+    <p class="sticker sticker-live">
+      <span class="sticker-dot" aria-hidden="true"></span>
+      <span>Nursing {{.Active.SideTitle}}</span>
+      <span class="sticker-sep" aria-hidden="true">·</span>
+      <span data-relative-since="{{iso .Active.StartedAt}}" data-relative-mode="duration">{{duration .Active.Elapsed}}</span>
+    </p>
+  {{else if .Last}}
+    <p class="sticker">
+      Last: <strong>{{.Last.SideTitle}}</strong>
+      <span class="sticker-sep" aria-hidden="true">·</span>
+      <span data-relative-since="{{iso .Last.Since}}">{{.Ago .Last.Since}}</span>
+    </p>
+  {{else}}
+    <p class="sticker sticker-muted">No feeds yet</p>
+  {{end}}
+{{end}}
+
+{{define "last-nursed-oob"}}
+<div id="last-nursed" class="sticker-holder" hx-swap-oob="outerHTML">{{template "last-nursed-inner" .}}</div>
+{{end}}
