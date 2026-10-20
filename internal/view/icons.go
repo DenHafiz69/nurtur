@@ -3,8 +3,9 @@ package view
 import "html/template"
 
 // icons are a small hand-drawn set: 24px, 2.25px rounded strokes. They are
-// inline so they inherit currentColor and need no extra requests.
-var icons = map[string]string{
+// inline so they inherit currentColor and need no extra requests. Every
+// fragment below is a trusted compile-time constant.
+var icons = map[string]template.HTML{
 	"drop":        `<path d="M12 3.4c3.1 4 5.4 6.8 5.4 9.5a5.4 5.4 0 0 1-10.8 0c0-2.7 2.3-5.5 5.4-9.5Z"/>`,
 	"drop-left":   `<path d="M12 3.4c3.1 4 5.4 6.8 5.4 9.5a5.4 5.4 0 0 1-10.8 0c0-2.7 2.3-5.5 5.4-9.5Z"/><path d="M13.7 15.4H10.3l2.1-3.1"/>`,
 	"drop-right":  `<path d="M12 3.4c3.1 4 5.4 6.8 5.4 9.5a5.4 5.4 0 0 1-10.8 0c0-2.7 2.3-5.5 5.4-9.5Z"/><path d="M10.3 15.4h3.4l-2.1-3.1"/>`,
@@ -30,6 +31,11 @@ var icons = map[string]string{
 	"lock":        `<rect x="5" y="10.5" width="14" height="9" rx="2.4"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><circle cx="12" cy="15" r="1"/>`,
 }
 
+const (
+	iconOpen  template.HTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">`
+	iconClose template.HTML = `</svg>`
+)
+
 // Icon returns an inline SVG for the named icon. Unknown names render nothing;
 // every control also carries a text label or aria-label.
 func Icon(name string) template.HTML {
@@ -37,5 +43,5 @@ func Icon(name string) template.HTML {
 	if !ok {
 		return ""
 	}
-	return template.HTML(`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">` + body + `</svg>`)
+	return iconOpen + body + iconClose
 }

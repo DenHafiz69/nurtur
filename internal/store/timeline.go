@@ -315,6 +315,8 @@ func (s *Store) feedsByIDs(ctx context.Context, ids []int64) (map[int64]*feed.Fe
 		return out, nil
 	}
 	placeholders, args := placeholdersFor(ids)
+	// #nosec G202 -- columns are compile-time constants and placeholders are
+	// generated "?" marks; every id is still bound as a query argument.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+feedColumns+` FROM feeds WHERE deleted_at IS NULL AND id IN (`+placeholders+`)`,
 		args...)
@@ -350,6 +352,8 @@ func (s *Store) diapersByIDs(ctx context.Context, ids []int64) (map[int64]*diape
 		return out, nil
 	}
 	placeholders, args := placeholdersFor(ids)
+	// #nosec G202 -- columns are compile-time constants and placeholders are
+	// generated "?" marks; every id is still bound as a query argument.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+diaperColumns+` FROM diapers WHERE deleted_at IS NULL AND id IN (`+placeholders+`)`,
 		args...)
@@ -378,6 +382,8 @@ func (s *Store) sleepsByIDs(ctx context.Context, ids []int64) (map[int64]*sleep.
 		return out, nil
 	}
 	placeholders, args := placeholdersFor(ids)
+	// #nosec G202 -- columns are compile-time constants and placeholders are
+	// generated "?" marks; every id is still bound as a query argument.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT `+sleepColumns+` FROM sleeps WHERE deleted_at IS NULL AND id IN (`+placeholders+`)`,
 		args...)

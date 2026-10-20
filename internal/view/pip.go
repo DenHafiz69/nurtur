@@ -19,8 +19,23 @@ const pipCheeks = `
 	<ellipse class="pip-cheek" cx="43" cy="75" rx="6.5" ry="3.6"/>
 	<ellipse class="pip-cheek" cx="77" cy="75" rx="6.5" ry="3.6"/>`
 
-func pipSVG(pose, content string) template.HTML {
-	return template.HTML(`<svg class="pip-svg pip-` + pose + `" viewBox="0 0 120 120" aria-hidden="true" focusable="false">` + content + `</svg>`)
+// pipOpen holds the trusted opening tag for each pose. Keeping them typed and
+// precomposed means no user-supplied string ever reaches the SVG wrapper.
+const pipViewBox = `" viewBox="0 0 120 120" aria-hidden="true" focusable="false">`
+
+var pipOpen = map[string]template.HTML{
+	"awake":    `<svg class="pip-svg pip-awake` + pipViewBox,
+	"nursing":  `<svg class="pip-svg pip-nursing` + pipViewBox,
+	"sleeping": `<svg class="pip-svg pip-sleeping` + pipViewBox,
+	"empty":    `<svg class="pip-svg pip-empty` + pipViewBox,
+}
+
+func pipSVG(pose string, content template.HTML) template.HTML {
+	open, ok := pipOpen[pose]
+	if !ok {
+		return ""
+	}
+	return open + content + `</svg>`
 }
 
 // Pip returns the named mascot pose: awake, nursing, sleeping, or empty.

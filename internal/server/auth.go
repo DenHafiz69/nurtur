@@ -187,6 +187,8 @@ func (a *auth) setSession(w http.ResponseWriter, r *http.Request, csrf string) {
 		time.Now().UTC().Add(sessionLifetime).Format(time.RFC3339),
 		csrf,
 	}, "|")
+	// #nosec G124 -- Secure is requested whenever TLS or auth.secure is in play;
+	// plain-HTTP LAN installs intentionally keep it off or the cookie is dropped.
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    payload + "." + a.sign(payload),
@@ -198,7 +200,8 @@ func (a *auth) setSession(w http.ResponseWriter, r *http.Request, csrf string) {
 	})
 }
 
-func (a *auth) clearSession(w http.ResponseWriter) {
+func (a *auth) clearSession(w http.ResponseWriter, r *http.Request) {
+	// #nosec G124 -- must mirror the attributes used by setSession above.
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    "",
@@ -206,6 +209,7 @@ func (a *auth) clearSession(w http.ResponseWriter) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Secure:   a.secure || r.TLS != nil,
 	})
 }
 
@@ -339,12 +343,14 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.auth.setSession(w, r, csrf)
+	// #nosec G710 -- safeNext returns only same-origin paths; absolute,
+	// protocol-relative, and backslash-normalised targets are rejected.
 	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if s.auth.enabled() {
-		s.auth.clearSession(w)
+		s.auth.clearSession(w, r)
 	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
@@ -364,11 +370,17 @@ func (s *Server) renderNamed(w http.ResponseWriter, r *http.Request, status int,
 }
 
 func safeNext(raw string) string {
-	if raw == "" {
+	if raw == "" || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
 		return "/"
 	}
-	if !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
+	// Browsers normalise backslashes to slashes, so "/\host" would otherwise
+	// turn into a protocol-relative redirect.
+	if strings.ContainsRune(raw, '\\') {
 		return "/"
 	}
-	return raw
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil {
+		return "/"
+	}
+	return u.RequestURI()
 }
