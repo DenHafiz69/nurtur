@@ -1,3 +1,10 @@
+## Git workflow
+
+- Commit completed work normally.
+- Never create a git tag unless the user explicitly asks for one.
+- Never `git push` commits or tags unless the user explicitly asks you to push.
+- Do not assume a commit should be published just because it was requested.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
