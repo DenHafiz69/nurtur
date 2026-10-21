@@ -407,6 +407,9 @@ than by Nurtur. Record the chosen retention in your deployment notes.
 
 ## Deployment
 
+For a VPS walkthrough that fits into an existing Docker Compose stack and Caddy
+setup, see [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 The single binary embeds templates, static assets, migrations, and fonts.
 
 ```sh

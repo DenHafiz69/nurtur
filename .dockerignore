@@ -17,5 +17,6 @@ README.md
 PLANS.md
 FEATURES.md
 AGENTS.md
+DEPLOYMENT.md
 docker-compose.yaml
 Makefile

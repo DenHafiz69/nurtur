@@ -408,9 +408,9 @@
     "semantic_hash": "b5c7b199ebc392f512622bee97909171"
   },
   "README.md": {
-    "mtime": 1792579025.0924828,
-    "seen": 1792579029.3657904,
-    "ast_hash": "664934c122737860e77e25e034df4fe3",
+    "mtime": 1792579783.9200277,
+    "seen": 1792579792.2949524,
+    "ast_hash": "22d72c8d153896b50b59c107e6a6b88f",
     "semantic_hash": ""
   },
   "e2e/README.md": {
@@ -579,6 +579,18 @@
     "mtime": 1792575433.1978326,
     "seen": 1792579029.3657925,
     "ast_hash": "1d5464125e591e855b352f07f540edcc",
+    "semantic_hash": ""
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1792579172.6573396,
+    "seen": 1792579792.2948823,
+    "ast_hash": "f0011e3b08cc0938f3d280567b804c6b",
+    "semantic_hash": ""
+  },
+  "DEPLOYMENT.md": {
+    "mtime": 1792579781.4850106,
+    "seen": 1792579792.2949073,
+    "ast_hash": "c81d8e6215ed53c662ad40e2cf686d63",
     "semantic_hash": ""
   }
 }
