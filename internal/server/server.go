@@ -5,7 +5,9 @@ package server
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -90,14 +92,19 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("server: templates: %w", err)
 	}
-	renderer, err := view.NewRenderer(templateFS)
-	if err != nil {
-		return nil, err
-	}
 
 	staticFS, err := fs.Sub(cfg.Assets, "web/static")
 	if err != nil {
 		return nil, fmt.Errorf("server: static assets: %w", err)
+	}
+	assetVersion, err := staticFingerprint(staticFS)
+	if err != nil {
+		return nil, fmt.Errorf("server: fingerprint static assets: %w", err)
+	}
+
+	renderer, err := view.NewRenderer(templateFS, assetVersion)
+	if err != nil {
+		return nil, err
 	}
 
 	accountCount, err := cfg.Store.CountAccounts(context.Background())
@@ -300,6 +307,38 @@ func nonceFrom(ctx context.Context) string {
 }
 
 /* ---------- Static ---------- */
+
+// staticFingerprint hashes the CSS and JS bundle so every deploy references
+// fresh URLs. Without this, an updated page can be paired with a stylesheet
+// from the service-worker cache and render half-styled.
+func staticFingerprint(fsys fs.FS) (string, error) {
+	h := sha256.New()
+	err := fs.WalkDir(fsys, ".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(path.Ext(name)) {
+		case ".css", ".js":
+		default:
+			return nil
+		}
+		body, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return err
+		}
+		h.Write([]byte(name))
+		h.Write([]byte{0})
+		h.Write(body)
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil))[:10], nil
+}
 
 func newStaticHandler(fsys fs.FS) http.Handler {
 	files := http.FileServerFS(fsys)

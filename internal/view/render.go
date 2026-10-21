@@ -15,7 +15,9 @@ type Renderer struct {
 }
 
 // NewRenderer parses layout.html, dashboard.html, and every partial.
-func NewRenderer(fsys fs.FS) (*Renderer, error) {
+// assetVersion is appended to asset URLs so a deploy can never pair new HTML
+// with a stylesheet still sitting in the browser or service-worker cache.
+func NewRenderer(fsys fs.FS, assetVersion string) (*Renderer, error) {
 	funcs := template.FuncMap{
 		"icon":        Icon,
 		"pip":         Pip,
@@ -26,6 +28,12 @@ func NewRenderer(fsys fs.FS) (*Renderer, error) {
 		"feedCount":   FeedCountLabel,
 		"diaperCount": DiaperCountLabel,
 		"sleepLabel":  SleepTotalLabel,
+		"asset": func(path string) string {
+			if assetVersion == "" {
+				return path
+			}
+			return path + "?v=" + assetVersion
+		},
 	}
 	tmpl, err := template.New("nurtur").Funcs(funcs).ParseFS(fsys, "*.html", "partials/*.html")
 	if err != nil {

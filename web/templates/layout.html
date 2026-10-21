@@ -36,7 +36,7 @@
   </script>
   <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="{{asset "/static/app.css"}}">
 </head>
 <body data-server-now="{{iso .Now}}"{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -96,7 +96,7 @@
     </dialog>
   </div>
 
-  <script src="/static/htmx.min.js"></script>
-  <script src="/static/js/timer.js"></script>
+  <script src="{{asset "/static/htmx.min.js"}}"></script>
+  <script src="{{asset "/static/js/timer.js"}}"></script>
 </body>
 </html>{{end}}

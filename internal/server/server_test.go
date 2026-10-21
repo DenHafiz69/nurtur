@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"nurtur/internal/clock"
@@ -106,7 +107,8 @@ func TestDashboardShellAndSecurityHeaders(t *testing.T) {
 		`id="timeline-today"`,
 		`id="feed-edit-dialog"`,
 		`hx-post="/feeds"`,
-		`/static/js/timer.js`,
+		`/static/js/timer.js?v=`,
+		`/static/app.css?v=`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard missing %q", want)
@@ -132,6 +134,30 @@ func TestDashboardShellAndSecurityHeaders(t *testing.T) {
 	}
 	if !strings.Contains(body, `nonce="`+nonceMatch[1]+`"`) {
 		t.Fatal("inline theme script nonce does not match CSP header")
+	}
+}
+
+func TestStaticFingerprintTracksBundleContent(t *testing.T) {
+	first, err := staticFingerprint(fstest.MapFS{
+		"app.css":      {Data: []byte("one")},
+		"js/timer.js":  {Data: []byte("timer")},
+		"img/logo.svg": {Data: []byte("ignored")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := staticFingerprint(fstest.MapFS{
+		"app.css":     {Data: []byte("two")},
+		"js/timer.js": {Data: []byte("timer")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first) != 10 {
+		t.Errorf("fingerprint length = %d, want 10", len(first))
+	}
+	if first == second {
+		t.Errorf("fingerprint did not change with stylesheet content: %q", first)
 	}
 }
 
