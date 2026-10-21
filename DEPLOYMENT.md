@@ -139,7 +139,7 @@ stays private, log in on the VPS with a token that has `read:packages`:
 echo "$GHCR_TOKEN" | docker login ghcr.io -u DenHafiz69 --password-stdin
 ```
 
-The image manifests cover `linux/amd64` and `linux/arm64`.
+The image is built for `linux/amd64`.
 
 ## 3. Point Caddy at it
 

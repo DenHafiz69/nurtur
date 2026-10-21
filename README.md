@@ -326,10 +326,9 @@ sync looks stuck.
 
 ### Prebuilt images (GHCR)
 
-CI runs formatting, `go vet`, and the Go tests, then builds a multi-arch image
-(`linux/amd64`, `linux/arm64`) and pushes it to GitHub Container Registry on
-every push to `main` and every `v*` tag. Pull requests build the image without
-pushing.
+CI runs formatting, `go vet`, and the Go tests, then builds the `linux/amd64`
+image and pushes it to GitHub Container Registry on every push to `main` and
+every `v*` tag. Pull requests build the image without pushing.
 
 ```sh
 docker pull ghcr.io/denhafiz69/nurtur:latest
@@ -418,7 +417,8 @@ docker build -t nurtur .
 docker run --rm -p 8080:8080 -v nurtur-data:/data --env-file .env nurtur
 ```
 
-Build both architectures if the target is not the build host:
+Build both architectures if the target is not the build host (the build host
+needs binfmt/QEMU, e.g. `docker run --privileged --rm tonistiigi/binfmt --install arm64`):
 
 ```sh
 docker buildx build --platform linux/amd64,linux/arm64 -t nurtur .
