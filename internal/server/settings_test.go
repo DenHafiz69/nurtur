@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -55,6 +56,24 @@ func TestSaveBabyNameRejectsEmpty(t *testing.T) {
 	}
 	if _, ok, err := env.store.Setting(context.Background(), settingBabyName); err != nil || ok {
 		t.Fatalf("empty name was stored: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestBabyNameValidationMessages(t *testing.T) {
+	if _, err := parseBabyName("   "); err != errBabyNameRequired {
+		t.Fatalf("empty name error = %v", err)
+	}
+	if _, err := parseBabyName(strings.Repeat("a", 41)); err != errBabyNameTooLong {
+		t.Fatalf("long name error = %v", err)
+	}
+	if got := babyNameMessage(errBabyNameRequired); got != "Baby's name is required." {
+		t.Errorf("required message = %q", got)
+	}
+	if got := babyNameMessage(errBabyNameTooLong); got != "Keep the baby's name under 40 characters." {
+		t.Errorf("length message = %q", got)
+	}
+	if got := babyNameMessage(errors.New("other")); got != "That name doesn't look right. Try again?" {
+		t.Errorf("fallback message = %q", got)
 	}
 }
 

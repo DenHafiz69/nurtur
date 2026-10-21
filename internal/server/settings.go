@@ -20,6 +20,11 @@ const (
 	settingBabyName   = "baby_name"
 )
 
+var (
+	errBabyNameRequired = errors.New("baby name is required")
+	errBabyNameTooLong  = errors.New("baby name must be 40 characters or fewer")
+)
+
 // currentBabyName returns the name saved for the account bound to ctx,
 // falling back to the environment value for installs that predate onboarding.
 // The environment is never the primary source once a name is stored.
@@ -38,12 +43,25 @@ func (s *Server) currentBabyName(ctx context.Context) string {
 func parseBabyName(raw string) (string, error) {
 	name := strings.Join(strings.Fields(raw), " ")
 	if name == "" {
-		return "", errors.New("Baby's name is required.")
+		return "", errBabyNameRequired
 	}
 	if utf8.RuneCountInString(name) > 40 {
-		return "", errors.New("Keep the baby's name under 40 characters.")
+		return "", errBabyNameTooLong
 	}
 	return name, nil
+}
+
+// babyNameMessage renders a parseBabyName error as copy for the signup and
+// settings forms. Error values themselves stay lower-case for linting.
+func babyNameMessage(err error) string {
+	switch {
+	case errors.Is(err, errBabyNameRequired):
+		return "Baby's name is required."
+	case errors.Is(err, errBabyNameTooLong):
+		return "Keep the baby's name under 40 characters."
+	default:
+		return "That name doesn't look right. Try again?"
+	}
 }
 
 // nightWindow returns the account's configured night window, preferring stored
@@ -164,7 +182,7 @@ func (s *Server) handleSaveBabyName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if nameErr != nil {
-		settings.BabyErr = nameErr.Error()
+		settings.BabyErr = babyNameMessage(nameErr)
 		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
 		return
 	}

@@ -513,7 +513,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 	babyName, err := parseBabyName(rawBabyName)
 	if err != nil {
-		reject(http.StatusBadRequest, err.Error())
+		reject(http.StatusBadRequest, babyNameMessage(err))
 		return
 	}
 
