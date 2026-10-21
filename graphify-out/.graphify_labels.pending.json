@@ -3,10 +3,8 @@
   "4": "time.Time",
   "7": "Feed",
   "8": "time.Duration",
-  "10": "scanDiaper",
-  "11": "server_test.go",
-  "23": "newTestEnvConfig",
-  "34": "newTestEnv",
-  "35": "TursoSyncer",
+  "10": "context.Context",
+  "14": "Session",
+  "23": "time.Time",
   "36": "AGENTS.md"
 }

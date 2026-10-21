@@ -174,16 +174,16 @@
     "semantic_hash": "ec3eb17d7b948eefdb79c63042cf2efd"
   },
   "internal/server/server_test.go": {
-    "mtime": 1792578063.5683634,
-    "seen": 1792578175.0372767,
-    "ast_hash": "0f2774df4dffeef68bfff21d7cfabf7f",
+    "mtime": 1792578644.1037745,
+    "seen": 1792578669.24837,
+    "ast_hash": "02f2d17dbdf92dacba55ef35b63c5f4d",
     "semantic_hash": ""
   },
   "internal/server/settings.go": {
-    "mtime": 1792575368.0099025,
-    "seen": 1792577377.7511938,
-    "ast_hash": "6ef947e8b10344efb9689d9ae39545d5",
-    "semantic_hash": "6ef947e8b10344efb9689d9ae39545d5"
+    "mtime": 1792578635.649915,
+    "seen": 1792578669.2483716,
+    "ast_hash": "f3534b799467e4546377579022788d54",
+    "semantic_hash": ""
   },
   "internal/server/settings_test.go": {
     "mtime": 1792575414.9935513,
@@ -318,15 +318,15 @@
     "semantic_hash": "28d59055296908738c02f3123c1b0afa"
   },
   "internal/view/format.go": {
-    "mtime": 1792578050.96428,
-    "seen": 1792578175.0382435,
-    "ast_hash": "22d32a4526413c9c04d536bb3520795a",
+    "mtime": 1792578630.6529994,
+    "seen": 1792578669.2488902,
+    "ast_hash": "89fdd45c6edfdae31e2986a902386ee2",
     "semantic_hash": ""
   },
   "internal/view/format_test.go": {
-    "mtime": 1792578058.5757234,
-    "seen": 1792578175.0382454,
-    "ast_hash": "559ac1e6757c1d8be29fd92944ecef02",
+    "mtime": 1792578646.8907292,
+    "seen": 1792578669.2488914,
+    "ast_hash": "2788d17991c360e7212736c5d112887f",
     "semantic_hash": ""
   },
   "internal/view/icons.go": {
@@ -348,10 +348,10 @@
     "semantic_hash": "1518ccc7947261abe372b1b7d80418f6"
   },
   "internal/view/render.go": {
-    "mtime": 1792503604.6222045,
-    "seen": 1792577377.7512193,
-    "ast_hash": "989bf9734dcdfa095822784487112205",
-    "semantic_hash": "989bf9734dcdfa095822784487112205"
+    "mtime": 1792578633.088958,
+    "seen": 1792578669.2489629,
+    "ast_hash": "1c3dec8183e0ca13d6b940a3e2e50eeb",
+    "semantic_hash": ""
   },
   "migrations/0001_init.sql": {
     "mtime": 1792501250.1161256,
