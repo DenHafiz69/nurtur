@@ -17,6 +17,8 @@ import (
 // # comments, and single- or double-quoted values. Variable expansion and
 // command substitution are not supported because secrets should stay literal.
 func loadDotEnv(path string, mustExist bool) error {
+	// #nosec G304 G703 -- the path is the operator's explicit NURTUR_ENV_FILE
+	// (or the conventional .env); reading that chosen file is the purpose here.
 	file, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) && !mustExist {
 		return nil
