@@ -224,7 +224,7 @@ func (s *Server) eventRows(feeds []feed.Feed, diapers []diaper.Diaper, sleeps []
 		if active {
 			title = "Nursing"
 		} else {
-			detail += " · " + view.FormatDuration(left+right)
+			detail = view.FeedDetail(left, right)
 		}
 		rows = append(rows, view.EventRow{
 			Kind:         "feed",

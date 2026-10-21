@@ -84,6 +84,24 @@ func TestSplitLabel(t *testing.T) {
 	}
 }
 
+func TestFeedDetail(t *testing.T) {
+	tests := []struct {
+		left, right time.Duration
+		want        string
+	}{
+		{0, 0, "Under a minute"},
+		{45 * time.Second, 0, "Under a minute"},
+		{20 * time.Second, 20 * time.Second, "Under a minute"},
+		{time.Minute, 0, "L 1m"},
+		{8 * time.Minute, 12 * time.Minute, "L 8m · R 12m · 20m"},
+	}
+	for _, tt := range tests {
+		if got := FeedDetail(tt.left, tt.right); got != tt.want {
+			t.Errorf("FeedDetail(%v, %v) = %q, want %q", tt.left, tt.right, got, tt.want)
+		}
+	}
+}
+
 func TestGreeting(t *testing.T) {
 	tests := []struct {
 		hour int

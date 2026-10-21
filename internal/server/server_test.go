@@ -194,6 +194,23 @@ func TestStartSwitchStopFlow(t *testing.T) {
 	}
 }
 
+func TestSubMinuteFeedReadsClearly(t *testing.T) {
+	env := newTestEnv(t)
+	env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true)
+	env.clock.Advance(5 * time.Second)
+	rec := env.do(t, http.MethodPost, "/feeds/1/stop", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stop status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Under a minute") {
+		t.Errorf("sub-minute feed detail missing:\n%s", body)
+	}
+	if strings.Contains(body, "0m · 0m") {
+		t.Errorf("sub-minute feed detail still shows duplicate zeros:\n%s", body)
+	}
+}
+
 func TestNonHTMXStartRedirects(t *testing.T) {
 	env := newTestEnv(t)
 	rec := env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, false)

@@ -84,6 +84,20 @@ func SplitLabel(left, right time.Duration, fallback feed.Side) string {
 	}
 }
 
+// FeedDetail renders the secondary line on a completed feed row. Sub-minute
+// feeds read as "Under a minute" rather than the redundant "L 0m · 0m". The
+// total is only repeated when both sides contributed to it.
+func FeedDetail(left, right time.Duration) string {
+	if left+right < time.Minute {
+		return "Under a minute"
+	}
+	label := SplitLabel(left, right, feed.SideLeft)
+	if left > 0 && right > 0 {
+		label += " · " + FormatDuration(left+right)
+	}
+	return label
+}
+
 // TodaySplitLabel is used on the summary card.
 func TodaySplitLabel(left, right time.Duration) string {
 	if left <= 0 && right <= 0 {

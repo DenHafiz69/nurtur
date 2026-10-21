@@ -183,7 +183,7 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 		if active {
 			title = "Nursing"
 		} else {
-			detail += " · " + view.FormatDuration(left+right)
+			detail = view.FeedDetail(left, right)
 		}
 		return view.EventRow{
 			Kind:         "feed",
