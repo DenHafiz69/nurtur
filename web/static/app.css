@@ -963,6 +963,8 @@ button {
 .sleep-slot,
 .sleep-slot form {
   display: flex;
+  width: 100%;
+  min-width: 0;
   margin: 0;
 }
 
