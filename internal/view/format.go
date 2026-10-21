@@ -152,12 +152,13 @@ func SleepTotalLabel(d time.Duration) string {
 	return FormatDuration(d) + " sleep"
 }
 
-// FormatClock renders a timestamp in the configured timezone.
+// FormatClock renders a timestamp in the configured timezone using a 12-hour
+// clock with an AM/PM suffix.
 func FormatClock(t time.Time, loc *time.Location) string {
 	if loc == nil {
 		loc = time.Local
 	}
-	return t.In(loc).Format("15:04")
+	return t.In(loc).Format("3:04 PM")
 }
 
 // FormatRange renders a local start–end pair.

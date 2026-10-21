@@ -276,12 +276,12 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 		out.SyncStatus = "Synced"
 	}
 	if status.LastPush != nil {
-		out.LastPush = status.LastPush.In(s.loc).Format("Jan 2, 15:04")
+		out.LastPush = status.LastPush.In(s.loc).Format("Jan 2, 3:04 PM")
 	} else {
 		out.LastPush = "Never"
 	}
 	if status.LastPull != nil {
-		out.LastPull = status.LastPull.In(s.loc).Format("Jan 2, 15:04")
+		out.LastPull = status.LastPull.In(s.loc).Format("Jan 2, 3:04 PM")
 	} else {
 		out.LastPull = "Never"
 	}

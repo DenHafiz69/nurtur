@@ -49,7 +49,7 @@ func ISO(t time.Time) string {
 
 // Clock is the local wall-clock label used in lists.
 func (p *PageData) Clock(t time.Time) string {
-	return t.In(p.location()).Format("15:04")
+	return FormatClock(t, p.location())
 }
 
 // DateInput formats a datetime-local value in the configured timezone.

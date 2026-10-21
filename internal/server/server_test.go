@@ -187,7 +187,7 @@ func TestStartSwitchStopFlow(t *testing.T) {
 
 	rec = env.do(t, http.MethodGet, "/", nil, false)
 	body = rec.Body.String()
-	for _, want := range []string{"12:00", "20m", "L 8m · R 12m", "1 feed", "L 8m · R 12m · 20m total"} {
+	for _, want := range []string{"12:00 PM", "20m", "L 8m · R 12m", "1 feed", "L 8m · R 12m · 20m total"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard after stop missing %q", want)
 		}
@@ -299,7 +299,7 @@ func TestEditCompletedFeed(t *testing.T) {
 
 	rec = env.do(t, http.MethodGet, "/", nil, false)
 	body = rec.Body.String()
-	if !strings.Contains(body, "L 10m · R 5m") || !strings.Contains(body, "11:50") {
+	if !strings.Contains(body, "L 10m · R 5m") || !strings.Contains(body, "11:50 AM") {
 		t.Fatalf("dashboard did not reflect edit:\n%s", body)
 	}
 }

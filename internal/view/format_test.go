@@ -44,6 +44,29 @@ func TestFormatTimer(t *testing.T) {
 	}
 }
 
+func TestFormatClock(t *testing.T) {
+	tests := []struct {
+		at   time.Time
+		want string
+	}{
+		{time.Date(2026, 10, 21, 17, 58, 0, 0, time.UTC), "5:58 PM"},
+		{time.Date(2026, 10, 21, 9, 7, 0, 0, time.UTC), "9:07 AM"},
+		{time.Date(2026, 10, 21, 0, 5, 0, 0, time.UTC), "12:05 AM"},
+		{time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC), "12:00 PM"},
+	}
+	for _, tt := range tests {
+		if got := FormatClock(tt.at, time.UTC); got != tt.want {
+			t.Errorf("FormatClock(%v) = %q, want %q", tt.at, got, tt.want)
+		}
+	}
+
+	start := time.Date(2026, 10, 21, 17, 58, 0, 0, time.UTC)
+	end := time.Date(2026, 10, 21, 18, 3, 0, 0, time.UTC)
+	if got := FormatRange(start, end, time.UTC); got != "5:58 PM–6:03 PM" {
+		t.Errorf("FormatRange = %q", got)
+	}
+}
+
 func TestFormatAgo(t *testing.T) {
 	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
