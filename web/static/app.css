@@ -254,6 +254,16 @@ button {
   white-space: nowrap;
 }
 
+.baby-age {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .theme-toggle {
   flex: none;
   display: grid;
@@ -1333,7 +1343,9 @@ button {
 }
 
 input[type="datetime-local"],
-input[type="number"] {
+input[type="date"],
+input[type="number"],
+select {
   width: 100%;
   min-height: 48px;
   padding: 8px 12px;

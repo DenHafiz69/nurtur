@@ -58,6 +58,28 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 	})
 }
 
+// SetSettingsOnce stores values only when their keys do not exist yet. It backs
+// profile details that are deliberately immutable, such as a baby's birth date.
+// Existing values are left untouched rather than failing the whole batch, so a
+// retried onboarding request stays harmless.
+func (s *Store) SetSettingsOnce(ctx context.Context, values map[string]string) error {
+	if len(values) == 0 {
+		return nil
+	}
+	return s.WithTx(ctx, func(tx *sql.Tx) error {
+		keys := sortedKeys(values)
+		for _, key := range keys {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO settings (account_id, key, value) VALUES (?, ?, ?)
+				 ON CONFLICT(account_id, key) DO NOTHING`,
+				AccountID(ctx), key, values[key]); err != nil {
+				return fmt.Errorf("store: set setting once %s: %w", key, err)
+			}
+		}
+		return nil
+	})
+}
+
 // setSettingsTx upserts settings for one account inside an existing
 // transaction. Callers pass the batch through it so one logical write stays
 // atomic.
@@ -65,11 +87,7 @@ func setSettingsTx(ctx context.Context, tx *sql.Tx, accountID int64, values map[
 	if len(values) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := sortedKeys(values)
 
 	for _, key := range keys {
 		if _, err := tx.ExecContext(ctx,
@@ -80,4 +98,14 @@ func setSettingsTx(ctx context.Context, tx *sql.Tx, accountID int64, values map[
 		}
 	}
 	return nil
+}
+
+// sortedKeys makes multi-key writes deterministic for tests and logs.
+func sortedKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

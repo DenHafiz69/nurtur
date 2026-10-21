@@ -45,7 +45,7 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		t.Fatalf("signup page = %d", rec.Code)
 	}
 	body = rec.Body.String()
-	for _, want := range []string{"Secret key", "Username", "Baby's name", "Confirm password", "Create account"} {
+	for _, want := range []string{"Secret key", "Username", "Baby's name", "date of birth", "Gender", "Confirm password", "Create account"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("signup page missing %q\n%s", want, body)
 		}
@@ -56,6 +56,8 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		"secret_key":       {"wrong"},
 		"username":         {"wife"},
 		"baby_name":        {"Aisyah"},
+		"baby_birth_date":  {"2026-06-20"},
+		"baby_gender":      {"girl"},
 		"password":         {"correct horse"},
 		"confirm_password": {"correct horse"},
 	}, false)
@@ -72,6 +74,8 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		"secret_key":       {"only-for-my-wife"},
 		"username":         {"  Wife  "},
 		"baby_name":        {"  Aisyah  "},
+		"baby_birth_date":  {"2026-06-20"},
+		"baby_gender":      {"girl"},
 		"password":         {"correct horse"},
 		"confirm_password": {"correct horse"},
 		"next":             {"/settings"},
@@ -94,6 +98,14 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 	if err != nil || !ok || storedName != "Aisyah" {
 		t.Fatalf("stored baby_name = %q, ok=%v, err=%v", storedName, ok, err)
 	}
+	storedBirthDate, ok, err := env.store.Setting(acctCtx, settingBabyBirthDate)
+	if err != nil || !ok || storedBirthDate != "2026-06-20" {
+		t.Fatalf("stored baby_birth_date = %q, ok=%v, err=%v", storedBirthDate, ok, err)
+	}
+	storedGender, ok, err := env.store.Setting(acctCtx, settingBabyGender)
+	if err != nil || !ok || storedGender != "girl" {
+		t.Fatalf("stored baby_gender = %q, ok=%v, err=%v", storedGender, ok, err)
+	}
 
 	// Signup stays open for anyone with the secret key. Each account gets its
 	// own baby profile and data, so the form always asks for a name.
@@ -111,6 +123,8 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		"secret_key":       {"only-for-my-wife"},
 		"username":         {"husband"},
 		"baby_name":        {"Someone else"},
+		"baby_birth_date":  {"2026-06-20"},
+		"baby_gender":      {"girl"},
 		"password":         {"another password"},
 		"confirm_password": {"another password"},
 	}, false)
@@ -138,6 +152,8 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		"secret_key":       {"only-for-my-wife"},
 		"username":         {"husband"},
 		"baby_name":        {"Another baby"},
+		"baby_birth_date":  {"2026-06-20"},
+		"baby_gender":      {"girl"},
 		"password":         {"another password"},
 		"confirm_password": {"another password"},
 	}, false)
@@ -188,6 +204,8 @@ func TestAccountsHaveSeparateData(t *testing.T) {
 			"secret_key":       {"only-for-my-wife"},
 			"username":         {username},
 			"baby_name":        {babyName},
+			"baby_birth_date":  {"2026-06-20"},
+			"baby_gender":      {"girl"},
 			"password":         {"correct horse"},
 			"confirm_password": {"correct horse"},
 		}, false)
@@ -251,6 +269,8 @@ func TestOnboardingRejectsWeakCredentials(t *testing.T) {
 			"secret_key":       {"only-for-my-wife"},
 			"username":         {username},
 			"baby_name":        {babyName},
+			"baby_birth_date":  {"2026-06-20"},
+			"baby_gender":      {"girl"},
 			"password":         {password},
 			"confirm_password": {confirm},
 		}, false)
@@ -269,6 +289,49 @@ func TestOnboardingRejectsWeakCredentials(t *testing.T) {
 	rec = post("wife", "correct horse", "correct horse", "   ")
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "name is required") {
 		t.Fatalf("missing baby name = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if count, err := env.store.CountAccounts(context.Background()); err != nil || count != 0 {
+		t.Fatalf("rejected signup created an account: count=%d err=%v", count, err)
+	}
+}
+
+func TestSignupRejectsInvalidBabyDetails(t *testing.T) {
+	env := newTestEnvConfig(t, func(cfg *Config) {
+		cfg.SignupKey = "only-for-my-wife"
+	})
+
+	post := func(birthDate, gender string) *httptest.ResponseRecorder {
+		return env.do(t, http.MethodPost, "/signup", url.Values{
+			"secret_key":       {"only-for-my-wife"},
+			"username":         {"wife"},
+			"baby_name":        {"Aisyah"},
+			"baby_birth_date":  {birthDate},
+			"baby_gender":      {gender},
+			"password":         {"correct horse"},
+			"confirm_password": {"correct horse"},
+		}, false)
+	}
+
+	cases := []struct {
+		name     string
+		birth    string
+		gender   string
+		contains string
+	}{
+		{"missing date", "", "girl", "date of birth is required"},
+		{"invalid date", "20/06/2026", "girl", "look right"},
+		{"future date", "2026-10-21", "girl", "in the future"},
+		{"too old", "2021-10-19", "girl", "more than 5 years"},
+		{"missing gender", "2026-06-20", "", "Choose the baby"},
+		{"invalid gender", "2026-06-20", "other", "Choose Girl or Boy"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := post(tt.birth, tt.gender)
+			if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), tt.contains) {
+				t.Fatalf("signup = %d\n%s", rec.Code, rec.Body.String())
+			}
+		})
 	}
 	if count, err := env.store.CountAccounts(context.Background()); err != nil || count != 0 {
 		t.Fatalf("rejected signup created an account: count=%d err=%v", count, err)

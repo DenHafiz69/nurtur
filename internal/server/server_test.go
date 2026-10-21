@@ -36,6 +36,18 @@ func newTestEnv(t *testing.T) *testEnv {
 
 func newTestEnvConfig(t *testing.T, mutate func(*Config)) *testEnv {
 	t.Helper()
+	return newTestEnvWithProfile(t, mutate, true)
+}
+
+// newTestEnvWithoutProfile leaves the baby profile incomplete so tests can
+// exercise the one-time welcome flow.
+func newTestEnvWithoutProfile(t *testing.T, mutate func(*Config)) *testEnv {
+	t.Helper()
+	return newTestEnvWithProfile(t, mutate, false)
+}
+
+func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool) *testEnv {
+	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 	st, err := store.Open(context.Background(), store.Options{
 		Path:      filepath.Join(t.TempDir(), "nurtur.db"),
@@ -48,6 +60,14 @@ func newTestEnvConfig(t *testing.T, mutate func(*Config)) *testEnv {
 	t.Cleanup(func() { _ = st.Close() })
 	if err := st.Migrate(context.Background(), os.DirFS("../../migrations"), testNow); err != nil {
 		t.Fatalf("Migrate: %v", err)
+	}
+	if seedProfile {
+		if err := st.SetSettings(context.Background(), map[string]string{
+			settingBabyBirthDate: "2026-06-20",
+			settingBabyGender:    babyGenderGirl,
+		}); err != nil {
+			t.Fatalf("seed baby profile: %v", err)
+		}
 	}
 
 	fakeClock := clock.NewFake(testNow)

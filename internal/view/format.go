@@ -246,6 +246,65 @@ func DayMetaLabel(diapers int, sleep time.Duration) string {
 	return strings.Join(parts, " · ")
 }
 
+// FormatBabyAge renders how old the baby is from their birth date. The result
+// reads naturally next to the baby's name: "born today", "12 days old",
+// "3 weeks old", "4 months old", or "2 years 3 months old". It returns an
+// empty string when the birth date is missing or in the future.
+func FormatBabyAge(birthDate, now time.Time, loc *time.Location) string {
+	if birthDate.IsZero() {
+		return ""
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	born := birthDate.In(loc)
+	current := now.In(loc)
+	bornDay := time.Date(born.Year(), born.Month(), born.Day(), 0, 0, 0, 0, time.UTC)
+	currentDay := time.Date(current.Year(), current.Month(), current.Day(), 0, 0, 0, 0, time.UTC)
+	days := int(currentDay.Sub(bornDay).Hours() / 24)
+	if days < 0 {
+		return ""
+	}
+
+	months := (current.Year()-born.Year())*12 + int(current.Month()) - int(born.Month())
+	if current.Day() < born.Day() {
+		months--
+	}
+	if months < 0 {
+		months = 0
+	}
+
+	switch {
+	case days == 0:
+		return "born today"
+	case days < 14:
+		return ageCount(days, "day") + " old"
+	case months < 1:
+		weeks := days / 7
+		if weeks < 1 {
+			weeks = 1
+		}
+		return ageCount(weeks, "week") + " old"
+	case months < 24:
+		return ageCount(months, "month") + " old"
+	default:
+		years := months / 12
+		rest := months % 12
+		if rest == 0 {
+			return ageCount(years, "year") + " old"
+		}
+		return ageCount(years, "year") + " " + ageCount(rest, "month") + " old"
+	}
+}
+
+// ageCount pluralizes a simple count, e.g. "1 month" or "4 months".
+func ageCount(n int, unit string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, unit)
+	}
+	return fmt.Sprintf("%d %ss", n, unit)
+}
+
 // FormatBytes renders a compact file size.
 func FormatBytes(n int64) string {
 	switch {

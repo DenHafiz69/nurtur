@@ -15,15 +15,39 @@ import (
 )
 
 const (
-	settingNightStart = "night_start"
-	settingNightEnd   = "night_end"
-	settingBabyName   = "baby_name"
+	settingNightStart    = "night_start"
+	settingNightEnd      = "night_end"
+	settingBabyName      = "baby_name"
+	settingBabyBirthDate = "baby_birth_date"
+	settingBabyGender    = "baby_gender"
+
+	babyGenderGirl = "girl"
+	babyGenderBoy  = "boy"
+
+	// maxBabyAgeYears keeps an obvious typo from saving a birth date that would
+	// render a five-year-old as a "newborn" or an adult as a baby.
+	maxBabyAgeYears = 5
 )
 
 var (
-	errBabyNameRequired = errors.New("baby name is required")
-	errBabyNameTooLong  = errors.New("baby name must be 40 characters or fewer")
+	errBabyNameRequired  = errors.New("baby name is required")
+	errBabyNameTooLong   = errors.New("baby name must be 40 characters or fewer")
+	errBirthDateRequired = errors.New("baby birth date is required")
+	errBirthDateInvalid  = errors.New("baby birth date must be a valid date")
+	errBirthDateFuture   = errors.New("baby birth date cannot be in the future")
+	errBirthDateTooOld   = errors.New("baby birth date must be within the last 5 years")
+	errGenderRequired    = errors.New("baby gender is required")
+	errGenderInvalid     = errors.New("baby gender must be girl or boy")
 )
+
+// babyProfile is the account's one baby. BirthDate and Gender are written once
+// during onboarding and never edited.
+type babyProfile struct {
+	Name      string
+	BirthDate time.Time
+	Gender    string
+	Complete  bool
+}
 
 // currentBabyName returns the name saved for the account bound to ctx,
 // falling back to the environment value for installs that predate onboarding.
@@ -36,6 +60,110 @@ func (s *Server) currentBabyName(ctx context.Context) string {
 		}
 	}
 	return name
+}
+
+// currentBabyProfile loads the account's baby details. Complete is false when
+// either the birth date or gender is missing, which sends existing accounts to
+// the one-time welcome page.
+func (s *Server) currentBabyProfile(ctx context.Context) (babyProfile, error) {
+	values, err := s.store.Settings(ctx)
+	if err != nil {
+		return babyProfile{}, fmt.Errorf("server: load baby profile: %w", err)
+	}
+
+	profile := babyProfile{Name: strings.TrimSpace(s.defaultBabyName)}
+	if stored := strings.TrimSpace(values[settingBabyName]); stored != "" {
+		profile.Name = stored
+	}
+	if raw := strings.TrimSpace(values[settingBabyBirthDate]); raw != "" {
+		if born, err := time.ParseInLocation("2006-01-02", raw, s.loc); err == nil {
+			profile.BirthDate = born
+		}
+	}
+	switch values[settingBabyGender] {
+	case babyGenderGirl, babyGenderBoy:
+		profile.Gender = values[settingBabyGender]
+	}
+	profile.Complete = !profile.BirthDate.IsZero() && profile.Gender != ""
+	return profile, nil
+}
+
+// todayISO is the local calendar date used as the max value on date inputs.
+func (s *Server) todayISO() string {
+	return s.clock.Now().In(s.loc).Format("2006-01-02")
+}
+
+// parseBirthDate accepts a calendar date and rejects missing, malformed,
+// future, and implausibly old values.
+func parseBirthDate(raw string, now time.Time, loc *time.Location) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, errBirthDateRequired
+	}
+	parsed, err := time.ParseInLocation("2006-01-02", raw, loc)
+	if err != nil {
+		return time.Time{}, errBirthDateInvalid
+	}
+	localNow := now.In(loc)
+	today := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, loc)
+	born := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, loc)
+	if born.After(today) {
+		return time.Time{}, errBirthDateFuture
+	}
+	if born.Before(today.AddDate(-maxBabyAgeYears, 0, 0)) {
+		return time.Time{}, errBirthDateTooOld
+	}
+	return born, nil
+}
+
+// parseBabyGender normalizes the limited set of choices the form offers.
+func parseBabyGender(raw string) (string, error) {
+	gender := strings.ToLower(strings.TrimSpace(raw))
+	switch gender {
+	case "":
+		return "", errGenderRequired
+	case babyGenderGirl, babyGenderBoy:
+		return gender, nil
+	default:
+		return "", errGenderInvalid
+	}
+}
+
+// babyGenderLabel renders the stored value for display.
+func babyGenderLabel(gender string) string {
+	switch gender {
+	case babyGenderGirl:
+		return "Girl"
+	case babyGenderBoy:
+		return "Boy"
+	default:
+		return ""
+	}
+}
+
+// birthDateMessage renders a validation error as copy for the signup and
+// welcome forms.
+func birthDateMessage(err error) string {
+	switch {
+	case errors.Is(err, errBirthDateRequired):
+		return "Baby's date of birth is required."
+	case errors.Is(err, errBirthDateFuture):
+		return "The date of birth can't be in the future."
+	case errors.Is(err, errBirthDateTooOld):
+		return "That date is more than 5 years ago. Check the year?"
+	default:
+		return "That date doesn't look right. Try again?"
+	}
+}
+
+// genderMessage renders a validation error as form copy.
+func genderMessage(err error) string {
+	switch {
+	case errors.Is(err, errGenderRequired):
+		return "Choose the baby's gender."
+	default:
+		return "Choose Girl or Boy."
+	}
 }
 
 // parseBabyName trims and collapses whitespace so a name typed with stray

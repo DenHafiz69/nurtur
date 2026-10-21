@@ -360,6 +360,7 @@ func (s *Server) authPageData(r *http.Request, mode, next string) *view.PageData
 		Next:         next,
 		AccountLogin: s.auth.accountLogin(),
 		SignupOpen:   s.auth.signupOpen(),
+		MaxBirthDate: s.todayISO(),
 	}
 }
 
@@ -482,12 +483,16 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 
 	rawUsername := strings.TrimSpace(r.FormValue("username"))
 	rawBabyName := r.FormValue("baby_name")
+	rawBirthDate := r.FormValue("baby_birth_date")
+	rawGender := r.FormValue("baby_gender")
 	password := r.FormValue("password")
 	confirm := r.FormValue("confirm_password")
 	reject := func(status int, message string) {
 		data := s.authPageData(r, "signup", next)
 		data.Username = rawUsername
 		data.BabyName = rawBabyName
+		data.BabyBirthDate = rawBirthDate
+		data.BabyGender = rawGender
 		data.SignupError = message
 		s.renderNamed(w, r, status, "login", data)
 	}
@@ -516,6 +521,16 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusBadRequest, babyNameMessage(err))
 		return
 	}
+	birthDate, err := parseBirthDate(rawBirthDate, s.clock.Now(), s.loc)
+	if err != nil {
+		reject(http.StatusBadRequest, birthDateMessage(err))
+		return
+	}
+	gender, err := parseBabyGender(rawGender)
+	if err != nil {
+		reject(http.StatusBadRequest, genderMessage(err))
+		return
+	}
 
 	hash, err := account.HashPassword(password)
 	if err != nil {
@@ -524,7 +539,11 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 	acct, err := s.store.CreateAccountWithSettings(
 		r.Context(), username, hash,
-		map[string]string{settingBabyName: babyName},
+		map[string]string{
+			settingBabyName:      babyName,
+			settingBabyBirthDate: birthDate.Format("2006-01-02"),
+			settingBabyGender:    gender,
+		},
 		s.clock.Now(),
 	)
 	if err != nil {

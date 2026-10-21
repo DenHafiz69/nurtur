@@ -256,3 +256,33 @@ func TestFormatBytes(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatBabyAge(t *testing.T) {
+	loc := time.FixedZone("test", 8*60*60)
+	now := time.Date(2026, 10, 20, 9, 30, 0, 0, loc)
+	cases := []struct {
+		name string
+		born time.Time
+		want string
+	}{
+		{"today", time.Date(2026, 10, 20, 0, 0, 0, 0, loc), "born today"},
+		{"one day", time.Date(2026, 10, 19, 0, 0, 0, 0, loc), "1 day old"},
+		{"twelve days", time.Date(2026, 10, 8, 0, 0, 0, 0, loc), "12 days old"},
+		{"two weeks", time.Date(2026, 10, 5, 0, 0, 0, 0, loc), "2 weeks old"},
+		{"one month", time.Date(2026, 9, 19, 0, 0, 0, 0, loc), "1 month old"},
+		{"four months", time.Date(2026, 6, 20, 0, 0, 0, 0, loc), "4 months old"},
+		{"two years", time.Date(2024, 10, 20, 0, 0, 0, 0, loc), "2 years old"},
+		{"two years three months", time.Date(2024, 7, 20, 0, 0, 0, 0, loc), "2 years 3 months old"},
+		{"future", time.Date(2026, 11, 1, 0, 0, 0, 0, loc), ""},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FormatBabyAge(tt.born, now, loc); got != tt.want {
+				t.Errorf("FormatBabyAge(%s) = %q, want %q", tt.born.Format("2006-01-02"), got, tt.want)
+			}
+		})
+	}
+	if got := FormatBabyAge(time.Time{}, now, loc); got != "" {
+		t.Errorf("FormatBabyAge(zero) = %q, want empty", got)
+	}
+}

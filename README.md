@@ -86,8 +86,9 @@ make build
 ./bin/nurtur
 ```
 
-The baby's name is asked for during onboarding and stored in the database, so
-it does not need an environment variable.
+The baby's name, date of birth, and gender are asked for during onboarding and
+stored in the database, so they do not need environment variables. The header
+shows the baby's current age, derived from the stored birth date.
 
 The local file is the write path. A feed or diaper log commits locally and
 returns immediately; a debounced background `Push` copies changes to Turso
@@ -189,7 +190,8 @@ service.
 
 - `/settings` shows the baby name (editable), the timezone (from the
   environment), the editable night window, theme help, sync state, database
-  path/size, and backup links.
+  path/size, and backup links. The birth date and gender are deliberately not
+  editable.
 - `GET /export.json` is a structured copy with feeds (and segments), diapers,
   sleeps, settings, and per-side minute totals.
 - `GET /export.csv` is one row per event. Columns:
@@ -467,17 +469,23 @@ The first browser that opens Nurtur is asked **“Do you already have an
 account?”**
 
 - **No, I'm new here** → enter the signup key, choose a username and password,
-  and enter the baby's name. The key is only checked locally; no email, OAuth, or
-  external service is involved. Nurtur stores a PBKDF2-SHA256 password hash for
-  each account.
+  and enter the baby's name, date of birth, and gender. The key is only checked
+  locally; no email, OAuth, or external service is involved. Nurtur stores a
+  PBKDF2-SHA256 password hash for each account.
 - **Yes, sign in** → enter your username and password.
 
 Anyone who knows the signup key can create another account. Every account has
-its own private baby profile and care log: its own baby name, night window,
-feeds, diapers, sleep sessions, timeline, and exports. Accounts cannot see or
-change each other's data. The baby's name is shown in the header and sleep
-messages and can be corrected later on **Settings**. `NURTUR_BABY_NAME` remains
+its own private baby profile and care log: its own baby name, birth date,
+gender, night window, feeds, diapers, sleep sessions, timeline, and exports.
+Accounts cannot see or change each other's data. The baby's name is shown in the
+header and sleep messages and can be corrected later on **Settings**. The birth
+date and gender are written once during onboarding and cannot be changed; the
+header shows the age derived from the birth date. `NURTUR_BABY_NAME` remains
 only as a fallback for an account that has not saved a name yet.
+
+Accounts created before the birth date and gender existed are sent to a
+one-time **One more thing** page after their next page load. It asks for those
+two details and then never appears again.
 
 Every other browser/device sees the same question and can sign in. Accounts live
 in the `accounts` table in the local database, so removing `NURTUR_SIGNUP_KEY`

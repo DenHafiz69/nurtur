@@ -1,0 +1,52 @@
+{{define "welcome"}}<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nurtur — one more thing</title>
+  <meta name="theme-color" content="#fff8f0">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
+  <script nonce="{{.Nonce}}">
+    (function () {
+      try {
+        var mode = localStorage.getItem("nurtur.theme") || "auto";
+        var hour = new Date().getHours();
+        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var theme = (mode === "day" || mode === "night") ? mode : auto;
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{asset "/static/app.css"}}">
+</head>
+<body class="auth-body">
+  <main class="auth-card">
+    <span class="pip auth-pip">{{pip "awake"}}</span>
+    <h1 class="auth-title">One more thing</h1>
+    <p class="auth-copy">Tell us when {{if .BabyName}}{{.BabyName}}{{else}}your baby{{end}} was born so we can show how old they are on the homepage.</p>
+
+    <form class="auth-form" method="post" action="/welcome">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label class="field">
+        <span class="field-label">Baby's date of birth</span>
+        <input type="date" name="baby_birth_date" value="{{.BabyBirthDate}}" max="{{.MaxBirthDate}}" required autofocus>
+      </label>
+      <label class="field">
+        <span class="field-label">Gender</span>
+        <select name="baby_gender" required>
+          <option value=""{{if not .BabyGender}} selected{{end}} disabled>Choose</option>
+          <option value="girl"{{if eq .BabyGender "girl"}} selected{{end}}>Girl</option>
+          <option value="boy"{{if eq .BabyGender "boy"}} selected{{end}}>Boy</option>
+        </select>
+      </label>
+      {{if .ProfileError}}<p class="field-error" role="alert">{{.ProfileError}}</p>{{end}}
+      <button type="submit" class="btn btn-primary auth-submit">{{icon "check"}}<span>Save and continue</span></button>
+    </form>
+
+    <p class="auth-note">These details can't be changed later. The baby's name can still be edited on Settings.</p>
+  </main>
+</body>
+</html>{{end}}

@@ -9,13 +9,15 @@ import (
 // PageData is the single view model used by the dashboard, fragments, and
 // out-of-band updates. Building it is cheap: a handful of small queries.
 type PageData struct {
-	Nonce      string
-	Version    string
-	BabyName   string
-	Greeting   string
-	TodayLabel string
-	Now        time.Time
-	Location   *time.Location
+	Nonce           string
+	Version         string
+	BabyName        string
+	BabyAge         string
+	BabyGenderLabel string
+	Greeting        string
+	TodayLabel      string
+	Now             time.Time
+	Location        *time.Location
 
 	// View selects the page body inside layout.html: "" or "dashboard",
 	// "timeline", "settings".
@@ -42,13 +44,17 @@ type PageData struct {
 	SyncChip    *SyncChipView
 
 	// Login page state.
-	AuthMode     string // chooser, login, signup
-	AccountLogin bool   // username/password form rather than the legacy passcode
-	SignupOpen   bool
-	LoginError   string
-	SignupError  string
-	Username     string
-	Next         string
+	AuthMode      string // chooser, login, signup
+	AccountLogin  bool   // username/password form rather than the legacy passcode
+	SignupOpen    bool
+	LoginError    string
+	SignupError   string
+	Username      string
+	BabyBirthDate string
+	BabyGender    string
+	MaxBirthDate  string
+	ProfileError  string
+	Next          string
 
 	Toast     *Toast
 	Edit      *EditView

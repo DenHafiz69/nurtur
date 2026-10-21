@@ -24,16 +24,22 @@ func DayBounds(now time.Time, loc *time.Location) (time.Time, time.Time) {
 // dashboard, cards, badge, summary, and list therefore always agree.
 func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast) (*view.PageData, error) {
 	now := s.clock.Now().UTC()
+	profile, err := s.currentBabyProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
 	p := &view.PageData{
-		Nonce:       nonce,
-		Version:     s.version,
-		BabyName:    s.currentBabyName(ctx),
-		Now:         now,
-		Location:    s.loc,
-		Toast:       toast,
-		CSRF:        csrfFrom(ctx),
-		AuthEnabled: s.auth.enabled(),
-		SyncChip:    s.syncChip(),
+		Nonce:           nonce,
+		Version:         s.version,
+		BabyName:        profile.Name,
+		BabyAge:         view.FormatBabyAge(profile.BirthDate, now, s.loc),
+		BabyGenderLabel: babyGenderLabel(profile.Gender),
+		Now:             now,
+		Location:        s.loc,
+		Toast:           toast,
+		CSRF:            csrfFrom(ctx),
+		AuthEnabled:     s.auth.enabled(),
+		SyncChip:        s.syncChip(),
 	}
 	p.Greeting = view.Greeting(now.In(s.loc).Hour())
 	p.TodayLabel = now.In(s.loc).Format("Monday, January 2")

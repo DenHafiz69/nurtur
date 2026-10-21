@@ -53,6 +53,18 @@
         <input type="text" name="baby_name" value="{{.BabyName}}" autocomplete="off" maxlength="40" placeholder="Aisyah" required>
       </label>
       <label class="field">
+        <span class="field-label">Baby's date of birth</span>
+        <input type="date" name="baby_birth_date" value="{{.BabyBirthDate}}" max="{{.MaxBirthDate}}" required>
+      </label>
+      <label class="field">
+        <span class="field-label">Gender</span>
+        <select name="baby_gender" required>
+          <option value=""{{if not .BabyGender}} selected{{end}} disabled>Choose</option>
+          <option value="girl"{{if eq .BabyGender "girl"}} selected{{end}}>Girl</option>
+          <option value="boy"{{if eq .BabyGender "boy"}} selected{{end}}>Boy</option>
+        </select>
+      </label>
+      <label class="field">
         <span class="field-label">Password</span>
         <input type="password" name="password" autocomplete="new-password" minlength="8" required>
       </label>

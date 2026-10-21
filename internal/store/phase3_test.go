@@ -264,3 +264,36 @@ func TestSettingsRoundTrip(t *testing.T) {
 		t.Fatalf("night_end = %q ok=%v err=%v", end, ok, err)
 	}
 }
+
+func TestSetSettingsOnceNeverOverwrites(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+
+	first := map[string]string{
+		"baby_birth_date": "2026-06-20",
+		"baby_gender":     "girl",
+	}
+	if err := st.SetSettingsOnce(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSettingsOnce(ctx, map[string]string{
+		"baby_birth_date": "2026-07-01",
+		"baby_gender":     "boy",
+		"baby_name":       "Aisyah",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	born, ok, err := st.Setting(ctx, "baby_birth_date")
+	if err != nil || !ok || born != "2026-06-20" {
+		t.Fatalf("baby_birth_date = %q ok=%v err=%v", born, ok, err)
+	}
+	gender, ok, err := st.Setting(ctx, "baby_gender")
+	if err != nil || !ok || gender != "girl" {
+		t.Fatalf("baby_gender = %q ok=%v err=%v", gender, ok, err)
+	}
+	name, ok, err := st.Setting(ctx, "baby_name")
+	if err != nil || !ok || name != "Aisyah" {
+		t.Fatalf("baby_name = %q ok=%v err=%v", name, ok, err)
+	}
+}

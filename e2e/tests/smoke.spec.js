@@ -40,6 +40,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
   test("history delete restores in place within the undo window", async ({ page }) => {
     await page.goto("/timeline");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await page.locator(".timeline-day-head").first().click();
 
     const diaperRow = page.locator("li.event-diaper").first();
     const rowID = await diaperRow.getAttribute("id");
@@ -55,6 +56,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
 
   test("tap a history row opens its edit sheet, and settings save", async ({ page }) => {
     await page.goto("/timeline");
+    await page.locator(".timeline-day-head").first().click();
     await page.locator(".timeline-row-main").first().click();
     await expect(page.locator("dialog.sheet[open]")).toBeVisible();
     await page.keyboard.press("Escape");

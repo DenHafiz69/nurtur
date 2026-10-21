@@ -185,6 +185,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /login", s.handleLogin)
 	mux.HandleFunc("GET /signup", s.handleSignupPage)
 	mux.HandleFunc("POST /signup", s.handleSignup)
+	mux.HandleFunc("GET /welcome", s.handleWelcomePage)
+	mux.HandleFunc("POST /welcome", s.handleSaveWelcome)
 	mux.HandleFunc("POST /logout", s.handleLogout)
 	mux.HandleFunc("GET /offline", s.handleOffline)
 	mux.HandleFunc("GET /sw.js", s.handleServiceWorker)
@@ -194,7 +196,7 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", s.static))
 
-	return s.recoverer(s.logRequests(s.security(s.limitBody(s.auth.middleware(mux)))))
+	return s.recoverer(s.logRequests(s.security(s.limitBody(s.auth.middleware(s.requireBabyProfile(mux))))))
 }
 
 /* ---------- Middleware ---------- */
