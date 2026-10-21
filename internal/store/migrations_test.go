@@ -187,6 +187,63 @@ func TestScopingMigrationPreservesExistingData(t *testing.T) {
 	}
 }
 
+func TestSettingsSchemaRepairAfterMissedRename(t *testing.T) {
+	ctx := context.Background()
+	st := openUnmigratedStore(t)
+	if err := st.Migrate(ctx, os.DirFS("../../migrations"), testNow); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := st.db.ExecContext(ctx, query, args...); err != nil {
+			t.Fatalf("exec %q: %v", query, err)
+		}
+	}
+
+	exec(`INSERT INTO settings (account_id, key, value) VALUES (0, 'baby_name', 'Aisyah')`)
+
+	// Simulate the Turso sync engine applying migration 0004 except for the
+	// final table rewrite: the migration is recorded, settings_scoped holds the
+	// rows, and settings does not exist.
+	exec(`CREATE TABLE settings_scoped (
+		account_id INTEGER NOT NULL DEFAULT 0,
+		key        TEXT NOT NULL,
+		value      TEXT NOT NULL,
+		PRIMARY KEY (account_id, key)
+	)`)
+	exec(`INSERT INTO settings_scoped (account_id, key, value)
+		SELECT account_id, key, value FROM settings`)
+	exec(`DROP TABLE settings`)
+
+	// Another startup reapplies migrations (0004 is already recorded) and must
+	// repair the missing table before any handler touches it.
+	if err := st.Migrate(ctx, os.DirFS("../../migrations"), testNow); err != nil {
+		t.Fatalf("repair migrate: %v", err)
+	}
+
+	name, ok, err := st.Setting(ctx, "baby_name")
+	if err != nil || !ok || name != "Aisyah" {
+		t.Fatalf("repaired baby_name = %q, ok=%v, err=%v", name, ok, err)
+	}
+	if exists, _, err := st.tableShape(ctx, `PRAGMA table_info(settings_scoped)`); err != nil || exists {
+		t.Fatalf("settings_scoped exists=%v err=%v, want removed", exists, err)
+	}
+
+	// This is the path signup takes; it failed with "no such table: settings"
+	// before the repair.
+	acct, err := st.CreateAccountWithSettings(ctx, "wife", "hash", map[string]string{
+		"baby_name": "Bilal",
+	}, testNow)
+	if err != nil {
+		t.Fatalf("create account after repair: %v", err)
+	}
+	got, ok, err := st.Setting(WithAccount(ctx, acct.ID), "baby_name")
+	if err != nil || !ok || got != "Bilal" {
+		t.Fatalf("new account baby_name = %q, ok=%v, err=%v", got, ok, err)
+	}
+}
+
 func TestFirstAccountClaimsLegacyNamespace(t *testing.T) {
 	st := newTestStore(t)
 	ctx := context.Background()

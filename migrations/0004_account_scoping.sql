@@ -27,7 +27,22 @@ INSERT INTO settings_scoped (account_id, key, value)
     SELECT COALESCE((SELECT MIN(id) FROM accounts), 0), key, value FROM settings;
 
 DROP TABLE settings;
-ALTER TABLE settings_scoped RENAME TO settings;
+
+-- Copy the rows into the final table instead of renaming settings_scoped. The
+-- Turso sync engine records ALTER TABLE ... RENAME TO as applied but does not
+-- update the synced schema, which leaves sync-mode installs without a settings
+-- table. CREATE, INSERT, and DROP do replicate correctly.
+CREATE TABLE settings (
+    account_id INTEGER NOT NULL DEFAULT 0,
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    PRIMARY KEY (account_id, key)
+);
+
+INSERT INTO settings (account_id, key, value)
+    SELECT account_id, key, value FROM settings_scoped;
+
+DROP TABLE settings_scoped;
 
 -- Active-row uniqueness is now per account rather than per server.
 DROP INDEX one_active_feed;

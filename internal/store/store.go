@@ -278,7 +278,140 @@ func (s *Store) Migrate(ctx context.Context, fsys fs.FS, now time.Time) error {
 		}
 		s.log.Info("migration applied", "version", entry.Name())
 	}
-	return nil
+	return s.repairSettingsSchema(ctx)
+}
+
+// repairSettingsSchema fixes databases where migration 0004 was recorded but the
+// Turso sync engine did not apply its final table rewrite. Those databases have
+// settings_scoped (often with the rows) but no settings table, so every signup
+// and settings request fails with "no such table: settings". The repair only
+// uses CREATE, INSERT, and DROP, which the sync engine replicates correctly.
+func (s *Store) repairSettingsSchema(ctx context.Context) error {
+	settingsExists, hasAccountID, err := s.tableShape(ctx, `PRAGMA table_info(settings)`)
+	if err != nil {
+		return fmt.Errorf("store: inspect settings: %w", err)
+	}
+	scopedExists, _, err := s.tableShape(ctx, `PRAGMA table_info(settings_scoped)`)
+	if err != nil {
+		return fmt.Errorf("store: inspect settings_scoped: %w", err)
+	}
+
+	if settingsExists && hasAccountID {
+		if !scopedExists {
+			return nil
+		}
+		// A normal database has no settings_scoped left. If one is still here,
+		// keep any rows it holds and remove the stray table.
+		s.log.Warn("repairing stray settings_scoped table")
+		return s.WithTx(ctx, func(tx *sql.Tx) error {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT OR IGNORE INTO settings (account_id, key, value)
+				 SELECT account_id, key, value FROM settings_scoped`); err != nil {
+				return fmt.Errorf("store: merge settings_scoped: %w", err)
+			}
+			if _, err := tx.ExecContext(ctx, `DROP TABLE settings_scoped`); err != nil {
+				return fmt.Errorf("store: drop stray settings_scoped: %w", err)
+			}
+			return nil
+		})
+	}
+
+	s.log.Warn("repairing settings table after incomplete migration",
+		"settings_exists", settingsExists, "settings_scoped_exists", scopedExists)
+
+	return s.WithTx(ctx, func(tx *sql.Tx) error {
+		if !scopedExists {
+			if settingsExists {
+				// The pre-account table survived without its account_id column.
+				// Move it into the scoped shape first.
+				if _, err := tx.ExecContext(ctx, settingsScopedDDL); err != nil {
+					return fmt.Errorf("store: create settings_scoped: %w", err)
+				}
+				if _, err := tx.ExecContext(ctx,
+					`INSERT INTO settings_scoped (account_id, key, value)
+					 SELECT COALESCE((SELECT MIN(id) FROM accounts), 0), key, value FROM settings`); err != nil {
+					return fmt.Errorf("store: copy legacy settings: %w", err)
+				}
+				if _, err := tx.ExecContext(ctx, `DROP TABLE settings`); err != nil {
+					return fmt.Errorf("store: drop legacy settings: %w", err)
+				}
+			} else {
+				// Both tables are gone; create the expected schema so reads and
+				// writes stop failing. There is no data left to recover.
+				if _, err := tx.ExecContext(ctx, settingsDDL); err != nil {
+					return fmt.Errorf("store: create settings: %w", err)
+				}
+				return nil
+			}
+		} else if settingsExists {
+			// An unscoped settings table is still around next to the scoped one.
+			if _, err := tx.ExecContext(ctx,
+				`INSERT OR IGNORE INTO settings_scoped (account_id, key, value)
+				 SELECT COALESCE((SELECT MIN(id) FROM accounts), 0), key, value FROM settings`); err != nil {
+				return fmt.Errorf("store: merge legacy settings: %w", err)
+			}
+			if _, err := tx.ExecContext(ctx, `DROP TABLE settings`); err != nil {
+				return fmt.Errorf("store: drop legacy settings: %w", err)
+			}
+		}
+
+		if _, err := tx.ExecContext(ctx, settingsDDL); err != nil {
+			return fmt.Errorf("store: create settings: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO settings (account_id, key, value)
+			 SELECT account_id, key, value FROM settings_scoped`); err != nil {
+			return fmt.Errorf("store: copy settings_scoped: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `DROP TABLE settings_scoped`); err != nil {
+			return fmt.Errorf("store: drop settings_scoped: %w", err)
+		}
+		return nil
+	})
+}
+
+const settingsDDL = `CREATE TABLE settings (
+	account_id INTEGER NOT NULL DEFAULT 0,
+	key        TEXT NOT NULL,
+	value      TEXT NOT NULL,
+	PRIMARY KEY (account_id, key)
+)`
+
+const settingsScopedDDL = `CREATE TABLE settings_scoped (
+	account_id INTEGER NOT NULL DEFAULT 0,
+	key        TEXT NOT NULL,
+	value      TEXT NOT NULL,
+	PRIMARY KEY (account_id, key)
+)`
+
+// tableShape reports whether the table named by the fixed PRAGMA query exists
+// and whether it has an account_id column. Callers pass constant queries; no
+// user input reaches the SQL string.
+func (s *Store) tableShape(ctx context.Context, query string) (exists, hasAccountID bool, err error) {
+	rows, err := s.db.QueryContext(ctx, query)
+	if err != nil {
+		return false, false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			cid, notNull, pk int
+			name, typ        string
+			defaultValue     sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return false, false, err
+		}
+		exists = true
+		if name == "account_id" {
+			hasAccountID = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, false, err
+	}
+	return exists, hasAccountID, nil
 }
 
 // splitSQL splits a SQLite script on semicolons outside strings and comments.
