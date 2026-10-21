@@ -99,12 +99,19 @@ func (s *Server) handleCreateSleep(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) startSleep(w http.ResponseWriter, r *http.Request, now time.Time) {
 	_, err := s.store.StartSleep(r.Context(), now)
+	name := s.currentBabyName(r.Context())
+	asleep := "Sleep started. Sleep well."
+	already := "Sleep is already running."
+	if name != "" {
+		asleep = name + "'s asleep. Sleep well."
+		already = name + " is already asleep."
+	}
 	var toast *view.Toast
 	switch {
 	case err == nil:
-		toast = &view.Toast{Message: "Pip's asleep. Sleep well.", Kind: "success"}
+		toast = &view.Toast{Message: asleep, Kind: "success"}
 	case errors.Is(err, sleep.ErrAlreadyActive):
-		toast = &view.Toast{Message: "Pip is already asleep.", Kind: "info"}
+		toast = &view.Toast{Message: already, Kind: "info"}
 	case errors.Is(err, sleep.ErrOverlap):
 		toast = &view.Toast{Message: "That would overlap another sleep. Check the times?", Kind: "info"}
 	default:

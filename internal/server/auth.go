@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"nurtur/internal/account"
+	"nurtur/internal/store"
 	"nurtur/internal/view"
 )
 
@@ -32,35 +34,75 @@ const (
 	authCSRFKey authContextKey = "csrf"
 )
 
-// auth implements the optional single-user passcode gate. When no passcode is
-// configured the middleware is a no-op, which keeps LAN-only installs simple.
+// auth implements Nurtur's local gate. It supports the original single
+// passcode and the account flow (username + password created with a signup
+// key). When neither is configured, the middleware is a no-op, which keeps
+// LAN-only installs simple.
 type auth struct {
-	passcode string
-	key      []byte
-	secure   bool
-	limiter  *loginLimiter
+	passcode  string
+	signupKey string
+	key       []byte
+	secure    bool
+	limiter   *loginLimiter
+
+	accountsMu sync.RWMutex
+	accounts   bool
 }
 
-func newAuth(passcode, secret string, secure bool) *auth {
+func newAuth(passcode, signupKey, secret string, secure, hasAccounts bool) *auth {
 	if secret == "" {
-		sum := sha256.Sum256([]byte("nurtur-session:" + passcode))
+		sum := sha256.Sum256([]byte("nurtur-session:" + passcode + ":" + signupKey))
 		secret = string(sum[:])
 	}
 	return &auth{
-		passcode: passcode,
-		key:      []byte(secret),
-		secure:   secure,
-		limiter:  newLoginLimiter(),
+		passcode:  passcode,
+		signupKey: signupKey,
+		key:       []byte(secret),
+		secure:    secure,
+		limiter:   newLoginLimiter(),
+		accounts:  hasAccounts,
 	}
 }
 
-func (a *auth) enabled() bool { return a != nil && a.passcode != "" }
+func (a *auth) enabled() bool {
+	if a == nil {
+		return false
+	}
+	return a.passcode != "" || a.signupKey != "" || a.hasAccounts()
+}
+
+func (a *auth) hasAccounts() bool {
+	a.accountsMu.RLock()
+	defer a.accountsMu.RUnlock()
+	return a.accounts
+}
+
+func (a *auth) setHasAccounts(has bool) {
+	a.accountsMu.Lock()
+	a.accounts = has
+	a.accountsMu.Unlock()
+}
+
+// accountLogin reports whether the gate checks the accounts table. The legacy
+// passcode form is used only when no account system is configured.
+func (a *auth) accountLogin() bool {
+	return a.signupKey != "" || a.hasAccounts()
+}
+
+// signupOpen reports whether onboarding may create the one local account.
+func (a *auth) signupOpen() bool {
+	return a.signupKey != "" && !a.hasAccounts()
+}
 
 func (a *auth) middleware(next http.Handler) http.Handler {
-	if !a.enabled() {
+	if a == nil {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !a.enabled() {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !requiresAuth(r) {
 			next.ServeHTTP(w, r)
 			return
@@ -88,7 +130,7 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 func requiresAuth(r *http.Request) bool {
 	path := r.URL.Path
 	switch {
-	case path == "/login", path == "/logout",
+	case path == "/login", path == "/signup", path == "/logout",
 		path == "/healthz",
 		path == "/offline",
 		path == "/sw.js",
@@ -220,6 +262,15 @@ func (a *auth) matches(candidate string) bool {
 	return subtle.ConstantTimeCompare(want[:], got[:]) == 1
 }
 
+func (a *auth) matchesSignupKey(candidate string) bool {
+	if a.signupKey == "" {
+		return false
+	}
+	want := sha256.Sum256([]byte(a.signupKey))
+	got := sha256.Sum256([]byte(strings.TrimSpace(candidate)))
+	return subtle.ConstantTimeCompare(want[:], got[:]) == 1
+}
+
 func csrfFrom(ctx context.Context) string {
 	value, _ := ctx.Value(authCSRFKey).(string)
 	return value
@@ -289,18 +340,48 @@ func clientIP(r *http.Request) string {
 
 /* ---------- Handlers ---------- */
 
+// authPageData prepares state for the standalone login/onboarding document.
+func (s *Server) authPageData(r *http.Request, mode, next string) *view.PageData {
+	return &view.PageData{
+		Nonce:        nonceFrom(r.Context()),
+		Version:      s.version,
+		AuthEnabled:  true,
+		AuthMode:     mode,
+		Next:         next,
+		AccountLogin: s.auth.accountLogin(),
+		SignupOpen:   s.auth.signupOpen(),
+		BabyName:     s.currentBabyName(r.Context()),
+	}
+}
+
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	if !s.auth.enabled() {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	data := &view.PageData{
-		Nonce:       nonceFrom(r.Context()),
-		AuthEnabled: true,
-		Next:        safeNext(r.URL.Query().Get("next")),
-		Version:     s.version,
+	mode := r.URL.Query().Get("mode")
+	switch mode {
+	case "signin", "signup":
+	default:
+		// A fresh browser is asked whether it already has an account. Installs
+		// using only the legacy passcode go straight to the passcode form.
+		if s.auth.accountLogin() {
+			mode = "chooser"
+		} else {
+			mode = "login"
+		}
 	}
-	s.renderNamed(w, r, http.StatusOK, "login", data)
+	next := safeNext(r.URL.Query().Get("next"))
+	s.renderNamed(w, r, http.StatusOK, "login", s.authPageData(r, mode, next))
+}
+
+func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.enabled() {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	next := safeNext(r.URL.Query().Get("next"))
+	s.renderNamed(w, r, http.StatusOK, "login", s.authPageData(r, "signup", next))
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -312,40 +393,161 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.badRequest(w, "Couldn't read that form. Try again.")
 		return
 	}
+	next := safeNext(r.FormValue("next"))
 	ip := clientIP(r)
-	if !s.auth.limiter.allowed(ip) {
-		data := &view.PageData{
-			Nonce:       nonceFrom(r.Context()),
-			AuthEnabled: true,
-			LoginError:  "Too many tries. Wait a few minutes and try again.",
-			Next:        safeNext(r.FormValue("next")),
-		}
+	limiterKey := "login:" + ip
+	if !s.auth.limiter.allowed(limiterKey) {
+		data := s.authPageData(r, "login", next)
+		data.LoginError = "Too many tries. Wait a few minutes and try again."
 		s.renderNamed(w, r, http.StatusTooManyRequests, "login", data)
 		return
 	}
-	if !s.auth.matches(r.FormValue("passcode")) {
-		s.auth.limiter.fail(ip)
-		s.log.Warn("login failed", "ip", ip)
-		data := &view.PageData{
-			Nonce:       nonceFrom(r.Context()),
-			AuthEnabled: true,
-			LoginError:  "That passcode isn't right. Try again?",
-			Next:        safeNext(r.FormValue("next")),
+
+	if s.auth.accountLogin() {
+		rawUsername := strings.TrimSpace(r.FormValue("username"))
+		username, err := account.NormalizeUsername(rawUsername)
+		var acct store.Account
+		if err == nil {
+			acct, err = s.store.AccountByUsername(r.Context(), username)
 		}
+		switch {
+		case errors.Is(err, store.ErrAccountNotFound), errors.Is(err, account.ErrInvalidUsername):
+			// Fall through to the generic message below.
+		case err != nil:
+			s.serverError(w, r, err)
+			return
+		}
+		if err != nil || !account.VerifyPassword(acct.PasswordHash, r.FormValue("password")) {
+			s.auth.limiter.fail(limiterKey)
+			s.log.Warn("account login failed", "ip", ip)
+			data := s.authPageData(r, "login", next)
+			data.Username = rawUsername
+			data.LoginError = "That username and password don't match. Try again."
+			s.renderNamed(w, r, http.StatusUnauthorized, "login", data)
+			return
+		}
+		s.auth.setHasAccounts(true)
+		s.auth.limiter.reset(limiterKey)
+		s.startSession(w, r, next)
+		return
+	}
+
+	if !s.auth.matches(r.FormValue("passcode")) {
+		s.auth.limiter.fail(limiterKey)
+		s.log.Warn("login failed", "ip", ip)
+		data := s.authPageData(r, "login", next)
+		data.LoginError = "That passcode isn't right. Try again?"
 		s.renderNamed(w, r, http.StatusUnauthorized, "login", data)
 		return
 	}
 
-	s.auth.limiter.reset(ip)
+	s.auth.limiter.reset(limiterKey)
+	s.startSession(w, r, next)
+}
+
+func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
+	if !s.auth.enabled() {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+	next := safeNext(r.FormValue("next"))
+	if !s.auth.signupOpen() {
+		data := s.authPageData(r, "signup", next)
+		data.SignupError = "An account already exists on this server. Sign in instead."
+		s.renderNamed(w, r, http.StatusConflict, "login", data)
+		return
+	}
+
+	ip := clientIP(r)
+	limiterKey := "signup:" + ip
+	if !s.auth.limiter.allowed(limiterKey) {
+		data := s.authPageData(r, "signup", next)
+		data.SignupError = "Too many tries. Wait a few minutes and try again."
+		s.renderNamed(w, r, http.StatusTooManyRequests, "login", data)
+		return
+	}
+
+	rawUsername := strings.TrimSpace(r.FormValue("username"))
+	rawBabyName := r.FormValue("baby_name")
+	password := r.FormValue("password")
+	confirm := r.FormValue("confirm_password")
+	reject := func(status int, message string) {
+		data := s.authPageData(r, "signup", next)
+		data.Username = rawUsername
+		data.BabyName = rawBabyName
+		data.SignupError = message
+		s.renderNamed(w, r, status, "login", data)
+	}
+
+	if !s.auth.matchesSignupKey(r.FormValue("secret_key")) {
+		s.auth.limiter.fail(limiterKey)
+		s.log.Warn("signup rejected: wrong secret key", "ip", ip)
+		reject(http.StatusUnauthorized, "That secret key isn't right.")
+		return
+	}
+	username, err := account.NormalizeUsername(rawUsername)
+	if err != nil {
+		reject(http.StatusBadRequest, account.ErrInvalidUsername.Error())
+		return
+	}
+	if err := account.ValidatePassword(password); err != nil {
+		reject(http.StatusBadRequest, account.ErrInvalidPassword.Error())
+		return
+	}
+	if password != confirm {
+		reject(http.StatusBadRequest, "Those passwords don't match.")
+		return
+	}
+	babyName, err := parseBabyName(rawBabyName)
+	if err != nil {
+		reject(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	hash, err := account.HashPassword(password)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if _, err := s.store.CreateAccountWithSettings(
+		r.Context(), username, hash,
+		map[string]string{settingBabyName: babyName},
+		s.clock.Now(),
+	); err != nil {
+		if errors.Is(err, store.ErrAccountExists) {
+			s.auth.setHasAccounts(true)
+			data := s.authPageData(r, "signup", next)
+			data.SignupError = "An account already exists on this server. Sign in instead."
+			s.renderNamed(w, r, http.StatusConflict, "login", data)
+			return
+		}
+		s.serverError(w, r, err)
+		return
+	}
+
+	s.auth.setHasAccounts(true)
+	s.setBabyName(babyName)
+	s.auth.limiter.reset(limiterKey)
+	s.log.Info("account created", "username", username, "ip", ip)
+	s.startSession(w, r, next)
+}
+
+// startSession issues the signed session cookie and returns to the page the
+// person originally asked for.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, next string) {
 	_, csrf, err := s.auth.newSession()
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
 	s.auth.setSession(w, r, csrf)
-	// #nosec G710 -- safeNext returns only same-origin paths; absolute,
-	// protocol-relative, and backslash-normalised targets are rejected.
-	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
+	// #nosec G710 -- next has passed through safeNext, which allows only
+	// same-origin paths and rejects absolute or backslash-normalised targets.
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {

@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"nurtur/internal/view"
 )
@@ -15,7 +17,55 @@ import (
 const (
 	settingNightStart = "night_start"
 	settingNightEnd   = "night_end"
+	settingBabyName   = "baby_name"
 )
+
+// currentBabyName returns the name saved during onboarding, falling back to the
+// environment value for installs that predate the onboarding field. The
+// environment is never the primary source once a name is stored.
+func (s *Server) currentBabyName(ctx context.Context) string {
+	s.babyMu.RLock()
+	if s.babyLoaded {
+		name := s.babyName
+		s.babyMu.RUnlock()
+		return name
+	}
+	s.babyMu.RUnlock()
+
+	s.babyMu.Lock()
+	defer s.babyMu.Unlock()
+	if !s.babyLoaded {
+		name := strings.TrimSpace(s.defaultBabyName)
+		if raw, ok, err := s.store.Setting(ctx, settingBabyName); err == nil && ok {
+			if stored := strings.TrimSpace(raw); stored != "" {
+				name = stored
+			}
+		}
+		s.babyName = name
+		s.babyLoaded = true
+	}
+	return s.babyName
+}
+
+func (s *Server) setBabyName(name string) {
+	s.babyMu.Lock()
+	s.babyName = name
+	s.babyLoaded = true
+	s.babyMu.Unlock()
+}
+
+// parseBabyName trims and collapses whitespace so a name typed with stray
+// spaces is stored cleanly.
+func parseBabyName(raw string) (string, error) {
+	name := strings.Join(strings.Fields(raw), " ")
+	if name == "" {
+		return "", errors.New("Baby's name is required.")
+	}
+	if utf8.RuneCountInString(name) > 40 {
+		return "", errors.New("Keep the baby's name under 40 characters.")
+	}
+	return name, nil
+}
 
 // nightWindow returns the configured night window, preferring the settings
 // table over the environment defaults. The value is cached until it changes.
@@ -141,6 +191,38 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleSaveBabyName(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+	name, nameErr := parseBabyName(r.FormValue("baby_name"))
+	settings, err := s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if nameErr != nil {
+		settings.BabyErr = nameErr.Error()
+		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
+		return
+	}
+	if err := s.store.SetSettings(r.Context(), map[string]string{settingBabyName: name}); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.setBabyName(name)
+	settings, err = s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.respondSettings(w, r, http.StatusOK, settings, &view.Toast{
+		Message: "Baby name saved.",
+		Kind:    "success",
+	})
+}
+
 func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status int, settings *view.SettingsView, toast *view.Toast) {
 	s.respond(w, r, mutateResponse{
 		Status:   status,
@@ -156,7 +238,7 @@ func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status 
 func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) {
 	nightStart, nightEnd := s.nightWindow(ctx)
 	out := &view.SettingsView{
-		BabyName:    s.babyName,
+		BabyName:    s.currentBabyName(ctx),
 		Timezone:    s.loc.String(),
 		DBPath:      s.store.Path(),
 		Version:     s.version,

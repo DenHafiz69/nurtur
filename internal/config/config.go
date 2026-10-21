@@ -24,12 +24,24 @@ type Config struct {
 	NightStart    time.Duration
 	NightEnd      time.Duration
 	Passcode      string
+	SignupKey     string
 	SessionSecret string
 	SecureCookie  bool
 }
 
-// Load reads configuration from the environment and applies defaults.
+// Load reads configuration from the environment and applies defaults. An
+// optional dotenv file is loaded first: .env by default, or the path in
+// NURTUR_ENV_FILE. Variables already set in the process environment win.
 func Load() (Config, error) {
+	envPath := strings.TrimSpace(os.Getenv("NURTUR_ENV_FILE"))
+	explicitEnvFile := envPath != ""
+	if envPath == "" {
+		envPath = ".env"
+	}
+	if err := loadDotEnv(envPath, explicitEnvFile); err != nil {
+		return Config{}, fmt.Errorf("env file %s: %w", envPath, err)
+	}
+
 	cfg := Config{
 		Addr:         env("NURTUR_ADDR", ":8080"),
 		DBPath:       env("NURTUR_DB", "./data/nurtur.db"),
@@ -55,9 +67,10 @@ func Load() (Config, error) {
 	}
 	cfg.SecureCookie = secureCookie
 	cfg.Passcode = strings.TrimSpace(os.Getenv("NURTUR_PASSCODE"))
+	cfg.SignupKey = strings.TrimSpace(os.Getenv("NURTUR_SIGNUP_KEY"))
 	cfg.SessionSecret = strings.TrimSpace(os.Getenv("NURTUR_SESSION_SECRET"))
-	if cfg.Passcode == "" && cfg.SessionSecret != "" {
-		return Config{}, fmt.Errorf("NURTUR_SESSION_SECRET is set but NURTUR_PASSCODE is empty")
+	if cfg.Passcode == "" && cfg.SignupKey == "" && cfg.SessionSecret != "" {
+		return Config{}, fmt.Errorf("NURTUR_SESSION_SECRET is set but neither NURTUR_PASSCODE nor NURTUR_SIGNUP_KEY is set")
 	}
 
 	if raw := strings.TrimSpace(os.Getenv("NURTUR_SYNC_INTERVAL")); raw != "" {
@@ -103,10 +116,6 @@ func Load() (Config, error) {
 	}
 	if cfg.NightStart == cfg.NightEnd {
 		return Config{}, fmt.Errorf("NURTUR_NIGHT_START and NURTUR_NIGHT_END must differ")
-	}
-
-	if cfg.BabyName == "" {
-		cfg.BabyName = "Baby"
 	}
 
 	if !cfg.LocalOnly {

@@ -75,7 +75,7 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 	}{
 		ExportedAt: now.Format(time.RFC3339),
 		Version:    s.version,
-		BabyName:   s.babyName,
+		BabyName:   s.currentBabyName(r.Context()),
 		Timezone:   s.loc.String(),
 		Settings:   settings,
 	}

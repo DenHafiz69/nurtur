@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Nurtur — sign in</title>
+  <title>Nurtur — {{if eq .AuthMode "signup"}}set up{{else if eq .AuthMode "chooser"}}welcome{{else}}sign in{{end}}</title>
   <meta name="theme-color" content="#fff8f0">
   <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
@@ -26,16 +26,75 @@
   <main class="auth-card">
     <span class="pip auth-pip">{{pip "awake"}}</span>
     <h1 class="auth-title">Nurtur</h1>
-    <p class="auth-copy">Enter the passcode to see today.</p>
+
+    {{if eq .AuthMode "chooser"}}
+    <p class="auth-copy">Do you already have an account?</p>
+    <div class="auth-choices">
+      <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Yes, sign in</span></a>
+      <a class="btn btn-ghost auth-submit" href="/login?mode=signup&amp;next={{urlquery .Next}}">{{icon "drop"}}<span>No, I'm new here</span></a>
+    </div>
+    <p class="auth-note">New here? You'll need the secret key from the person who set up this server.</p>
+
+    {{else if eq .AuthMode "signup"}}
+    <p class="auth-copy">Set up the one account for this server.</p>
+    {{if .SignupOpen}}
+    <form class="auth-form" method="post" action="/signup">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label class="field">
+        <span class="field-label">Step 1 · Secret key</span>
+        <input type="password" name="secret_key" autocomplete="off" required autofocus>
+      </label>
+      <label class="field">
+        <span class="field-label">Step 2 · Username</span>
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" required>
+      </label>
+      <label class="field">
+        <span class="field-label">Baby's name</span>
+        <input type="text" name="baby_name" value="{{.BabyName}}" autocomplete="off" maxlength="40" placeholder="Aisyah" required>
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input type="password" name="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label class="field">
+        <span class="field-label">Confirm password</span>
+        <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+      </label>
+      {{if .SignupError}}<p class="field-error" role="alert">{{.SignupError}}</p>{{end}}
+      <button type="submit" class="btn btn-primary auth-submit">{{icon "lock"}}<span>Create account</span></button>
+    </form>
+    <a class="auth-alt" href="/login?mode=signin&amp;next={{urlquery .Next}}">I already have an account</a>
+    {{else}}
+    <p class="auth-copy">An account already exists on this server.</p>
+    {{if .SignupError}}<p class="field-error" role="alert">{{.SignupError}}</p>{{end}}
+    <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Sign in</span></a>
+    {{end}}
+
+    {{else}}
+    <p class="auth-copy">{{if .AccountLogin}}Welcome back. Sign in to see today.{{else}}Enter the passcode to see today.{{end}}</p>
     <form class="auth-form" method="post" action="/login">
       <input type="hidden" name="next" value="{{.Next}}">
+      {{if .AccountLogin}}
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      {{else}}
       <label class="field">
         <span class="field-label">Passcode</span>
         <input type="password" name="passcode" autocomplete="current-password" inputmode="text" required autofocus>
       </label>
+      {{end}}
       {{if .LoginError}}<p class="field-error" role="alert">{{.LoginError}}</p>{{end}}
       <button type="submit" class="btn btn-primary auth-submit">{{icon "lock"}}<span>Unlock</span></button>
     </form>
+    {{if .SignupOpen}}<a class="auth-alt" href="/login?mode=signup&amp;next={{urlquery .Next}}">No account yet? Set one up</a>{{end}}
+    <a class="auth-alt" href="/login?next={{urlquery .Next}}">Not you? Start over</a>
+    {{end}}
   </main>
 </body>
 </html>{{end}}

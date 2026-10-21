@@ -10,9 +10,15 @@ BIN="${TMPDIR:-/tmp}/nurtur-dev"
 PID=0
 
 fingerprint() {
-  find assets.go go.mod go.sum cmd internal web migrations -type f \
-    \( -name '*.go' -o -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.sql' -o -name '*.woff2' \) \
-    -printf '%T@ %p\n' 2>/dev/null | sort | sha256sum | cut -d' ' -f1
+  {
+    find assets.go go.mod go.sum cmd internal web migrations -type f \
+      \( -name '*.go' -o -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.sql' -o -name '*.woff2' \) \
+      -printf '%T@ %p\n' 2>/dev/null
+    # Restart when the local dotenv changes too.
+    if [ -f .env ]; then
+      printf '%s %s\n' "$(stat -c '%y' .env)" ".env"
+    fi
+  } | sort | sha256sum | cut -d' ' -f1
 }
 
 stop_server() {

@@ -41,8 +41,13 @@ type PageData struct {
 	SyncChip    *SyncChipView
 
 	// Login page state.
-	LoginError string
-	Next       string
+	AuthMode     string // chooser, login, signup
+	AccountLogin bool   // username/password form rather than the legacy passcode
+	SignupOpen   bool
+	LoginError   string
+	SignupError  string
+	Username     string
+	Next         string
 
 	Toast     *Toast
 	Edit      *EditView
@@ -178,6 +183,7 @@ type SyncChipView struct {
 // SettingsView backs the settings page.
 type SettingsView struct {
 	BabyName    string
+	BabyErr     string
 	Timezone    string
 	DBPath      string
 	DBSize      string

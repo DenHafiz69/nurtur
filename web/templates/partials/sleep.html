@@ -12,7 +12,7 @@
       <button type="submit" class="sleep-pill is-asleep" data-live-since="{{iso .Sleep.StartedAt}}" data-live-server-now="{{iso .Sleep.ServerNow}}">
         <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
         <span class="sleep-copy">
-          <span class="sleep-title">Pip is asleep</span>
+          <span class="sleep-title">{{if .BabyName}}{{.BabyName}} is asleep{{else}}Sleeping{{end}}</span>
           <span class="sleep-sub"><span data-live-digits>{{timer .Sleep.Elapsed}}</span> · tap to wake</span>
         </span>
         <span class="sleep-action">Wake up</span>
@@ -24,7 +24,7 @@
         <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
         <span class="sleep-copy">
           <span class="sleep-title">Start sleep</span>
-          <span class="sleep-sub">Tap when {{.BabyName}} is ready to rest</span>
+          <span class="sleep-sub">Tap when {{if .BabyName}}{{.BabyName}}{{else}}your baby{{end}} is ready to rest</span>
         </span>
         <span class="sleep-action">{{icon "arrow-right"}}</span>
       </button>

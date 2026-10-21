@@ -15,11 +15,20 @@
 
   <section class="settings-card" aria-labelledby="settings-baby">
     <h3 id="settings-baby" class="settings-title">Baby</h3>
+    <form class="settings-form" method="post" action="/settings/baby" hx-post="/settings/baby" hx-target="#settings-panel" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <label class="field">
+        <span class="field-label">Name</span>
+        <input type="text" name="baby_name" value="{{.Settings.BabyName}}" maxlength="40" placeholder="Your baby's name" required>
+      </label>
+      {{if .Settings.BabyErr}}<p class="field-error" role="alert">{{.Settings.BabyErr}}</p>{{end}}
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">Save name</button>
+      </div>
+    </form>
     <dl class="settings-list">
-      <div><dt>Name</dt><dd>{{.Settings.BabyName}}</dd></div>
       <div><dt>Timezone</dt><dd>{{.Settings.Timezone}}</dd></div>
     </dl>
-    <p class="settings-note">Set these with <code>NURTUR_BABY_NAME</code> and <code>NURTUR_TZ</code> when the server starts.</p>
+    <p class="settings-note">The timezone comes from <code>NURTUR_TZ</code> when the server starts.</p>
   </section>
 
   <section class="settings-card" aria-labelledby="settings-night">
@@ -88,7 +97,7 @@
   {{if .AuthEnabled}}
   <section class="settings-card" aria-labelledby="settings-security">
     <h3 id="settings-security" class="settings-title">Security</h3>
-    <p class="settings-note">The passcode gate is on. This browser stays signed in for 30 days.</p>
+    <p class="settings-note">Sign-in is on. This browser stays signed in for 30 days.</p>
     <form method="post" action="/logout">
       <button type="submit" class="btn btn-ghost settings-wide">{{icon "logout"}}<span>Sign out</span></button>
     </form>

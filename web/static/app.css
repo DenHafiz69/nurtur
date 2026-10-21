@@ -2010,8 +2010,9 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 132px;
-  padding: 7px 10px;
+  max-width: 164px;
+  min-height: 48px;
+  padding: 0 12px;
   overflow: hidden;
   border: 2px solid var(--line);
   border-radius: 999px;
@@ -2022,6 +2023,12 @@ textarea {
   line-height: 1.1;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.sync-chip .icon {
+  flex: none;
+  width: 17px;
+  height: 17px;
 }
 
 .sync-dot {
@@ -2359,13 +2366,48 @@ textarea {
   text-decoration: none;
 }
 
+.auth-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.auth-choices .auth-submit {
+  margin-top: 0;
+}
+
+.auth-note {
+  margin-top: 14px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.auth-alt {
+  margin-top: 14px;
+  color: var(--ink-soft-strong);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 @media (max-width: 420px) {
   .sync-chip {
     justify-content: center;
-    width: 34px;
-    height: 34px;
+    gap: 5px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border-radius: 50%;
+  }
+
+  .sync-chip .icon {
+    width: 18px;
+    height: 18px;
   }
 
   .sync-label {

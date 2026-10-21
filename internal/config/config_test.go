@@ -11,6 +11,7 @@ func clearEnv(t *testing.T) {
 	for _, key := range []string{
 		"NURTUR_ADDR",
 		"NURTUR_DB",
+		"NURTUR_ENV_FILE",
 		"NURTUR_LOCAL_ONLY",
 		"TURSO_DATABASE_URL",
 		"TURSO_AUTH_TOKEN",
@@ -21,6 +22,7 @@ func clearEnv(t *testing.T) {
 		"NURTUR_NIGHT_END",
 		"NURTUR_LOG_LEVEL",
 		"NURTUR_PASSCODE",
+		"NURTUR_SIGNUP_KEY",
 		"NURTUR_SESSION_SECRET",
 		"NURTUR_COOKIE_SECURE",
 	} {
@@ -39,7 +41,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Addr != ":8080" || cfg.DBPath != "./data/nurtur.db" {
 		t.Fatalf("defaults = %+v", cfg)
 	}
-	if !cfg.LocalOnly || cfg.BabyName != "Baby" {
+	if !cfg.LocalOnly || cfg.BabyName != "" {
 		t.Fatalf("defaults = %+v", cfg)
 	}
 	if cfg.SyncInterval != 60*time.Second || cfg.Location != time.Local || cfg.LogLevel != slog.LevelInfo {
@@ -153,6 +155,21 @@ func TestLoadPasscodeConfiguration(t *testing.T) {
 	t.Setenv("NURTUR_LOCAL_ONLY", "true")
 	t.Setenv("NURTUR_SESSION_SECRET", "orphan-secret")
 	if _, err := Load(); err == nil {
-		t.Fatal("Load accepted a session secret without a passcode")
+		t.Fatal("Load accepted a session secret without a passcode or signup key")
+	}
+}
+
+func TestLoadSignupKeyConfiguration(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("NURTUR_LOCAL_ONLY", "true")
+	t.Setenv("NURTUR_SIGNUP_KEY", "only-for-my-wife")
+	t.Setenv("NURTUR_SESSION_SECRET", "a-long-random-secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.SignupKey != "only-for-my-wife" || cfg.SessionSecret != "a-long-random-secret" {
+		t.Fatalf("signup config = %+v", cfg)
 	}
 }

@@ -7,7 +7,7 @@ that syncs to Turso Cloud when configured.
 This repository ships **Phase 3 — Timeline, Undo + Ship**: the Phase 1 nursing
 timer, the Phase 2 diaper/sleep dashboard, plus a unified history page, in-place
 undo, night-mode polish, a PWA shell, JSON/CSV/SQL export, a documented restore
-drill, an optional passcode gate, and a repeatable deployment. See
+drill, optional local sign-in, and a repeatable deployment. See
 [`PLANS.md`](./PLANS.md) for the full roadmap and [`FEATURES.md`](./FEATURES.md)
 for the product brief.
 
@@ -18,6 +18,8 @@ for the product brief.
 Requirements: Go 1.24+ (the Turso driver requires it).
 
 ```sh
+cp .env-example .env
+# edit NURTUR_TZ, NURTUR_SIGNUP_KEY, and NURTUR_SESSION_SECRET
 make dev
 ```
 
@@ -29,8 +31,10 @@ The default timezone is the system local zone. Set `NURTUR_TZ` (for example
 `Asia/Kuala_Lumpur`) so "today" and edit inputs match the phone.
 
 ```sh
-NURTUR_TZ=Asia/Kuala_Lumpur NURTUR_BABY_NAME=Pip make dev
+NURTUR_TZ=Asia/Kuala_Lumpur make dev
 ```
+
+Variables exported in your shell override the same names in `.env`.
 
 No account, analytics, CDN, or external font request. Everything is served by
 the one binary.
@@ -41,6 +45,7 @@ the one binary.
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `NURTUR_ENV_FILE` | `.env` | Optional dotenv file to load |
 | `NURTUR_ADDR` | `:8080` | HTTP listen address |
 | `NURTUR_DB` | `./data/nurtur.db` | Local Turso database file |
 | `NURTUR_LOCAL_ONLY` | `false` | Skip Turso Cloud sync entirely |
@@ -48,12 +53,13 @@ the one binary.
 | `TURSO_AUTH_TOKEN` | — | Turso database token |
 | `NURTUR_SYNC_INTERVAL` | `60s` | Periodic pull interval |
 | `NURTUR_TZ` | system local | IANA timezone for display and day boundaries |
-| `NURTUR_BABY_NAME` | `Baby` | Name in the header |
+| `NURTUR_BABY_NAME` | — | Optional fallback; onboarding normally stores the name |
 | `NURTUR_NIGHT_START` | `19:00` | Local night window start (`HH:MM`) |
 | `NURTUR_NIGHT_END` | `07:00` | Local night window end (`HH:MM`) |
 | `NURTUR_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
-| `NURTUR_PASSCODE` | — | Enables the optional single-user passcode gate |
-| `NURTUR_SESSION_SECRET` | derived | HMAC key for session cookies (set this to survive passcode changes) |
+| `NURTUR_PASSCODE` | — | Legacy single-user passcode gate |
+| `NURTUR_SIGNUP_KEY` | — | Secret key that enables onboarding (one local account) |
+| `NURTUR_SESSION_SECRET` | derived | HMAC key for session cookies (set this to survive credential changes) |
 | `NURTUR_COOKIE_SECURE` | `false` | Set `true` when serving over HTTPS (also auto-detected per request) |
 
 The night window can also be changed at runtime on the **Settings** page. Values
@@ -72,11 +78,13 @@ turso db tokens create nurtur
 export TURSO_DATABASE_URL='libsql://…'
 export TURSO_AUTH_TOKEN='…'
 export NURTUR_TZ='Asia/Kuala_Lumpur'
-export NURTUR_BABY_NAME='Pip'
 
 make build
 ./bin/nurtur
 ```
+
+The baby's name is asked for during onboarding and stored in the database, so
+it does not need an environment variable.
 
 The local file is the write path. A feed or diaper log commits locally and
 returns immediately; a debounced background `Push` copies changes to Turso
@@ -167,7 +175,7 @@ service.
   both use it.
 - `GET /sw.js` is served from the domain root so it controls the whole app. Static
   assets are cache-first; navigation is network-first and never cached (a cached
-  authenticated page could outlive the passcode gate). Offline navigation falls
+  authenticated page could outlive the sign-in gate). Offline navigation falls
   back to `/offline`.
 - A header chip shows sync state separately from network connectivity: `Synced`,
   `Syncing…`, `Local copy`, or `Local`.
@@ -176,9 +184,9 @@ service.
 
 ### Settings and export
 
-- `/settings` shows the baby name and timezone (from the environment), the
-  editable night window, theme help, sync state, database path/size, and backup
-  links.
+- `/settings` shows the baby name (editable), the timezone (from the
+  environment), the editable night window, theme help, sync state, database
+  path/size, and backup links.
 - `GET /export.json` is a structured copy with feeds (and segments), diapers,
   sleeps, settings, and per-side minute totals.
 - `GET /export.csv` is one row per event. Columns:
@@ -283,7 +291,7 @@ The suites cover:
 - timeline ordering, soft-delete exclusion, whole-day pagination, day summaries
   with sleeps that overlap local midnight, and delete/restore-in-place;
 - settings persistence, night-window validation, all three export formats, and
-  the passcode gate (session cookie, rate limit, Origin check, HTMX CSRF token);
+  the sign-in gate (session cookie, rate limit, Origin check, HTMX CSRF token);
 - timezone and DST day boundaries (23/25-hour days), and formatting.
 
 The real-phone checklist in `PLANS.md` §2.5 is still the release gate:
@@ -302,7 +310,6 @@ docker run --rm -p 8080:8080 \
   -e TURSO_DATABASE_URL='libsql://…' \
   -e TURSO_AUTH_TOKEN='…' \
   -e NURTUR_TZ='Asia/Kuala_Lumpur' \
-  -e NURTUR_BABY_NAME='Pip' \
   nurtur
 ```
 
@@ -317,13 +324,15 @@ sync looks stuck.
 ### Docker Compose
 
 ```sh
+cp .env-example .env   # edit it first
 docker compose up -d --build
 ```
 
-Open <http://localhost:8005>. The compose file runs local-only by default and
-keeps the database in the `nurtur-data` volume. To use Turso Cloud instead, set
+Open <http://localhost:8005>. Docker Compose reads `.env` automatically for
+variable substitution. The compose file runs local-only by default and keeps the
+database in the `nurtur-data` volume. To use Turso Cloud instead, set
 `NURTUR_LOCAL_ONLY=false` plus `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in
-the environment before `docker compose up`.
+`.env` before `docker compose up`.
 
 ### Backups and restore
 
@@ -414,7 +423,40 @@ sudo systemctl enable --now nurtur
 ## Security
 
 Authentication is **optional and off by default** for a solo user on a trusted
-LAN. Set `NURTUR_PASSCODE` before exposing Nurtur beyond that LAN:
+LAN.
+
+### Local account onboarding
+
+For a shared phone or an install that reaches the internet, set a signup key:
+
+```sh
+NURTUR_SIGNUP_KEY='the secret you give your wife' \
+NURTUR_SESSION_SECRET='a random 32+ byte value' \
+NURTUR_COOKIE_SECURE=true \
+nurtur
+```
+
+The first browser that opens Nurtur is asked **“Do you already have an
+account?”**
+
+- **No, I'm new here** → enter the signup key, choose a username and password,
+  and enter the baby's name. The key is only checked locally; no email, OAuth, or
+  external service is involved. Nurtur stores one PBKDF2-SHA256 password hash and
+  refuses any further signups.
+- **Yes, sign in** → enter that username and password.
+
+The baby's name is saved with the account and shown in the header and sleep
+messages. It can be corrected later on **Settings**. `NURTUR_BABY_NAME` remains
+only as a fallback for installs that do not use onboarding.
+
+Every other browser/device sees the same question and can sign in. The account
+lives in the `accounts` table in the local database, so removing
+`NURTUR_SIGNUP_KEY` after setup does not disable the gate. To start over, delete
+the row from `accounts` (or use a fresh `NURTUR_DB`) and re-run onboarding with
+the key.
+
+The older single-passcode flow still works when `NURTUR_PASSCODE` is set and no
+account exists:
 
 ```sh
 NURTUR_PASSCODE='a long passphrase' \
@@ -423,17 +465,20 @@ NURTUR_COOKIE_SECURE=true \
 nurtur
 ```
 
-- The passcode is compared as SHA-256 digests in constant time.
+- Credentials are compared in constant time; passwords use per-account salted
+  PBKDF2-SHA256 hashes, never plain text.
 - Sessions are signed `HttpOnly`, `SameSite=Lax` cookies valid for 30 days.
-  `NURTUR_SESSION_SECRET` keeps sessions alive across passcode changes; without
-  it the key is derived from the passcode, so changing the passcode signs everyone
-  out.
-- Login attempts are limited to five per IP per 15 minutes (in memory).
+  `NURTUR_SESSION_SECRET` keeps sessions alive across credential changes;
+  without it the key is derived from the configured credentials, so changing
+  either one signs everyone out.
+- Login and signup attempts are limited to five per IP per 15 minutes (in
+  memory).
 - Mutations verify `Origin`/`Sec-Fetch-Site`; HTMX mutations also carry a
   per-session `X-CSRF-Token` (rendered into the page as `hx-headers`). Classic
   no-JS form posts rely on the same-origin check.
-- `GET /healthz`, `/login`, `/offline`, `/sw.js`, and `/static/*` stay public so
-  container healthchecks and the installable shell work before sign-in.
+- `GET /healthz`, `/login`, `/signup`, `/offline`, `/sw.js`, and `/static/*` stay
+  public so container healthchecks and the installable shell work before
+  sign-in.
 - The server sets a restrictive CSP, `nosniff`, `Referrer-Policy: same-origin`,
   `X-Frame-Options: DENY`, and a permissions policy. There are no third-party
   runtime requests.

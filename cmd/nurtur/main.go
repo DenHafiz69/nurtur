@@ -96,6 +96,7 @@ func run() error {
 		NightStart:    cfg.NightStart,
 		NightEnd:      cfg.NightEnd,
 		Passcode:      cfg.Passcode,
+		SignupKey:     cfg.SignupKey,
 		SessionSecret: cfg.SessionSecret,
 		SecureCookie:  cfg.SecureCookie,
 	})

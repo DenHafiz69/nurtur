@@ -48,21 +48,30 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 	if len(values) == 0 {
 		return nil
 	}
+	return s.WithTx(ctx, func(tx *sql.Tx) error {
+		return setSettingsTx(ctx, tx, values)
+	})
+}
+
+// setSettingsTx upserts settings inside an existing transaction. Callers pass
+// the batch through it so one logical write stays atomic.
+func setSettingsTx(ctx context.Context, tx *sql.Tx, values map[string]string) error {
+	if len(values) == 0 {
+		return nil
+	}
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
-	return s.WithTx(ctx, func(tx *sql.Tx) error {
-		for _, key := range keys {
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO settings (key, value) VALUES (?, ?)
-				 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-				key, values[key]); err != nil {
-				return fmt.Errorf("store: set setting %s: %w", key, err)
-			}
+	for _, key := range keys {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO settings (key, value) VALUES (?, ?)
+			 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+			key, values[key]); err != nil {
+			return fmt.Errorf("store: set setting %s: %w", key, err)
 		}
-		return nil
-	})
+	}
+	return nil
 }

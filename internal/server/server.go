@@ -37,6 +37,7 @@ type Config struct {
 	NightEnd   time.Duration
 
 	Passcode      string
+	SignupKey     string
 	SessionSecret string
 	SecureCookie  bool
 }
@@ -46,7 +47,7 @@ type Server struct {
 	store      *store.Store
 	clock      clock.Clock
 	loc        *time.Location
-	babyName   string
+	babyName   string // cached from settings, falling back to the environment
 	version    string
 	log        *slog.Logger
 	renderer   *view.Renderer
@@ -58,6 +59,11 @@ type Server struct {
 	migrations fs.FS
 	assets     fs.FS
 	auth       *auth
+
+	defaultBabyName string
+
+	babyMu     sync.RWMutex
+	babyLoaded bool
 
 	nightMu     sync.RWMutex
 	nightLoaded bool
@@ -79,9 +85,6 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
-	}
-	if cfg.BabyName == "" {
-		cfg.BabyName = "Baby"
 	}
 	if cfg.Version == "" {
 		cfg.Version = "dev"
@@ -105,22 +108,27 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("server: static assets: %w", err)
 	}
 
+	accountCount, err := cfg.Store.CountAccounts(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("server: count accounts: %w", err)
+	}
+
 	return &Server{
-		store:      cfg.Store,
-		clock:      cfg.Clock,
-		loc:        cfg.Location,
-		babyName:   cfg.BabyName,
-		version:    cfg.Version,
-		log:        cfg.Logger,
-		renderer:   renderer,
-		static:     newStaticHandler(staticFS),
-		worker:     cfg.SyncWorker,
-		local:      cfg.LocalOnly,
-		nightStart: cfg.NightStart,
-		nightEnd:   cfg.NightEnd,
-		migrations: cfg.Migrations,
-		assets:     cfg.Assets,
-		auth:       newAuth(cfg.Passcode, cfg.SessionSecret, cfg.SecureCookie),
+		store:           cfg.Store,
+		clock:           cfg.Clock,
+		loc:             cfg.Location,
+		defaultBabyName: cfg.BabyName,
+		version:         cfg.Version,
+		log:             cfg.Logger,
+		renderer:        renderer,
+		static:          newStaticHandler(staticFS),
+		worker:          cfg.SyncWorker,
+		local:           cfg.LocalOnly,
+		nightStart:      cfg.NightStart,
+		nightEnd:        cfg.NightEnd,
+		migrations:      cfg.Migrations,
+		assets:          cfg.Assets,
+		auth:            newAuth(cfg.Passcode, cfg.SignupKey, cfg.SessionSecret, cfg.SecureCookie, accountCount > 0),
 	}, nil
 }
 
@@ -169,12 +177,15 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /settings", s.handleSettingsPage)
 	mux.HandleFunc("POST /settings", s.handleSaveSettings)
+	mux.HandleFunc("POST /settings/baby", s.handleSaveBabyName)
 	mux.HandleFunc("GET /export.csv", s.handleExportCSV)
 	mux.HandleFunc("GET /export.json", s.handleExportJSON)
 	mux.HandleFunc("GET /export.sql", s.handleExportSQL)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /login", s.handleLogin)
+	mux.HandleFunc("GET /signup", s.handleSignupPage)
+	mux.HandleFunc("POST /signup", s.handleSignup)
 	mux.HandleFunc("POST /logout", s.handleLogout)
 	mux.HandleFunc("GET /offline", s.handleOffline)
 	mux.HandleFunc("GET /sw.js", s.handleServiceWorker)

@@ -27,16 +27,13 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 	p := &view.PageData{
 		Nonce:       nonce,
 		Version:     s.version,
-		BabyName:    s.babyName,
+		BabyName:    s.currentBabyName(ctx),
 		Now:         now,
 		Location:    s.loc,
 		Toast:       toast,
 		CSRF:        csrfFrom(ctx),
 		AuthEnabled: s.auth.enabled(),
 		SyncChip:    s.syncChip(),
-	}
-	if p.BabyName == "" {
-		p.BabyName = "Baby"
 	}
 	p.Greeting = view.Greeting(now.In(s.loc).Hour())
 	p.TodayLabel = now.In(s.loc).Format("Monday, January 2")
