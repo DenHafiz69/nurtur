@@ -1,7 +1,14 @@
 .git
+.github
 .gitignore
+.opencode
 data
 bin
+e2e
+graphify-out
+deploy
+scripts
+node_modules
 *.db
 *.db-shm
 *.db-wal
@@ -9,3 +16,6 @@ bin
 README.md
 PLANS.md
 FEATURES.md
+AGENTS.md
+docker-compose.yaml
+Makefile

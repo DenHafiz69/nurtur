@@ -408,16 +408,10 @@
     "semantic_hash": "b5c7b199ebc392f512622bee97909171"
   },
   "README.md": {
-    "mtime": 1792575433.227833,
-    "seen": 1792577377.7512274,
-    "ast_hash": "2d22835c9cafac2c0e66dfbd7a788769",
-    "semantic_hash": "2d22835c9cafac2c0e66dfbd7a788769"
-  },
-  "compose.yaml": {
-    "mtime": 1792575433.1978326,
-    "seen": 1792577377.7512283,
-    "ast_hash": "1d5464125e591e855b352f07f540edcc",
-    "semantic_hash": "1d5464125e591e855b352f07f540edcc"
+    "mtime": 1792579025.0924828,
+    "seen": 1792579029.3657904,
+    "ast_hash": "664934c122737860e77e25e034df4fe3",
+    "semantic_hash": ""
   },
   "e2e/README.md": {
     "mtime": 1792506614.4990664,
@@ -579,6 +573,12 @@
     "mtime": 1792501813.0199769,
     "seen": 1792578175.0393517,
     "ast_hash": "bba4dcf3490e8724833d8fd626a68309",
+    "semantic_hash": ""
+  },
+  "docker-compose.yaml": {
+    "mtime": 1792575433.1978326,
+    "seen": 1792579029.3657925,
+    "ast_hash": "1d5464125e591e855b352f07f540edcc",
     "semantic_hash": ""
   }
 }

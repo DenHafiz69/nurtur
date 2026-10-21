@@ -1,5 +1,8 @@
 # Nurtur
 
+[![CI](https://github.com/DenHafiz69/nurtur/actions/workflows/ci.yml/badge.svg)](https://github.com/DenHafiz69/nurtur/actions/workflows/ci.yml)
+[![Container](https://img.shields.io/badge/ghcr.io-nurtur-blue?logo=docker&logoColor=white)](https://github.com/DenHafiz69/nurtur/pkgs/container/nurtur)
+
 A calm, one-thumb baby tracker for nursing, diapers, and sleep. One Go service,
 server-rendered with HTMX, backed by a local [Turso](https://turso.tech) database
 that syncs to Turso Cloud when configured.
@@ -321,6 +324,27 @@ database on `/data`, and ships a `curl /healthz` healthcheck.
 push/pull, pending-sync age, CDC operations, and WAL size. Peer at the JSON when
 sync looks stuck.
 
+### Prebuilt images (GHCR)
+
+CI runs formatting, `go vet`, and the Go tests, then builds a multi-arch image
+(`linux/amd64`, `linux/arm64`) and pushes it to GitHub Container Registry on
+every push to `main` and every `v*` tag. Pull requests build the image without
+pushing.
+
+```sh
+docker pull ghcr.io/denhafiz69/nurtur:latest
+docker run --rm -p 8080:8080 -v nurtur-data:/data --env-file .env \
+  ghcr.io/denhafiz69/nurtur:latest
+```
+
+Tag scheme: `latest` follows `main`, release tags produce `X.Y.Z` and `X.Y`,
+and every build also gets `<branch>` and `sha-<short>` tags.
+
+The package is private by default. Make it public under the repository's
+[package settings](https://github.com/DenHafiz69/nurtur/pkgs/container/nurtur/settings)
+if anonymous pulls are wanted, or log in with a token that has `read:packages`
+before pulling.
+
 ### Docker Compose
 
 ```sh
@@ -329,7 +353,7 @@ docker compose up -d --build
 ```
 
 Open <http://localhost:8005>. Docker Compose reads `.env` automatically for
-variable substitution. The compose file runs local-only by default and keeps the
+variable substitution. The docker-compose file runs local-only by default and keeps the
 database in the `nurtur-data` volume. To use Turso Cloud instead, set
 `NURTUR_LOCAL_ONLY=false` plus `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in
 `.env` before `docker compose up`.

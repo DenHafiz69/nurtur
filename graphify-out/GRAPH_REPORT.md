@@ -6,12 +6,12 @@
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .woff2 2, .example 1)
 
 ## Summary
-- 967 nodes · 3394 edges · 33 communities (23 shown, 10 thin omitted)
-- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 455 edges (avg confidence: 0.85)
+- 965 nodes · 3390 edges · 32 communities (22 shown, 10 thin omitted)
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 454 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `53069b8a`
+- Built from commit: `1e502f00`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -23,22 +23,21 @@
 - time.Time
 - Product Spec & Ops Docs
 - Web Templates & Views
-- Feed
+- scanDiaper
 - time.Duration
 - Client Timer Script
 - context.Context
+- Side
 - App Configuration
 - Diaper Domain Model
 - Session
-- Sync Worker
+- SyncWorker
 - App Wiring & Renderer
-- Sync Worker Tests
+- Feed
 - Playwright E2E Setup
-- Turso Sync & Health
-- Database Bootstrap
+- Debian-slim (glibc) Docker Runtime for tursogo
 - Local Dev Script
-- time.Time
-- Main & Sync Config
+- .Totals
 - Font Licensing (OFL)
 - Service Worker Caching
 - HTTP Status Recorder
@@ -69,10 +68,10 @@
   cmd/nurtur/main.go → internal/config/config.go
 - `run()` --calls--> `New()`  [EXTRACTED]
   cmd/nurtur/main.go → internal/server/server.go
+- `Manual Release Gate (soak, sync outage, restore, 3 a.m. test)` --conceptually_related_to--> `Risks and Mitigations Register`  [INFERRED]
+  e2e/README.md → PLANS.md
 - `run()` --calls--> `Open()`  [EXTRACTED]
   cmd/nurtur/main.go → internal/store/store.go
-- `run()` --calls--> `NewTursoSyncer()`  [EXTRACTED]
-  cmd/nurtur/main.go → internal/store/sync.go
 
 ## Import Cycles
 - None detected.
@@ -81,55 +80,58 @@
 - **HTMX Out-of-Band Fragment Update Pattern** — web_templates_partials_status_statusstripoob, web_templates_partials_last_nursed_lastnursedoob, web_templates_partials_sleep_sleeppilloob, web_templates_partials_timeline_timelinetodayoob, web_templates_partials_toast_toastoob [EXTRACTED 1.00]
 - **Nurtur Three-Phase Delivery Plan** — plans_nurtur_build_plan, plans_phase1_nursing_core, plans_phase2_diapers_sleep_dashboard, plans_phase3_timeline_undo_ship [EXTRACTED 1.00]
 - **Quick-Logging Dock (Timer, Diapers, Sleep, Last Nursed)** — web_templates_layout_layout, web_templates_partials_timer_timer, web_templates_partials_diapers_diaperrow, web_templates_partials_sleep_sleeppill, web_templates_partials_last_nursed_lastnursed [EXTRACTED 1.00]
-- **Local-First Turso Sync Architecture** — plans_turso_local_first_topology, readme_local_first_sync, readme_single_instance_sync_constraint, readme_healthz_endpoint, compose_nurtur_app_service [INFERRED 0.85]
 - **One-Thumb, 3 a.m. Design Language** — features_zero_friction_rule, features_night_mode_one_handed_ux, plans_thumb_first_principles, plans_night_first_palette, plans_pip_mascot [INFERRED 0.85]
 - **Single Action Dialog Serving Multiple Bottom Sheets** — web_templates_layout_sheetdialog, web_templates_partials_status_statuscard, web_templates_partials_nursing_sheet_nursingsheet, web_templates_partials_diapers_diapersheet, web_templates_partials_sleep_sleepsheet [INFERRED 0.95]
 
-## Communities (33 total, 10 thin omitted)
+## Communities (32 total, 10 thin omitted)
 
 ### Community 0 - "HTTP Handlers & Middleware"
 Cohesion: 0.06
-Nodes (27): NormalizeUsername(), ParseSide(), clientIP(), requiresAuth(), safeNext(), isoPtr(), sqlNullable(), sqlText() (+19 more)
+Nodes (28): ParseSide(), clientIP(), requiresAuth(), safeNext(), isoPtr(), verbose(), parseLocalDateTime(), applyValidation() (+20 more)
 
 ### Community 1 - "Entrypoint & Stdlib Deps"
 Cohesion: 0.07
-Nodes (29): ValidationError, ValidationError, HashPassword(), TestHashPasswordRoundTrip(), TestHashPasswordUsesFreshSalt(), ValidatePassword(), VerifyPassword(), ParseKind() (+21 more)
+Nodes (31): ValidationError, ValidationError, HashPassword(), NormalizeUsername(), TestHashPasswordRoundTrip(), TestHashPasswordUsesFreshSalt(), TestNormalizeUsername(), ValidatePassword() (+23 more)
 
 ### Community 2 - "HTMX Library"
 Cohesion: 0.08
 Nodes (101): a(), Ae(), an(), at(), B(), be(), bn(), bt() (+93 more)
 
 ### Community 3 - "testing.T"
-Cohesion: 0.05
-Nodes (88): TestNormalizeUsername(), TestEditValidate(), TestKindCoversBoth(), TestCompletedEditValidate(), TestOpenSegmentCountsToNowAndClampsNegative(), TestOpposite(), TestParseSide(), TestOnboardingRejectsWeakCredentials() (+80 more)
+Cohesion: 0.06
+Nodes (84): TestEditValidate(), TestKindCoversBoth(), TestCompletedEditValidate(), TestOpposite(), TestParseSide(), TestOnboardingRejectsWeakCredentials(), TestOnboardingSignupThenLogin(), TestSafeNext() (+76 more)
 
 ### Community 4 - "time.Time"
 Cohesion: 0.19
-Nodes (9): Edit, ValidateNotes(), ValidateTimes(), nullableString(), timePtr(), setSettingsTx(), encodeTime(), isUniqueViolation() (+1 more)
+Nodes (9): Real, Edit, ValidateNotes(), ValidateTimes(), encodeTime(), isUniqueViolation(), normalizeTime(), loginAttempt (+1 more)
 
 ### Community 5 - "Product Spec & Ops Docs"
-Cohesion: 0.06
-Nodes (42): compose app service (nurtur:local, port 8005), nurtur-data Named Volume, Manual Release Gate (soak, sync outage, restore, 3 a.m. test), Playwright Browser Smoke Suite (390x844), Nurtur Feature Brief, Chronological Feed with Quick Undo, Streamlined Diaper Tracker (Wet/Dirty/Both), Dual-Side Breastfeeding Timer & Logger (+34 more)
+Cohesion: 0.07
+Nodes (39): Manual Release Gate (soak, sync outage, restore, 3 a.m. test), Playwright Browser Smoke Suite (390x844), Nurtur Feature Brief, Chronological Feed with Quick Undo, Streamlined Diaper Tracker (Wet/Dirty/Both), Dual-Side Breastfeeding Timer & Logger, Last Nursed Indicator, Night Mode & Single-Hand UX (+31 more)
 
 ### Community 6 - "Web Templates & Views"
 Cohesion: 0.08
 Nodes (42): App Icon (Pip Face), Maskable App Icon, Dashboard View, App Layout Shell, Action Dialog Sheet System, Inline Theme Bootstrap Script, Server-Side View Dispatch, Auth Mode Variants (chooser / signup / signin) (+34 more)
 
-### Community 7 - "Feed"
-Cohesion: 0.10
-Nodes (14): Feed, Segment, Side, Opposite(), TestCurrentSegmentAndMostRecentSide(), scanFeed(), scanSegment(), segmentIndex() (+6 more)
+### Community 7 - "scanDiaper"
+Cohesion: 0.16
+Nodes (8): scanDiaper(), scanFeed(), scanSleep(), decodeNullTime(), decodeTime(), placeholdersFor(), Entry, scanner
 
 ### Community 8 - "time.Duration"
-Cohesion: 0.05
-Nodes (63): DayBounds(), applyDiaperValidation(), DayBounds(), diaperIcon(), latestDiapers(), TestDayBoundsAcrossDST(), applySleepEditError(), applySleepEditValidation() (+55 more)
+Cohesion: 0.06
+Nodes (57): DayBounds(), applyDiaperValidation(), DayBounds(), diaperIcon(), latestDiapers(), applySleepSheetError(), applySleepSheetValidation(), previousLocalDayStart() (+49 more)
 
 ### Community 9 - "Client Timer Script"
 Cohesion: 0.14
 Nodes (26): activeTimerElapsed(), announce(), applyTheme(), armToast(), clearCache(), closeDialog(), closeOpenDialogs(), formatAgo() (+18 more)
 
 ### Community 10 - "context.Context"
-Cohesion: 0.15
-Nodes (3): csrfFrom(), queryer, Syncer
+Cohesion: 0.12
+Nodes (4): csrfFrom(), setSettingsTx(), fakeReader, Syncer
+
+### Community 11 - "Side"
+Cohesion: 0.17
+Nodes (6): Segment, Side, Opposite(), TestCurrentSegmentAndMostRecentSide(), scanSegment(), queryer
 
 ### Community 12 - "App Configuration"
 Cohesion: 0.14
@@ -140,64 +142,56 @@ Cohesion: 0.11
 Nodes (9): Color, Consistency, Diaper, Edit, Kind, ParseColor(), ParseConsistency(), TestSummary() (+1 more)
 
 ### Community 14 - "Session"
-Cohesion: 0.13
-Nodes (9): Session, Build(), Snapshot, TestBuildEmpty(), TestBuildPartialAndWakeWindow(), TestBuildSleepingUsesActiveDuration(), scanSleep(), fakeReader (+1 more)
+Cohesion: 0.14
+Nodes (10): Session, TestWakeWindow(), TestWakeWindowAcrossMidnight(), WakeWindow(), Build(), Snapshot, TestBuildEmpty(), TestBuildPartialAndWakeWindow() (+2 more)
+
+### Community 15 - "SyncWorker"
+Cohesion: 0.05
+Nodes (33): main(), run(), Clock, Fake, NewFake(), Store, Open(), splitSQL() (+25 more)
 
 ### Community 16 - "App Wiring & Renderer"
 Cohesion: 0.14
-Nodes (10): Clock, newAuth(), newLoginLimiter(), migrationVersions(), writeSchema(), New(), newStaticHandler(), Renderer (+2 more)
+Nodes (12): newAuth(), newLoginLimiter(), migrationVersions(), sqlNullable(), sqlText(), sqlTimePtr(), writeSchema(), New() (+4 more)
 
-### Community 17 - "Sync Worker Tests"
-Cohesion: 0.30
-Nodes (10): startWorker(), TestSyncFailureDoesNotFailMutation(), TestSyncPullOnDemand(), TestSyncPullOnStartup(), TestSyncPullsOnInterval(), TestSyncPushIsDebouncedAndCoalesced(), TestSyncRetriesWithBackoffThenSucceeds(), TestSyncShutdownFlushesAndCheckpoints() (+2 more)
+### Community 17 - "Feed"
+Cohesion: 0.29
+Nodes (3): Feed, segmentIndex(), timePtr()
 
 ### Community 18 - "Playwright E2E Setup"
 Cohesion: 0.14
 Nodes (11): devDependencies, @playwright/test, name, private, scripts, test, test:headed, version (+3 more)
 
-### Community 19 - "Turso Sync & Health"
-Cohesion: 0.25
-Nodes (5): SyncStats, SyncStatus, healthResponse, syncHealth, StatsSyncer
-
-### Community 20 - "Database Bootstrap"
-Cohesion: 0.19
-Nodes (5): Store, Open(), NewTursoSyncer(), Options, TursoSyncer
-
 ### Community 22 - "Local Dev Script"
 Cohesion: 0.48
 Nodes (6): cleanup(), fingerprint(), NURTUR_LOCAL_ONLY, dev.sh script, start_server(), stop_server()
 
-### Community 23 - "time.Time"
-Cohesion: 0.11
-Nodes (11): Real, Fake, NewFake(), BuildSegments(), CompletedEdit, TestBuildSegmentsOrder(), TestBuildSegmentsSingleSide(), TestTotalsDeriveFromSegments() (+3 more)
-
-### Community 24 - "Main & Sync Config"
-Cohesion: 0.33
-Nodes (7): main(), run(), discardLogger(), DefaultSyncConfig(), NewSyncWorker(), TestNotifyNeverBlocks(), SyncConfig
+### Community 23 - ".Totals"
+Cohesion: 0.18
+Nodes (7): BuildSegments(), CompletedEdit, TestBuildSegmentsOrder(), TestBuildSegmentsSingleSide(), TestOpenSegmentCountsToNowAndClampsNegative(), TestTotalsDeriveFromSegments(), timePtr()
 
 ### Community 25 - "Font Licensing (OFL)"
 Cohesion: 0.83
 Nodes (4): Self-Hosted OFL Fonts (Fredoka + Nunito Sans), Fredoka OFL License, Nunito Sans OFL License, SIL Open Font License 1.1
 
 ## Knowledge Gaps
-- **28 isolated node(s):** `nurtur`, `NURTUR_LOCAL_ONLY`, `Apple Touch Icon (PWA Home-Screen Icon)`, `Nurtur Brand Mascot: Smiling Cream Fruit with Leaves`, `Nurtur App Icon (192x192 PWA Icon)` (+23 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 93 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **27 isolated node(s):** `nurtur`, `NURTUR_LOCAL_ONLY`, `Apple Touch Icon (PWA Home-Screen Icon)`, `Nurtur Brand Mascot: Smiling Cream Fruit with Leaves`, `Nurtur App Icon (192x192 PWA Icon)` (+22 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 92 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Server` connect `HTTP Handlers & Middleware` to `Entrypoint & Stdlib Deps`, `Feed`, `time.Duration`, `Sync Worker`, `App Wiring & Renderer`, `Database Bootstrap`, `Main & Sync Config`?**
+- **Why does `Server` connect `HTTP Handlers & Middleware` to `Entrypoint & Stdlib Deps`, `time.Duration`, `Side`, `SyncWorker`, `App Wiring & Renderer`?**
   _High betweenness centrality (0.087) - this node is a cross-community bridge._
 - **What connects `nurtur`, `NURTUR_LOCAL_ONLY`, `Apple Touch Icon (PWA Home-Screen Icon)` to the rest of the system?**
-  _28 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _27 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `HTTP Handlers & Middleware` be split into smaller, more focused modules?**
-  _Cohesion score 0.06285403050108933 - nodes in this community are weakly interconnected._
-- **Why does `SyncWorker` connect `Sync Worker` to `HTTP Handlers & Middleware`, `Entrypoint & Stdlib Deps`, `context.Context`, `App Wiring & Renderer`, `Sync Worker Tests`, `Turso Sync & Health`, `time.Time`, `Main & Sync Config`?**
+  _Cohesion score 0.0634604754007739 - nodes in this community are weakly interconnected._
+- **Why does `SyncWorker` connect `SyncWorker` to `HTTP Handlers & Middleware`, `Entrypoint & Stdlib Deps`, `context.Context`, `time.Time`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Should `Entrypoint & Stdlib Deps` be split into smaller, more focused modules?**
-  _Cohesion score 0.07181409295352324 - nodes in this community are weakly interconnected._
-- **Why does `Store` connect `Database Bootstrap` to `HTTP Handlers & Middleware`, `Entrypoint & Stdlib Deps`, `testing.T`, `time.Time`, `context.Context`, `App Wiring & Renderer`, `Main & Sync Config`?**
+  _Cohesion score 0.07172799254774104 - nodes in this community are weakly interconnected._
+- **Why does `Store` connect `SyncWorker` to `HTTP Handlers & Middleware`, `Entrypoint & Stdlib Deps`, `testing.T`, `time.Time`, `context.Context`?**
   _High betweenness centrality (0.018) - this node is a cross-community bridge._
 - **Should `HTMX Library` be split into smaller, more focused modules?**
   _Cohesion score 0.07897684839432412 - nodes in this community are weakly interconnected._

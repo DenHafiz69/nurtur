@@ -1,10 +1,14 @@
 {
   "3": "testing.T",
   "4": "time.Time",
-  "7": "Feed",
+  "7": "scanDiaper",
   "8": "time.Duration",
   "10": "context.Context",
+  "11": "Side",
   "14": "Session",
-  "23": "time.Time",
+  "15": "SyncWorker",
+  "17": "Feed",
+  "19": "Debian-slim (glibc) Docker Runtime for tursogo",
+  "23": ".Totals",
   "36": "AGENTS.md"
 }
