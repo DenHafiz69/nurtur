@@ -40,7 +40,7 @@
   --lilac: #e0d2f4;
   --line: #eadccf;
   --danger: #a83d35;
-  --shadow: 0 4px 0 #e7d6c6;
+  --shadow: #e7d6c6;
 
   --focus: #9a4b00;
   --timer: #b94a3f;
@@ -63,38 +63,39 @@
 :root[data-theme="night"] {
   color-scheme: dark;
 
-  --bg: #08080c;
-  --bg-dots: #111118;
-  --surface: #121219;
-  --surface-soft: #1a1a22;
-  --ink: #f1eadc;
-  --ink-soft: #a9a2b2;
-  --ink-soft-strong: #b9b2c1;
-  --coral: #f0a184;
-  --coral-soft: #5a342d;
-  --on-coral: #1c100e;
-  --peach: #3a2a25;
-  --butter: #3b3524;
-  --sage: #223629;
-  --sky: #22353d;
-  --lilac: #2d273b;
-  --line: #272732;
-  --danger: #ff9e8f;
-  --shadow: 0 4px 0 #050508;
+  /* Warm plum twilight: lifted surfaces, no pure black, color kept for accents. */
+  --bg: #1a1621;
+  --bg-dots: #26202e;
+  --surface: #2a2334;
+  --surface-soft: #342c40;
+  --ink: #f5eee9;
+  --ink-soft: #c0b5cb;
+  --ink-soft-strong: #d5cbe0;
+  --coral: #ff9f87;
+  --coral-soft: #74453c;
+  --on-coral: #2b1411;
+  --peach: #4a2f39;
+  --butter: #57431f;
+  --sage: #294633;
+  --sky: #244252;
+  --lilac: #3b3156;
+  --line: #4b405c;
+  --danger: #ff9d90;
+  --shadow: #0d0a11;
 
-  --focus: #f0b37e;
-  --timer: #f0b37e;
-  --glow: rgba(240, 161, 132, 0.2);
-  --dock-shadow: rgba(0, 0, 0, 0.5);
-  --toast-bg: #f0b37e;
-  --toast-fg: #1c100e;
+  --focus: #ffc38f;
+  --timer: #ffc98f;
+  --glow: rgba(255, 159, 135, 0.22);
+  --dock-shadow: rgba(0, 0, 0, 0.38);
+  --toast-bg: #ffc98f;
+  --toast-fg: #2b1411;
 
-  --pip-body: #3b3524;
-  --pip-leaf: #223629;
-  --pip-leaf2: #2d4a37;
-  --pip-line: #f1eadc;
-  --pip-cheek: #5a342d;
-  --pip-drop: #22353d;
+  --pip-body: #6b5324;
+  --pip-leaf: #294633;
+  --pip-leaf2: #31503c;
+  --pip-line: #f5eee9;
+  --pip-cheek: #74453c;
+  --pip-drop: #244252;
 }
 
 *,
@@ -429,6 +430,34 @@ button {
 .status-icon .icon {
   width: 18px;
   height: 18px;
+}
+
+/* At night the cards stay neutral and the tint moves into the icon chip, so
+   the dashboard reads as calm panels instead of three muddy color blocks. */
+:root[data-theme="night"] .status-card,
+:root[data-theme="night"] .status-card.tone-peach,
+:root[data-theme="night"] .status-card.tone-butter,
+:root[data-theme="night"] .status-card.tone-sage {
+  background: var(--surface);
+}
+
+:root[data-theme="night"] .status-card.is-active {
+  background: var(--surface-soft);
+}
+
+:root[data-theme="night"] .status-card.tone-peach .status-icon {
+  background: var(--peach);
+  color: var(--coral);
+}
+
+:root[data-theme="night"] .status-card.tone-butter .status-icon {
+  background: var(--butter);
+  color: #ffd58a;
+}
+
+:root[data-theme="night"] .status-card.tone-sage .status-icon {
+  background: var(--sage);
+  color: #a8e0bd;
 }
 
 .status-label {
@@ -797,7 +826,7 @@ button {
   border: 2px solid var(--line);
   border-radius: 26px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 0 var(--shadow);
 }
 
 .timer-card.is-nursing {
@@ -1345,6 +1374,9 @@ button {
 input[type="datetime-local"],
 input[type="date"],
 input[type="number"],
+input[type="password"],
+input[type="text"],
+input[type="time"],
 select {
   width: 100%;
   min-height: 48px;
@@ -2367,7 +2399,7 @@ textarea {
   border: 2px solid var(--line);
   border-radius: 24px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 0 var(--shadow);
 }
 
 .settings-title {
@@ -2475,7 +2507,7 @@ textarea {
   border: 2px solid var(--line);
   border-radius: 30px;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 0 var(--shadow);
   text-align: center;
 }
 

@@ -53,7 +53,7 @@
     root.dataset.themeMode = mode;
 
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "night" ? "#08080c" : "#fff8f0");
+    if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
 
     var index = THEME_MODES.indexOf(mode);
     var next = THEME_MODES[(index + 1) % THEME_MODES.length];

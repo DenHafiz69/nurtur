@@ -38,7 +38,7 @@ Instead of forcing her to read a full log table to figure out what comes next, h
 
 ### 5. Night Mode & Single-Hand UX
 
-* **True OLED Dark Mode:** Nursing sessions at 3:00 AM require dark slate/black backgrounds with muted amber or soft white text to avoid waking the baby or hurting tired eyes.
+* **Low-Glare Night Mode:** Nursing sessions at 3:00 AM use a lifted plum-charcoal palette with soft off-white text and muted amber accents — no pure black, no glare, and no muddy color blocks.
 * **Thumb-zone layout:** Position the primary action buttons (Start/Stop, Diaper log) in the bottom third of the screen within easy reach of one thumb.
 * **HTMX swap without page jump:** Use `hx-swap="outerHTML"` or targeted out-of-band updates (`hx-swap-oob="true"`) to update the feed and summary widgets smoothly without losing the user's scroll position.
 
