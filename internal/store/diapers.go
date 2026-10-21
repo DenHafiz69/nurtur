@@ -36,8 +36,8 @@ func (s *Store) CreateDiaper(ctx context.Context, kind diaper.Kind, now time.Tim
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`INSERT INTO diapers (logged_at, type, created_at) VALUES (?, ?, ?)`,
-			encodeTime(now), kind, encodeTime(now))
+			`INSERT INTO diapers (account_id, logged_at, type, created_at) VALUES (?, ?, ?, ?)`,
+			AccountID(ctx), encodeTime(now), kind, encodeTime(now))
 		if err != nil {
 			return fmt.Errorf("store: insert diaper: %w", err)
 		}
@@ -66,9 +66,9 @@ func (s *Store) LastDiaper(ctx context.Context, kind diaper.Kind) (*diaper.Diape
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+diaperColumns+`
 		FROM diapers
-		WHERE deleted_at IS NULL AND (type = ? OR type = 'both')
+		WHERE account_id = ? AND deleted_at IS NULL AND (type = ? OR type = 'both')
 		ORDER BY logged_at DESC, id DESC
-		LIMIT 1`, kind)
+		LIMIT 1`, AccountID(ctx), kind)
 	d, err := scanDiaper(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -87,10 +87,10 @@ func (s *Store) RecentDiapers(ctx context.Context, from, to time.Time, limit int
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+diaperColumns+`
 		FROM diapers
-		WHERE deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
+		WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
 		ORDER BY logged_at DESC, id DESC
 		LIMIT ?`,
-		encodeTime(from), encodeTime(to), limit)
+		AccountID(ctx), encodeTime(from), encodeTime(to), limit)
 	if err != nil {
 		return nil, fmt.Errorf("store: list diapers: %w", err)
 	}
@@ -125,8 +125,8 @@ func (s *Store) UpdateDiaper(ctx context.Context, id int64, edit diaper.Edit, no
 			return err
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE diapers SET logged_at = ?, color = ?, consistency = ?, notes = ? WHERE id = ? AND deleted_at IS NULL`,
-			encodeTime(edit.LoggedAt), nullableString(string(edit.Color)), nullableString(string(edit.Consistency)), edit.Notes, id); err != nil {
+			`UPDATE diapers SET logged_at = ?, color = ?, consistency = ?, notes = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+			encodeTime(edit.LoggedAt), nullableString(string(edit.Color)), nullableString(string(edit.Consistency)), edit.Notes, id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: update diaper: %w", err)
 		}
 		d.LoggedAt = edit.LoggedAt
@@ -144,8 +144,8 @@ func (s *Store) DeleteDiaper(ctx context.Context, id int64, now time.Time) error
 	now = normalizeTime(now)
 	return s.WithTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx,
-			`UPDATE diapers SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`,
-			encodeTime(now), id)
+			`UPDATE diapers SET deleted_at = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+			encodeTime(now), id, AccountID(ctx))
 		if err != nil {
 			return fmt.Errorf("store: soft delete diaper: %w", err)
 		}
@@ -182,7 +182,7 @@ func (s *Store) RestoreDiaper(ctx context.Context, id int64) (diaper.Diaper, boo
 			return nil
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE diapers SET deleted_at = NULL WHERE id = ?`, id); err != nil {
+			`UPDATE diapers SET deleted_at = NULL WHERE id = ? AND account_id = ?`, id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: restore diaper: %w", err)
 		}
 		d.DeletedAt = nil
@@ -197,11 +197,12 @@ func (s *Store) RestoreDiaper(ctx context.Context, id int64) (diaper.Diaper, boo
 }
 
 func (s *Store) getDiaperAt(ctx context.Context, q queryer, id int64, includeDeleted bool) (diaper.Diaper, error) {
-	query := `SELECT ` + diaperColumns + ` FROM diapers WHERE id = ?`
+	query := `SELECT ` + diaperColumns + ` FROM diapers WHERE id = ? AND account_id = ?`
+	args := []any{id, AccountID(ctx)}
 	if !includeDeleted {
 		query += ` AND deleted_at IS NULL`
 	}
-	d, err := scanDiaper(q.QueryRowContext(ctx, query, id))
+	d, err := scanDiaper(q.QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return diaper.Diaper{}, diaper.ErrNotFound
 	}
@@ -216,10 +217,10 @@ func (s *Store) recentDuplicateDiaper(ctx context.Context, q queryer, kind diape
 	row := q.QueryRowContext(ctx, `
 		SELECT `+diaperColumns+`
 		FROM diapers
-		WHERE deleted_at IS NULL AND type = ? AND logged_at >= ? AND logged_at <= ?
+		WHERE account_id = ? AND deleted_at IS NULL AND type = ? AND logged_at >= ? AND logged_at <= ?
 		ORDER BY logged_at DESC, id DESC
 		LIMIT 1`,
-		kind, encodeTime(from), encodeTime(now))
+		AccountID(ctx), kind, encodeTime(from), encodeTime(now))
 	d, err := scanDiaper(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

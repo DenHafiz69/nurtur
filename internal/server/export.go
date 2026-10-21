@@ -190,6 +190,7 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 
 	var b strings.Builder
 	b.WriteString("-- Nurtur logical export. Replay into a fresh Turso/SQLite database.\n")
+	b.WriteString("-- This export contains one account's data, written to the account 0 namespace.\n")
 	fmt.Fprintf(&b, "-- Exported %s (version %s, timezone %s)\n\n", now.Format(time.RFC3339), s.version, s.loc.String())
 	b.WriteString("BEGIN TRANSACTION;\n\n")
 	b.WriteString("CREATE TABLE IF NOT EXISTS schema_migrations (\n    version    TEXT PRIMARY KEY,\n    applied_at TEXT NOT NULL\n);\n\n")
@@ -202,21 +203,21 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, f := range feeds {
-		fmt.Fprintf(&b, "INSERT INTO feeds (id, started_at, ended_at, last_side, notes, created_at, deleted_at) VALUES (%d, %s, %s, %s, %s, %s, %s);\n",
+		fmt.Fprintf(&b, "INSERT INTO feeds (id, account_id, started_at, ended_at, last_side, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %s, %s);\n",
 			f.ID, sqlText(view.ISO(f.StartedAt)), sqlTimePtr(f.EndedAt), sqlNullable(string(f.LastSide)),
 			sqlNullable(f.Notes), sqlText(view.ISO(f.CreatedAt)), sqlTimePtr(f.DeletedAt))
 		for _, seg := range f.Segments {
-			fmt.Fprintf(&b, "INSERT INTO feed_segments (id, feed_id, side, started_at, ended_at) VALUES (%d, %d, %s, %s, %s);\n",
+			fmt.Fprintf(&b, "INSERT INTO feed_segments (id, account_id, feed_id, side, started_at, ended_at) VALUES (%d, 0, %d, %s, %s, %s);\n",
 				seg.ID, seg.FeedID, sqlText(string(seg.Side)), sqlText(view.ISO(seg.StartedAt)), sqlTimePtr(seg.EndedAt))
 		}
 	}
 	for _, d := range diapers {
-		fmt.Fprintf(&b, "INSERT INTO diapers (id, logged_at, type, color, consistency, notes, created_at, deleted_at) VALUES (%d, %s, %s, %s, %s, %s, %s, %s);\n",
+		fmt.Fprintf(&b, "INSERT INTO diapers (id, account_id, logged_at, type, color, consistency, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %s, %s, %s);\n",
 			d.ID, sqlText(view.ISO(d.LoggedAt)), sqlText(string(d.Kind)), sqlNullable(string(d.Color)),
 			sqlNullable(string(d.Consistency)), sqlNullable(d.Notes), sqlText(view.ISO(d.CreatedAt)), sqlTimePtr(d.DeletedAt))
 	}
 	for _, session := range sleeps {
-		fmt.Fprintf(&b, "INSERT INTO sleeps (id, started_at, ended_at, notes, created_at, deleted_at) VALUES (%d, %s, %s, %s, %s, %s);\n",
+		fmt.Fprintf(&b, "INSERT INTO sleeps (id, account_id, started_at, ended_at, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %s);\n",
 			session.ID, sqlText(view.ISO(session.StartedAt)), sqlTimePtr(session.EndedAt),
 			sqlNullable(session.Notes), sqlText(view.ISO(session.CreatedAt)), sqlTimePtr(session.DeletedAt))
 	}
@@ -226,7 +227,7 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		fmt.Fprintf(&b, "INSERT INTO settings (key, value) VALUES (%s, %s);\n", sqlText(key), sqlText(settings[key]))
+		fmt.Fprintf(&b, "INSERT INTO settings (account_id, key, value) VALUES (0, %s, %s);\n", sqlText(key), sqlText(settings[key]))
 	}
 
 	// Mark migrations as applied so the app does not try to recreate tables.

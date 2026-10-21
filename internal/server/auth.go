@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -89,9 +90,11 @@ func (a *auth) accountLogin() bool {
 	return a.signupKey != "" || a.hasAccounts()
 }
 
-// signupOpen reports whether onboarding may create the one local account.
+// signupOpen reports whether anyone who knows the signup key may create an
+// account. Accounts are shared logins for one household, so signup stays open
+// while the key is configured rather than closing after the first account.
 func (a *auth) signupOpen() bool {
-	return a.signupKey != "" && !a.hasAccounts()
+	return a.signupKey != ""
 }
 
 func (a *auth) middleware(next http.Handler) http.Handler {
@@ -108,7 +111,7 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		csrf, ok := a.session(r)
+		accountID, csrf, ok := a.session(r)
 		if !ok {
 			next := r.URL.RequestURI()
 			http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusSeeOther)
@@ -123,6 +126,7 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), authCSRFKey, csrf)
+		ctx = store.WithAccount(ctx, accountID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -179,38 +183,43 @@ func (a *auth) checkCSRF(r *http.Request, csrf string) error {
 	return nil
 }
 
-func (a *auth) newSession() (value, csrf string, err error) {
+func (a *auth) newSession(accountID int64) (value, csrf string, err error) {
 	var raw [18]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return "", "", err
 	}
 	csrf = base64.RawURLEncoding.EncodeToString(raw[:])
 	payload := strings.Join([]string{
-		"v1",
+		"v2",
 		time.Now().UTC().Add(sessionLifetime).Format(time.RFC3339),
+		strconv.FormatInt(accountID, 10),
 		csrf,
 	}, "|")
 	return payload + "." + a.sign(payload), csrf, nil
 }
 
-func (a *auth) session(r *http.Request) (csrf string, ok bool) {
+func (a *auth) session(r *http.Request) (accountID int64, csrf string, ok bool) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil || cookie.Value == "" {
-		return "", false
+		return 0, "", false
 	}
 	payload, sig, found := strings.Cut(cookie.Value, ".")
 	if !found || !hmac.Equal([]byte(sig), []byte(a.sign(payload))) {
-		return "", false
+		return 0, "", false
 	}
 	parts := strings.Split(payload, "|")
-	if len(parts) != 3 || parts[0] != "v1" {
-		return "", false
+	if len(parts) != 4 || parts[0] != "v2" {
+		return 0, "", false
 	}
 	expires, err := time.Parse(time.RFC3339, parts[1])
 	if err != nil || time.Now().UTC().After(expires) {
-		return "", false
+		return 0, "", false
 	}
-	return parts[2], true
+	accountID, err = strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || accountID < 0 {
+		return 0, "", false
+	}
+	return accountID, parts[3], true
 }
 
 func (a *auth) sign(payload string) string {
@@ -219,14 +228,15 @@ func (a *auth) sign(payload string) string {
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
-func (a *auth) setSession(w http.ResponseWriter, r *http.Request, csrf string) {
+func (a *auth) setSession(w http.ResponseWriter, r *http.Request, accountID int64, csrf string) {
 	if csrf == "" {
 		return
 	}
 	// Rebuild the value so expiry and signature match the token issued above.
 	payload := strings.Join([]string{
-		"v1",
+		"v2",
 		time.Now().UTC().Add(sessionLifetime).Format(time.RFC3339),
+		strconv.FormatInt(accountID, 10),
 		csrf,
 	}, "|")
 	// #nosec G124 -- Secure is requested whenever TLS or auth.secure is in play;
@@ -350,7 +360,6 @@ func (s *Server) authPageData(r *http.Request, mode, next string) *view.PageData
 		Next:         next,
 		AccountLogin: s.auth.accountLogin(),
 		SignupOpen:   s.auth.signupOpen(),
-		BabyName:     s.currentBabyName(r.Context()),
 	}
 }
 
@@ -428,7 +437,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		s.auth.setHasAccounts(true)
 		s.auth.limiter.reset(limiterKey)
-		s.startSession(w, r, next)
+		s.startSession(w, r, acct.ID, next)
 		return
 	}
 
@@ -442,7 +451,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.auth.limiter.reset(limiterKey)
-	s.startSession(w, r, next)
+	s.startSession(w, r, 0, next)
 }
 
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
@@ -457,8 +466,8 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	next := safeNext(r.FormValue("next"))
 	if !s.auth.signupOpen() {
 		data := s.authPageData(r, "signup", next)
-		data.SignupError = "An account already exists on this server. Sign in instead."
-		s.renderNamed(w, r, http.StatusConflict, "login", data)
+		data.SignupError = "Sign-ups are closed on this server. Ask the person who set it up for the secret key."
+		s.renderNamed(w, r, http.StatusForbidden, "login", data)
 		return
 	}
 
@@ -513,16 +522,15 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	if _, err := s.store.CreateAccountWithSettings(
+	acct, err := s.store.CreateAccountWithSettings(
 		r.Context(), username, hash,
 		map[string]string{settingBabyName: babyName},
 		s.clock.Now(),
-	); err != nil {
+	)
+	if err != nil {
 		if errors.Is(err, store.ErrAccountExists) {
 			s.auth.setHasAccounts(true)
-			data := s.authPageData(r, "signup", next)
-			data.SignupError = "An account already exists on this server. Sign in instead."
-			s.renderNamed(w, r, http.StatusConflict, "login", data)
+			reject(http.StatusConflict, "That username is already taken. Try another.")
 			return
 		}
 		s.serverError(w, r, err)
@@ -530,21 +538,20 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.auth.setHasAccounts(true)
-	s.setBabyName(babyName)
 	s.auth.limiter.reset(limiterKey)
-	s.log.Info("account created", "username", username, "ip", ip)
-	s.startSession(w, r, next)
+	s.log.Info("account created", "username", username, "id", acct.ID, "ip", ip)
+	s.startSession(w, r, acct.ID, next)
 }
 
 // startSession issues the signed session cookie and returns to the page the
 // person originally asked for.
-func (s *Server) startSession(w http.ResponseWriter, r *http.Request, next string) {
-	_, csrf, err := s.auth.newSession()
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, accountID int64, next string) {
+	_, csrf, err := s.auth.newSession(accountID)
 	if err != nil {
 		s.serverError(w, r, err)
 		return
 	}
-	s.auth.setSession(w, r, csrf)
+	s.auth.setSession(w, r, accountID, csrf)
 	// #nosec G710 -- next has passed through safeNext, which allows only
 	// same-origin paths and rejects absolute or backslash-normalised targets.
 	http.Redirect(w, r, next, http.StatusSeeOther)

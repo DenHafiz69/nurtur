@@ -38,10 +38,11 @@ func (s *Store) LastFeed(ctx context.Context) (*feed.Feed, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+feedColumns+`
 		FROM feeds f
-		WHERE f.deleted_at IS NULL
+		WHERE f.account_id = ?
+		  AND f.deleted_at IS NULL
 		  AND EXISTS (SELECT 1 FROM feed_segments s WHERE s.feed_id = f.id)
 		ORDER BY COALESCE(f.ended_at, f.started_at) DESC, f.id DESC
-		LIMIT 1`)
+		LIMIT 1`, AccountID(ctx))
 	f, err := scanFeed(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -64,11 +65,12 @@ func (s *Store) RecentFeeds(ctx context.Context, from, to time.Time, limit int) 
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+feedColumns+`
 		FROM feeds
-		WHERE deleted_at IS NULL
+		WHERE account_id = ?
+		  AND deleted_at IS NULL
 		  AND ((started_at >= ? AND started_at < ?) OR ended_at IS NULL)
 		ORDER BY started_at DESC, id DESC
 		LIMIT ?`,
-		encodeTime(from), encodeTime(to), limit)
+		AccountID(ctx), encodeTime(from), encodeTime(to), limit)
 	if err != nil {
 		return nil, fmt.Errorf("store: list feeds: %w", err)
 	}
@@ -114,12 +116,14 @@ func (s *Store) CreateFeed(ctx context.Context, side feed.Side, now time.Time) (
 		return feed.Feed{}, feed.ErrInvalidSide
 	}
 	now = normalizeTime(now)
+	account := AccountID(ctx)
 	var out feed.Feed
 
 	err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		var active int
 		if err := tx.QueryRowContext(ctx,
-			`SELECT COUNT(1) FROM feeds WHERE ended_at IS NULL AND deleted_at IS NULL`,
+			`SELECT COUNT(1) FROM feeds WHERE account_id = ? AND ended_at IS NULL AND deleted_at IS NULL`,
+			account,
 		).Scan(&active); err != nil {
 			return fmt.Errorf("store: check active feed: %w", err)
 		}
@@ -128,8 +132,8 @@ func (s *Store) CreateFeed(ctx context.Context, side feed.Side, now time.Time) (
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`INSERT INTO feeds (started_at, created_at) VALUES (?, ?)`,
-			encodeTime(now), encodeTime(now))
+			`INSERT INTO feeds (account_id, started_at, created_at) VALUES (?, ?, ?)`,
+			account, encodeTime(now), encodeTime(now))
 		if err != nil {
 			if isUniqueViolation(err) {
 				return feed.ErrAlreadyActive
@@ -142,8 +146,8 @@ func (s *Store) CreateFeed(ctx context.Context, side feed.Side, now time.Time) (
 		}
 
 		res, err = tx.ExecContext(ctx,
-			`INSERT INTO feed_segments (feed_id, side, started_at) VALUES (?, ?, ?)`,
-			feedID, side, encodeTime(now))
+			`INSERT INTO feed_segments (account_id, feed_id, side, started_at) VALUES (?, ?, ?, ?)`,
+			account, feedID, side, encodeTime(now))
 		if err != nil {
 			if isUniqueViolation(err) {
 				return feed.ErrAlreadyActive
@@ -204,8 +208,8 @@ func (s *Store) SwitchFeed(ctx context.Context, id int64, side feed.Side, now ti
 			end = current.StartedAt
 		}
 		res, err := tx.ExecContext(ctx,
-			`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND ended_at IS NULL`,
-			encodeTime(end), current.ID)
+			`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+			encodeTime(end), current.ID, AccountID(ctx))
 		if err != nil {
 			return fmt.Errorf("store: close segment: %w", err)
 		}
@@ -218,8 +222,8 @@ func (s *Store) SwitchFeed(ctx context.Context, id int64, side feed.Side, now ti
 		}
 
 		res, err = tx.ExecContext(ctx,
-			`INSERT INTO feed_segments (feed_id, side, started_at) VALUES (?, ?, ?)`,
-			id, side, encodeTime(end))
+			`INSERT INTO feed_segments (account_id, feed_id, side, started_at) VALUES (?, ?, ?, ?)`,
+			AccountID(ctx), id, side, encodeTime(end))
 		if err != nil {
 			if isUniqueViolation(err) {
 				return feed.ErrAlreadyActive
@@ -231,7 +235,7 @@ func (s *Store) SwitchFeed(ctx context.Context, id int64, side feed.Side, now ti
 			return fmt.Errorf("store: segment id: %w", err)
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE feeds SET last_side = ? WHERE id = ?`, side, id); err != nil {
+			`UPDATE feeds SET last_side = ? WHERE id = ? AND account_id = ?`, side, id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: update last side: %w", err)
 		}
 
@@ -277,8 +281,8 @@ func (s *Store) StopFeed(ctx context.Context, id int64, now time.Time) (feed.Fee
 				end = current.StartedAt
 			}
 			res, err := tx.ExecContext(ctx,
-				`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND ended_at IS NULL`,
-				encodeTime(end), current.ID)
+				`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+				encodeTime(end), current.ID, AccountID(ctx))
 			if err != nil {
 				return fmt.Errorf("store: close segment: %w", err)
 			}
@@ -300,8 +304,8 @@ func (s *Store) StopFeed(ctx context.Context, id int64, now time.Time) (feed.Fee
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`UPDATE feeds SET ended_at = ?, last_side = ? WHERE id = ? AND ended_at IS NULL`,
-			encodeTime(end), f.LastSide, id)
+			`UPDATE feeds SET ended_at = ?, last_side = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+			encodeTime(end), f.LastSide, id, AccountID(ctx))
 		if err != nil {
 			return fmt.Errorf("store: stop feed: %w", err)
 		}
@@ -340,21 +344,21 @@ func (s *Store) DeleteFeed(ctx context.Context, id int64, now time.Time) error {
 					end = current.StartedAt
 				}
 				if _, err := tx.ExecContext(ctx,
-					`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND ended_at IS NULL`,
-					encodeTime(end), current.ID); err != nil {
+					`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+					encodeTime(end), current.ID, AccountID(ctx)); err != nil {
 					return fmt.Errorf("store: close segment before delete: %w", err)
 				}
 			}
 			if _, err := tx.ExecContext(ctx,
-				`UPDATE feeds SET ended_at = ?, last_side = ? WHERE id = ? AND ended_at IS NULL`,
-				encodeTime(end), f.MostRecentSide(), id); err != nil {
+				`UPDATE feeds SET ended_at = ?, last_side = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+				encodeTime(end), f.MostRecentSide(), id, AccountID(ctx)); err != nil {
 				return fmt.Errorf("store: close feed before delete: %w", err)
 			}
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`UPDATE feeds SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`,
-			encodeTime(now), id)
+			`UPDATE feeds SET deleted_at = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+			encodeTime(now), id, AccountID(ctx))
 		if err != nil {
 			return fmt.Errorf("store: soft delete feed: %w", err)
 		}
@@ -392,13 +396,15 @@ func (s *Store) UpdateCompletedFeed(ctx context.Context, id int64, edit feed.Com
 			return feed.ErrFeedActive
 		}
 
-		if _, err := tx.ExecContext(ctx, `DELETE FROM feed_segments WHERE feed_id = ?`, id); err != nil {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM feed_segments WHERE feed_id = ? AND account_id = ?`,
+			id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: clear segments: %w", err)
 		}
 		for i := range segments {
 			res, err := tx.ExecContext(ctx,
-				`INSERT INTO feed_segments (feed_id, side, started_at, ended_at) VALUES (?, ?, ?, ?)`,
-				id, segments[i].Side, encodeTime(segments[i].StartedAt), encodeTime(*segments[i].EndedAt))
+				`INSERT INTO feed_segments (account_id, feed_id, side, started_at, ended_at) VALUES (?, ?, ?, ?, ?)`,
+				AccountID(ctx), id, segments[i].Side, encodeTime(segments[i].StartedAt), encodeTime(*segments[i].EndedAt))
 			if err != nil {
 				return fmt.Errorf("store: insert rebuilt segment: %w", err)
 			}
@@ -409,8 +415,8 @@ func (s *Store) UpdateCompletedFeed(ctx context.Context, id int64, edit feed.Com
 		}
 
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE feeds SET started_at = ?, ended_at = ?, last_side = ? WHERE id = ?`,
-			encodeTime(edit.StartedAt), encodeTime(edit.EndedAt), edit.LastSide(), id); err != nil {
+			`UPDATE feeds SET started_at = ?, ended_at = ?, last_side = ? WHERE id = ? AND account_id = ?`,
+			encodeTime(edit.StartedAt), encodeTime(edit.EndedAt), edit.LastSide(), id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: update feed times: %w", err)
 		}
 
@@ -489,14 +495,14 @@ func (s *Store) updateActiveStart(ctx context.Context, id int64, start time.Time
 		proposed = normalizeTime(proposed)
 
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE feed_segments SET started_at = ? WHERE id = ? AND ended_at IS NULL`,
-			encodeTime(proposed), current.ID); err != nil {
+			`UPDATE feed_segments SET started_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+			encodeTime(proposed), current.ID, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: adjust segment start: %w", err)
 		}
 		if index == 0 {
 			if _, err := tx.ExecContext(ctx,
-				`UPDATE feeds SET started_at = ? WHERE id = ?`,
-				encodeTime(proposed), id); err != nil {
+				`UPDATE feeds SET started_at = ? WHERE id = ? AND account_id = ?`,
+				encodeTime(proposed), id, AccountID(ctx)); err != nil {
 				return fmt.Errorf("store: adjust feed start: %w", err)
 			}
 			f.StartedAt = proposed
@@ -516,9 +522,9 @@ func (s *Store) TotalsForFeed(ctx context.Context, id int64, now time.Time) (lef
 		SELECT side,
 		       COALESCE(SUM(MAX(0, strftime('%s', COALESCE(ended_at, ?)) - strftime('%s', started_at))), 0)
 		FROM feed_segments
-		WHERE feed_id = ?
+		WHERE feed_id = ? AND account_id = ?
 		GROUP BY side`,
-		encodeTime(now), id)
+		encodeTime(now), id, AccountID(ctx))
 	if err != nil {
 		return 0, 0, fmt.Errorf("store: feed totals: %w", err)
 	}
@@ -554,13 +560,14 @@ func (s *Store) loadFeedAt(ctx context.Context, q queryer, id int64, includeDele
 	)
 	switch {
 	case activeOnly:
-		query = `SELECT ` + feedColumns + ` FROM feeds WHERE ended_at IS NULL AND deleted_at IS NULL ORDER BY id DESC LIMIT 1`
+		query = `SELECT ` + feedColumns + ` FROM feeds WHERE account_id = ? AND ended_at IS NULL AND deleted_at IS NULL ORDER BY id DESC LIMIT 1`
+		args = []any{AccountID(ctx)}
 	case includeDeleted:
-		query = `SELECT ` + feedColumns + ` FROM feeds WHERE id = ?`
-		args = []any{id}
+		query = `SELECT ` + feedColumns + ` FROM feeds WHERE id = ? AND account_id = ?`
+		args = []any{id, AccountID(ctx)}
 	default:
-		query = `SELECT ` + feedColumns + ` FROM feeds WHERE id = ? AND deleted_at IS NULL`
-		args = []any{id}
+		query = `SELECT ` + feedColumns + ` FROM feeds WHERE id = ? AND account_id = ? AND deleted_at IS NULL`
+		args = []any{id, AccountID(ctx)}
 	}
 
 	f, err := scanFeed(q.QueryRowContext(ctx, query, args...))
@@ -587,8 +594,8 @@ func (s *Store) attachSegments(ctx context.Context, q queryer, f *feed.Feed) err
 
 func (s *Store) segmentsForFeed(ctx context.Context, q queryer, feedID int64) ([]feed.Segment, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT `+segmentColumns+` FROM feed_segments WHERE feed_id = ? ORDER BY started_at ASC, id ASC`,
-		feedID)
+		`SELECT `+segmentColumns+` FROM feed_segments WHERE feed_id = ? AND account_id = ? ORDER BY started_at ASC, id ASC`,
+		feedID, AccountID(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("store: list segments: %w", err)
 	}
@@ -613,12 +620,13 @@ func (s *Store) segmentsForFeeds(ctx context.Context, q queryer, ids []int64) (m
 		return nil, nil
 	}
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
-	args := make([]any, len(ids))
-	for i, id := range ids {
-		args[i] = id
+	args := make([]any, 0, len(ids)+1)
+	for _, id := range ids {
+		args = append(args, id)
 	}
+	args = append(args, AccountID(ctx))
 	rows, err := q.QueryContext(ctx,
-		`SELECT `+segmentColumns+` FROM feed_segments WHERE feed_id IN (`+placeholders+`) ORDER BY started_at ASC, id ASC`,
+		`SELECT `+segmentColumns+` FROM feed_segments WHERE feed_id IN (`+placeholders+`) AND account_id = ? ORDER BY started_at ASC, id ASC`,
 		args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: list segments: %w", err)

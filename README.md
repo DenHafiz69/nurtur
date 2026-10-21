@@ -61,7 +61,7 @@ the one binary.
 | `NURTUR_NIGHT_END` | `07:00` | Local night window end (`HH:MM`) |
 | `NURTUR_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
 | `NURTUR_PASSCODE` | — | Legacy single-user passcode gate |
-| `NURTUR_SIGNUP_KEY` | — | Secret key that enables onboarding (one local account) |
+| `NURTUR_SIGNUP_KEY` | — | Secret key that lets people create local accounts |
 | `NURTUR_SESSION_SECRET` | derived | HMAC key for session cookies (set this to survive credential changes) |
 | `NURTUR_COOKIE_SECURE` | `false` | Set `true` when serving over HTTPS (also auto-detected per request) |
 
@@ -468,19 +468,23 @@ account?”**
 
 - **No, I'm new here** → enter the signup key, choose a username and password,
   and enter the baby's name. The key is only checked locally; no email, OAuth, or
-  external service is involved. Nurtur stores one PBKDF2-SHA256 password hash and
-  refuses any further signups.
-- **Yes, sign in** → enter that username and password.
+  external service is involved. Nurtur stores a PBKDF2-SHA256 password hash for
+  each account.
+- **Yes, sign in** → enter your username and password.
 
-The baby's name is saved with the account and shown in the header and sleep
-messages. It can be corrected later on **Settings**. `NURTUR_BABY_NAME` remains
-only as a fallback for installs that do not use onboarding.
+Anyone who knows the signup key can create another account. Every account has
+its own private baby profile and care log: its own baby name, night window,
+feeds, diapers, sleep sessions, timeline, and exports. Accounts cannot see or
+change each other's data. The baby's name is shown in the header and sleep
+messages and can be corrected later on **Settings**. `NURTUR_BABY_NAME` remains
+only as a fallback for an account that has not saved a name yet.
 
-Every other browser/device sees the same question and can sign in. The account
-lives in the `accounts` table in the local database, so removing
-`NURTUR_SIGNUP_KEY` after setup does not disable the gate. To start over, delete
-the row from `accounts` (or use a fresh `NURTUR_DB`) and re-run onboarding with
-the key.
+Every other browser/device sees the same question and can sign in. Accounts live
+in the `accounts` table in the local database, so removing `NURTUR_SIGNUP_KEY`
+after setup closes new signups without disabling the gate. Data created before
+accounts were enabled is adopted by the first account created. To start over,
+delete the rows from `accounts` (or use a fresh `NURTUR_DB`) and re-run
+onboarding with the key.
 
 The older single-passcode flow still works when `NURTUR_PASSCODE` is set and no
 account exists:

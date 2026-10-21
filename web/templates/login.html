@@ -31,12 +31,12 @@
     <p class="auth-copy">Do you already have an account?</p>
     <div class="auth-choices">
       <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Yes, sign in</span></a>
-      <a class="btn btn-ghost auth-submit" href="/login?mode=signup&amp;next={{urlquery .Next}}">{{icon "drop"}}<span>No, I'm new here</span></a>
+      {{if .SignupOpen}}<a class="btn btn-ghost auth-submit" href="/login?mode=signup&amp;next={{urlquery .Next}}">{{icon "drop"}}<span>No, I'm new here</span></a>{{end}}
     </div>
-    <p class="auth-note">New here? You'll need the secret key from the person who set up this server.</p>
+    {{if .SignupOpen}}<p class="auth-note">New here? You'll need the secret key from the person who set up this server.</p>{{end}}
 
     {{else if eq .AuthMode "signup"}}
-    <p class="auth-copy">Set up the one account for this server.</p>
+    <p class="auth-copy">Set up your account and tell us who you're caring for.</p>
     {{if .SignupOpen}}
     <form class="auth-form" method="post" action="/signup">
       <input type="hidden" name="next" value="{{.Next}}">
@@ -65,7 +65,7 @@
     </form>
     <a class="auth-alt" href="/login?mode=signin&amp;next={{urlquery .Next}}">I already have an account</a>
     {{else}}
-    <p class="auth-copy">An account already exists on this server.</p>
+    <p class="auth-copy">Sign-ups are closed on this server.</p>
     {{if .SignupError}}<p class="field-error" role="alert">{{.SignupError}}</p>{{end}}
     <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Sign in</span></a>
     {{end}}

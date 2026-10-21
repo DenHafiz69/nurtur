@@ -30,19 +30,19 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT kind, id, anchor FROM (
 			SELECT 'feed' AS kind, id, started_at AS anchor
-			  FROM feeds WHERE deleted_at IS NULL AND started_at >= ? AND started_at < ?
+			  FROM feeds WHERE account_id = ? AND deleted_at IS NULL AND started_at >= ? AND started_at < ?
 			UNION ALL
 			SELECT 'diaper', id, logged_at
-			  FROM diapers WHERE deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
+			  FROM diapers WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
 			UNION ALL
 			SELECT 'sleep', id, started_at
-			  FROM sleeps WHERE deleted_at IS NULL AND started_at >= ? AND started_at < ?
+			  FROM sleeps WHERE account_id = ? AND deleted_at IS NULL AND started_at >= ? AND started_at < ?
 		)
 		ORDER BY anchor DESC, id DESC, kind DESC
 		LIMIT ?`,
-		encodeTime(from), encodeTime(to),
-		encodeTime(from), encodeTime(to),
-		encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
 		limit)
 	if err != nil {
 		return nil, fmt.Errorf("store: timeline anchors: %w", err)
@@ -135,10 +135,10 @@ func (s *Store) TimelineDaySummary(ctx context.Context, from, to, now time.Time)
 	}
 	if err := s.db.QueryRowContext(ctx, `
 		SELECT
-			(SELECT COUNT(1) FROM feeds   WHERE deleted_at IS NULL AND started_at >= ? AND started_at < ?),
-			(SELECT COUNT(1) FROM diapers WHERE deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?)`,
-		encodeTime(from), encodeTime(to),
-		encodeTime(from), encodeTime(to),
+			(SELECT COUNT(1) FROM feeds   WHERE account_id = ? AND deleted_at IS NULL AND started_at >= ? AND started_at < ?),
+			(SELECT COUNT(1) FROM diapers WHERE account_id = ? AND deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?)`,
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
 	).Scan(&summary.Feeds, &summary.Diapers); err != nil {
 		return timeline.DaySummary{}, fmt.Errorf("store: timeline day counts: %w", err)
 	}
@@ -169,11 +169,13 @@ func (s *Store) HasTimelineBefore(ctx context.Context, before time.Time) (bool, 
 	var exists int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT CASE WHEN
-			EXISTS (SELECT 1 FROM feeds   WHERE deleted_at IS NULL AND started_at < ?) OR
-			EXISTS (SELECT 1 FROM diapers WHERE deleted_at IS NULL AND logged_at  < ?) OR
-			EXISTS (SELECT 1 FROM sleeps  WHERE deleted_at IS NULL AND started_at < ?)
+			EXISTS (SELECT 1 FROM feeds   WHERE account_id = ? AND deleted_at IS NULL AND started_at < ?) OR
+			EXISTS (SELECT 1 FROM diapers WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
+			EXISTS (SELECT 1 FROM sleeps  WHERE account_id = ? AND deleted_at IS NULL AND started_at < ?)
 		THEN 1 ELSE 0 END`,
-		encodeTime(before), encodeTime(before), encodeTime(before),
+		AccountID(ctx), encodeTime(before),
+		AccountID(ctx), encodeTime(before),
+		AccountID(ctx), encodeTime(before),
 	).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("store: timeline before: %w", err)
@@ -185,7 +187,8 @@ func (s *Store) HasTimelineBefore(ctx context.Context, before time.Time) (bool, 
 // used by the logical export.
 func (s *Store) AllFeeds(ctx context.Context) ([]feed.Feed, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+feedColumns+` FROM feeds ORDER BY id ASC`)
+		SELECT `+feedColumns+` FROM feeds WHERE account_id = ? ORDER BY id ASC`,
+		AccountID(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("store: export feeds: %w", err)
 	}
@@ -221,7 +224,8 @@ func (s *Store) AllFeeds(ctx context.Context) ([]feed.Feed, error) {
 // AllDiapers returns every diaper, including soft-deleted rows, oldest first.
 func (s *Store) AllDiapers(ctx context.Context) ([]diaper.Diaper, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+diaperColumns+` FROM diapers ORDER BY id ASC`)
+		SELECT `+diaperColumns+` FROM diapers WHERE account_id = ? ORDER BY id ASC`,
+		AccountID(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("store: export diapers: %w", err)
 	}
@@ -244,7 +248,8 @@ func (s *Store) AllDiapers(ctx context.Context) ([]diaper.Diaper, error) {
 // AllSleeps returns every sleep, including soft-deleted rows, oldest first.
 func (s *Store) AllSleeps(ctx context.Context) ([]sleep.Session, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT `+sleepColumns+` FROM sleeps ORDER BY id ASC`)
+		SELECT `+sleepColumns+` FROM sleeps WHERE account_id = ? ORDER BY id ASC`,
+		AccountID(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("store: export sleeps: %w", err)
 	}
@@ -284,7 +289,8 @@ func (s *Store) RestoreFeed(ctx context.Context, id int64) (feed.Feed, bool, err
 			var active int
 			if err := tx.QueryRowContext(ctx, `
 				SELECT COUNT(1) FROM feeds
-				WHERE ended_at IS NULL AND deleted_at IS NULL AND id != ?`, id).Scan(&active); err != nil {
+				WHERE account_id = ? AND ended_at IS NULL AND deleted_at IS NULL AND id != ?`,
+				AccountID(ctx), id).Scan(&active); err != nil {
 				return fmt.Errorf("store: check active feed before restore: %w", err)
 			}
 			if active > 0 {
@@ -292,7 +298,7 @@ func (s *Store) RestoreFeed(ctx context.Context, id int64) (feed.Feed, bool, err
 			}
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE feeds SET deleted_at = NULL WHERE id = ?`, id); err != nil {
+			`UPDATE feeds SET deleted_at = NULL WHERE id = ? AND account_id = ?`, id, AccountID(ctx)); err != nil {
 			if isUniqueViolation(err) {
 				return feed.ErrAlreadyActive
 			}
@@ -315,10 +321,11 @@ func (s *Store) feedsByIDs(ctx context.Context, ids []int64) (map[int64]*feed.Fe
 		return out, nil
 	}
 	placeholders, args := placeholdersFor(ids)
+	args = append(args, AccountID(ctx))
 	// #nosec G202 -- columns are compile-time constants and placeholders are
 	// generated "?" marks; every id is still bound as a query argument.
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+feedColumns+` FROM feeds WHERE deleted_at IS NULL AND id IN (`+placeholders+`)`,
+		`SELECT `+feedColumns+` FROM feeds WHERE deleted_at IS NULL AND id IN (`+placeholders+`) AND account_id = ?`,
 		args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: timeline feeds: %w", err)
@@ -352,10 +359,11 @@ func (s *Store) diapersByIDs(ctx context.Context, ids []int64) (map[int64]*diape
 		return out, nil
 	}
 	placeholders, args := placeholdersFor(ids)
+	args = append(args, AccountID(ctx))
 	// #nosec G202 -- columns are compile-time constants and placeholders are
 	// generated "?" marks; every id is still bound as a query argument.
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+diaperColumns+` FROM diapers WHERE deleted_at IS NULL AND id IN (`+placeholders+`)`,
+		`SELECT `+diaperColumns+` FROM diapers WHERE deleted_at IS NULL AND id IN (`+placeholders+`) AND account_id = ?`,
 		args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: timeline diapers: %w", err)
@@ -382,10 +390,11 @@ func (s *Store) sleepsByIDs(ctx context.Context, ids []int64) (map[int64]*sleep.
 		return out, nil
 	}
 	placeholders, args := placeholdersFor(ids)
+	args = append(args, AccountID(ctx))
 	// #nosec G202 -- columns are compile-time constants and placeholders are
 	// generated "?" marks; every id is still bound as a query argument.
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+sleepColumns+` FROM sleeps WHERE deleted_at IS NULL AND id IN (`+placeholders+`)`,
+		`SELECT `+sleepColumns+` FROM sleeps WHERE deleted_at IS NULL AND id IN (`+placeholders+`) AND account_id = ?`,
 		args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: timeline sleeps: %w", err)

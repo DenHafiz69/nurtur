@@ -13,7 +13,6 @@ import (
 	"path"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 
 	"nurtur/internal/clock"
@@ -47,7 +46,6 @@ type Server struct {
 	store      *store.Store
 	clock      clock.Clock
 	loc        *time.Location
-	babyName   string // cached from settings, falling back to the environment
 	version    string
 	log        *slog.Logger
 	renderer   *view.Renderer
@@ -61,12 +59,6 @@ type Server struct {
 	auth       *auth
 
 	defaultBabyName string
-
-	babyMu     sync.RWMutex
-	babyLoaded bool
-
-	nightMu     sync.RWMutex
-	nightLoaded bool
 }
 
 // New validates dependencies and parses the embedded templates.

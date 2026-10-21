@@ -38,16 +38,24 @@ func TestAccountLifecycle(t *testing.T) {
 		t.Fatalf("missing account error = %v, want ErrAccountNotFound", err)
 	}
 
-	if _, err := st.CreateAccount(ctx, "second", "hash-two", testNow); !errors.Is(err, ErrAccountExists) {
-		t.Fatalf("second account error = %v, want ErrAccountExists", err)
+	second, err := st.CreateAccount(ctx, "second", "hash-two", testNow)
+	if err != nil {
+		t.Fatalf("second account: %v", err)
+	}
+	if second.ID == acct.ID {
+		t.Fatalf("second account reused id %d", acct.ID)
+	}
+
+	if _, err := st.CreateAccount(ctx, "wife", "hash-three", testNow); !errors.Is(err, ErrAccountExists) {
+		t.Fatalf("duplicate username error = %v, want ErrAccountExists", err)
 	}
 
 	count, err = st.CountAccounts(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Fatalf("account count = %d, want 1", count)
+	if count != 2 {
+		t.Fatalf("account count = %d, want 2", count)
 	}
 }
 
@@ -64,19 +72,25 @@ func TestCreateAccountWithSettingsIsAtomic(t *testing.T) {
 	if acct.Username != "wife" {
 		t.Fatalf("account = %+v", acct)
 	}
-	name, ok, err := st.Setting(ctx, "baby_name")
+	acctCtx := WithAccount(ctx, acct.ID)
+	name, ok, err := st.Setting(acctCtx, "baby_name")
 	if err != nil || !ok || name != "Aisyah" {
 		t.Fatalf("baby_name = %q, ok=%v, err=%v", name, ok, err)
 	}
 
-	// A second attempt must not overwrite the first account or its settings.
-	if _, err := st.CreateAccountWithSettings(ctx, "other", "hash", map[string]string{
+	// An additional account has its own settings namespace.
+	other, err := st.CreateAccountWithSettings(ctx, "other", "hash", map[string]string{
 		"baby_name": "Someone else",
-	}, testNow); !errors.Is(err, ErrAccountExists) {
-		t.Fatalf("second account error = %v, want ErrAccountExists", err)
+	}, testNow)
+	if err != nil {
+		t.Fatalf("additional account: %v", err)
 	}
-	name, _, err = st.Setting(ctx, "baby_name")
+	name, _, err = st.Setting(acctCtx, "baby_name")
 	if err != nil || name != "Aisyah" {
-		t.Fatalf("baby_name after rejected signup = %q, err=%v", name, err)
+		t.Fatalf("first account baby_name = %q, err=%v", name, err)
+	}
+	name, ok, err = st.Setting(WithAccount(ctx, other.ID), "baby_name")
+	if err != nil || !ok || name != "Someone else" {
+		t.Fatalf("second account baby_name = %q, ok=%v, err=%v", name, ok, err)
 	}
 }

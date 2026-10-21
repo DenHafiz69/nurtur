@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"nurtur/internal/store"
 )
 
 func TestOnboardingSignupThenLogin(t *testing.T) {
@@ -87,25 +89,60 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 	if strings.Contains(acct.PasswordHash, "correct horse") {
 		t.Fatal("password was stored in plain text")
 	}
-	storedName, ok, err := env.store.Setting(context.Background(), settingBabyName)
+	acctCtx := store.WithAccount(context.Background(), acct.ID)
+	storedName, ok, err := env.store.Setting(acctCtx, settingBabyName)
 	if err != nil || !ok || storedName != "Aisyah" {
 		t.Fatalf("stored baby_name = %q, ok=%v, err=%v", storedName, ok, err)
 	}
 
-	// The signup is now closed: the form explains that an account exists.
+	// Signup stays open for anyone with the secret key. Each account gets its
+	// own baby profile and data, so the form always asks for a name.
 	rec = env.do(t, http.MethodGet, "/login?mode=signup", nil, false)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "already exists") {
-		t.Fatalf("closed signup = %d\n%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("open signup = %d", rec.Code)
+	}
+	body = rec.Body.String()
+	for _, want := range []string{"Secret key", "Baby's name"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("open signup missing %q:\n%s", want, body)
+		}
 	}
 	rec = env.do(t, http.MethodPost, "/signup", url.Values{
 		"secret_key":       {"only-for-my-wife"},
-		"username":         {"intruder"},
-		"baby_name":        {"Intruder"},
+		"username":         {"husband"},
+		"baby_name":        {"Someone else"},
 		"password":         {"another password"},
 		"confirm_password": {"another password"},
 	}, false)
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("second signup = %d", rec.Code)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("second signup = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if count, err := env.store.CountAccounts(context.Background()); err != nil || count != 2 {
+		t.Fatalf("second signup count=%d err=%v", count, err)
+	}
+	storedName, ok, err = env.store.Setting(acctCtx, settingBabyName)
+	if err != nil || !ok || storedName != "Aisyah" {
+		t.Fatalf("first account baby_name = %q, ok=%v, err=%v", storedName, ok, err)
+	}
+	husband, err := env.store.AccountByUsername(context.Background(), "husband")
+	if err != nil {
+		t.Fatalf("husband account: %v", err)
+	}
+	husbandName, ok, err := env.store.Setting(store.WithAccount(context.Background(), husband.ID), settingBabyName)
+	if err != nil || !ok || husbandName != "Someone else" {
+		t.Fatalf("second account baby_name = %q, ok=%v, err=%v", husbandName, ok, err)
+	}
+
+	// A username can only be claimed once.
+	rec = env.do(t, http.MethodPost, "/signup", url.Values{
+		"secret_key":       {"only-for-my-wife"},
+		"username":         {"husband"},
+		"baby_name":        {"Another baby"},
+		"password":         {"another password"},
+		"confirm_password": {"another password"},
+	}, false)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "already taken") {
+		t.Fatalf("duplicate signup = %d\n%s", rec.Code, rec.Body.String())
 	}
 
 	// A new browser can choose "Yes, sign in" and log in with the account.
@@ -136,6 +173,71 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "Aisyah") {
 		t.Fatalf("dashboard missing the onboarded baby name:\n%s", rec.Body.String())
+	}
+}
+
+func TestAccountsHaveSeparateData(t *testing.T) {
+	env := newTestEnvConfig(t, func(cfg *Config) {
+		cfg.SignupKey = "only-for-my-wife"
+		cfg.SessionSecret = "test-session-secret"
+	})
+
+	signup := func(username, babyName string) *http.Cookie {
+		t.Helper()
+		rec := env.do(t, http.MethodPost, "/signup", url.Values{
+			"secret_key":       {"only-for-my-wife"},
+			"username":         {username},
+			"baby_name":        {babyName},
+			"password":         {"correct horse"},
+			"confirm_password": {"correct horse"},
+		}, false)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("signup %s = %d\n%s", username, rec.Code, rec.Body.String())
+		}
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name == sessionCookieName {
+				return cookie
+			}
+		}
+		t.Fatalf("signup %s did not set a session cookie", username)
+		return nil
+	}
+
+	wife := signup("wife", "Aisyah")
+	husband := signup("husband", "Bilal")
+	headers := func(cookie *http.Cookie) map[string]string {
+		return map[string]string{"Cookie": cookie.Name + "=" + cookie.Value}
+	}
+	get := func(cookie *http.Cookie, path string) *httptest.ResponseRecorder {
+		t.Helper()
+		return doWith(t, env, http.MethodGet, path, nil, headers(cookie))
+	}
+
+	// The wife's feed belongs only to her account.
+	rec := doWith(t, env, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, headers(wife))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("wife start feed = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	wifeBody := get(wife, "/").Body.String()
+	if !strings.Contains(wifeBody, "Aisyah") || !strings.Contains(wifeBody, `data-feed-id=`) {
+		t.Fatalf("wife dashboard missing her own data:\n%s", wifeBody)
+	}
+	husbandBody := get(husband, "/").Body.String()
+	if !strings.Contains(husbandBody, "Bilal") {
+		t.Fatalf("husband dashboard missing his baby name:\n%s", husbandBody)
+	}
+	if strings.Contains(husbandBody, "Aisyah") || strings.Contains(husbandBody, `data-feed-id=`) {
+		t.Fatalf("husband dashboard leaked the wife's data:\n%s", husbandBody)
+	}
+	if !strings.Contains(husbandBody, "Tap a side to start.") {
+		t.Fatalf("husband should start with an idle dashboard:\n%s", husbandBody)
+	}
+
+	// His own feed is independent of hers.
+	rec = doWith(t, env, http.MethodPost, "/feeds", url.Values{"side": {"right"}}, headers(husband))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("husband start feed = %d\n%s", rec.Code, rec.Body.String())
 	}
 }
 

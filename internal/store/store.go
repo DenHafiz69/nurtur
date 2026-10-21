@@ -162,6 +162,21 @@ func (s *Store) WithTx(ctx context.Context, fn func(*sql.Tx) error) error {
 	return nil
 }
 
+type accountContextKey struct{}
+
+// WithAccount scopes store reads and writes to one account. Installs without an
+// account system use account 0, which is also the legacy namespace that the
+// first account claims on creation.
+func WithAccount(ctx context.Context, id int64) context.Context {
+	return context.WithValue(ctx, accountContextKey{}, id)
+}
+
+// AccountID returns the account bound to ctx, or 0 when none is set.
+func AccountID(ctx context.Context) int64 {
+	id, _ := ctx.Value(accountContextKey{}).(int64)
+	return id
+}
+
 type queryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row

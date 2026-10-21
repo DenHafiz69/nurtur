@@ -40,7 +40,7 @@ NURTUR_LOCAL_ONLY=true
 # TURSO_DATABASE_URL=libsql://your-db.turso.io
 # TURSO_AUTH_TOKEN=
 
-# Required for the single local account. Generate fresh values:
+# Required to create local accounts. Generate fresh values:
 #   openssl rand -hex 16   (signup key)
 #   openssl rand -hex 32   (session secret)
 NURTUR_SIGNUP_KEY=replace-with-a-long-random-value
@@ -64,8 +64,9 @@ Compose with `sudo`, or make it `640 root:docker` and run as a user in the
 the safer default.
 
 Keep `NURTUR_SESSION_SECRET` stable. Changing it invalidates existing sessions.
-`NURTUR_SIGNUP_KEY` is only used to create the first account; after onboarding
-it is ignored.
+Anyone who knows `NURTUR_SIGNUP_KEY` can create an account; each account gets
+its own private baby profile and care log. Remove the key to close new signups
+without affecting existing accounts.
 
 ## 2. Add Nurtur to your Compose stack
 
@@ -76,15 +77,34 @@ other services. Merge the `volumes` section if you already have one.
 services:
   nurtur:
     image: ghcr.io/denhafiz69/nurtur:latest
+    restart: unless-stopped
     env_file:
       - /etc/nurtur/nurtur.env
+    environment:
+      # Soft ceiling for the Go heap, kept below the container limit.
+      GOMEMLIMIT: 48MiB
+      GOGC: "50"
     volumes:
       - /srv/nurtur/data:/data
-    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
     stop_grace_period: 35s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     expose:
       - "8080"
 ```
+
+`env_file` keeps the secrets out of the YAML itself, so the Compose file stays
+safe to copy around or commit. If you prefer the inline `environment:` style
+used by your other services, reference shell variables (`NURTUR_SIGNUP_KEY:
+"${NURTUR_SIGNUP_KEY}"`) and export them from a root-only source instead of
+pasting the values in.
 
 Create the data directory and give it to the container user (UID/GID 10001):
 
@@ -129,6 +149,32 @@ networks:
 
 Create it once with `docker network create web`, and keep the Caddyfile target
 as `nurtur:8080`.
+
+### Container hardening
+
+- `read_only: true` makes the image filesystem immutable. The only writable
+  paths are the `/data` bind mount and `/tmp`. The Turso Go library loads its
+  prebuilt native engine through `purego` and unpacks it into
+  `TURSO_GO_CACHE_DIR=/tmp/turso-go`, so the `tmpfs` mount is required for the
+  local database to open at all — not just for sync.
+- `no-new-privileges:true` blocks setuid escalation. The process already runs as
+  UID 10001.
+- `GOMEMLIMIT` is a soft limit for the Go heap, not a hard cap. Set it around
+  70–75% of the container limit so the runtime still has room for stacks,
+  goroutine buffers, and the OS page cache. `GOGC: "50"` collects earlier than
+  the default `100`, trading CPU for a smaller resident set. `GOMEMLIMIT` alone
+  is enough; drop `GOGC` if startup feels sluggish on a tiny VPS.
+- `deploy.resources.limits` is honored by Compose v2 outside Swarm. On Compose
+  v1, replace it with `mem_limit: 64m`.
+
+64M is a starting point for a small install. Watch
+`docker stats nurtur` for a day, then lower the container limit and
+`GOMEMLIMIT` together until the idle footprint plus headroom fits. Never set
+`GOMEMLIMIT` above the container limit: the kernel OOM killer still wins, and
+the runtime will not collect aggressively enough to avoid it.
+
+The image already defines a `HEALTHCHECK`, so Compose reports `(healthy)`
+without any extra configuration.
 
 ### Private image
 
@@ -188,8 +234,10 @@ sudo docker compose exec nurtur curl -fsS 'http://127.0.0.1:8080/healthz?verbose
 ```
 
 Then open `https://nurtur.example.com`, enter `NURTUR_SIGNUP_KEY`, choose a
-username/password, and set the baby's name. Onboarding writes the account and
-baby name into the database; later logins use that username/password.
+username/password, and set the baby's name. Repeat with the same key for each
+person who needs their own account. Onboarding writes the account and baby name
+into the database; later logins use that username/password and only see that
+account's data.
 
 If login appears to succeed but you are bounced back to the sign-in page, check
 `NURTUR_COOKIE_SECURE`: it must be `true` over HTTPS and `false` only when
@@ -262,6 +310,12 @@ Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
   `read:packages` token, or make the package public.
 - **Data looks empty after redeploy**: confirm the bind mount path did not
   change and that `NURTUR_DB` is `/data/nurtur.db`.
+- **`read-only file system` in the logs**: with `read_only: true`, only `/data`
+  and the `/tmp` tmpfs are writable. Keep both mounts; the Turso cache lives at
+  `/tmp/turso-go`.
+- **Exit code 137 / container killed while idle**: the memory limit is too
+  tight. Raise `memory` and `GOMEMLIMIT` together, then check
+  `docker stats nurtur` again.
 
 ## Security checklist
 
@@ -269,6 +323,9 @@ Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
 - [ ] `NURTUR_SIGNUP_KEY` and `NURTUR_SESSION_SECRET` are random and unique
 - [ ] `NURTUR_COOKIE_SECURE=true` behind HTTPS
 - [ ] Only 80/443 are exposed; Nurtur has no public port
+- [ ] The container runs `read_only` with a `/tmp` tmpfs and
+      `no-new-privileges`
+- [ ] A memory limit is set and `GOMEMLIMIT` sits below it
 - [ ] Backups run on a schedule and a restore has been tested
 - [ ] The GHCR token or package visibility is intentional
 - [ ] Runtime secrets were **not** added to GitHub; CI needs none

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Account is the single local login created during onboarding.
+// Account is one local login created during onboarding.
 type Account struct {
 	ID           int64
 	Username     string
@@ -19,10 +19,10 @@ type Account struct {
 // ErrAccountNotFound means no account has the requested username.
 var ErrAccountNotFound = errors.New("store: account not found")
 
-// ErrAccountExists means the single account slot is already taken.
+// ErrAccountExists means the requested username is already registered.
 var ErrAccountExists = errors.New("store: account already exists")
 
-// CountAccounts reports how many accounts exist. Nurtur allows at most one.
+// CountAccounts reports how many accounts exist.
 func (s *Store) CountAccounts(ctx context.Context) (int, error) {
 	var count int
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(1) FROM accounts`).Scan(&count); err != nil {
@@ -54,8 +54,8 @@ func (s *Store) AccountByUsername(ctx context.Context, username string) (Account
 	return acct, nil
 }
 
-// CreateAccount inserts the only account. It refuses when one already exists,
-// including when two onboarding requests race.
+// CreateAccount inserts a new account. It refuses a username that is already
+// registered, including when two signup requests race.
 func (s *Store) CreateAccount(ctx context.Context, username, passwordHash string, now time.Time) (Account, error) {
 	return s.CreateAccountWithSettings(ctx, username, passwordHash, nil, now)
 }
@@ -67,13 +67,11 @@ func (s *Store) CreateAccountWithSettings(ctx context.Context, username, passwor
 	acct := Account{Username: username, PasswordHash: passwordHash, CreatedAt: now}
 
 	err := s.WithTx(ctx, func(tx *sql.Tx) error {
-		var count int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(1) FROM accounts`).Scan(&count); err != nil {
+		var existing int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(1) FROM accounts`).Scan(&existing); err != nil {
 			return fmt.Errorf("store: count accounts: %w", err)
 		}
-		if count > 0 {
-			return ErrAccountExists
-		}
+
 		result, err := tx.ExecContext(ctx,
 			`INSERT INTO accounts (username, password_hash, created_at) VALUES (?, ?, ?)`,
 			username, passwordHash, encodeTime(now))
@@ -84,10 +82,36 @@ func (s *Store) CreateAccountWithSettings(ctx context.Context, username, passwor
 			return fmt.Errorf("store: create account: %w", err)
 		}
 		acct.ID, _ = result.LastInsertId()
-		return setSettingsTx(ctx, tx, settings)
+
+		// Data created before accounts existed lives in the account 0 namespace.
+		// The first real account adopts it; later accounts start empty.
+		if existing == 0 {
+			if err := claimLegacyDataTx(ctx, tx, acct.ID); err != nil {
+				return err
+			}
+		}
+		return setSettingsTx(ctx, tx, acct.ID, settings)
 	})
 	if err != nil {
 		return Account{}, err
 	}
 	return acct, nil
+}
+
+// claimLegacyDataTx moves the pre-account namespace (account 0) into the first
+// account so an existing install keeps its history after enabling signups.
+func claimLegacyDataTx(ctx context.Context, tx *sql.Tx, accountID int64) error {
+	statements := []string{
+		`UPDATE feeds SET account_id = ? WHERE account_id = 0`,
+		`UPDATE feed_segments SET account_id = ? WHERE account_id = 0`,
+		`UPDATE diapers SET account_id = ? WHERE account_id = 0`,
+		`UPDATE sleeps SET account_id = ? WHERE account_id = 0`,
+		`UPDATE settings SET account_id = ? WHERE account_id = 0`,
+	}
+	for _, stmt := range statements {
+		if _, err := tx.ExecContext(ctx, stmt, accountID); err != nil {
+			return fmt.Errorf("store: claim legacy data: %w", err)
+		}
+	}
+	return nil
 }

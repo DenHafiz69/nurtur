@@ -17,9 +17,9 @@ func (s *Store) ActiveSleep(ctx context.Context) (*sleep.Session, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+sleepColumns+`
 		FROM sleeps
-		WHERE ended_at IS NULL AND deleted_at IS NULL
+		WHERE account_id = ? AND ended_at IS NULL AND deleted_at IS NULL
 		ORDER BY started_at DESC, id DESC
-		LIMIT 1`)
+		LIMIT 1`, AccountID(ctx))
 	session, err := scanSleep(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -40,9 +40,9 @@ func (s *Store) LastEndedSleep(ctx context.Context) (*sleep.Session, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT `+sleepColumns+`
 		FROM sleeps
-		WHERE deleted_at IS NULL AND ended_at IS NOT NULL
+		WHERE account_id = ? AND deleted_at IS NULL AND ended_at IS NOT NULL
 		ORDER BY ended_at DESC, id DESC
-		LIMIT 1`)
+		LIMIT 1`, AccountID(ctx))
 	session, err := scanSleep(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -61,12 +61,13 @@ func (s *Store) SleepsBetween(ctx context.Context, from, to, now time.Time, limi
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+sleepColumns+`
 		FROM sleeps
-		WHERE deleted_at IS NULL
+		WHERE account_id = ?
+		  AND deleted_at IS NULL
 		  AND started_at < ?
 		  AND COALESCE(ended_at, ?) > ?
 		ORDER BY started_at DESC, id DESC
 		LIMIT ?`,
-		encodeTime(to), encodeTime(now), encodeTime(from), limit)
+		AccountID(ctx), encodeTime(to), encodeTime(now), encodeTime(from), limit)
 	if err != nil {
 		return nil, fmt.Errorf("store: list sleeps: %w", err)
 	}
@@ -94,7 +95,8 @@ func (s *Store) StartSleep(ctx context.Context, now time.Time) (sleep.Session, e
 	err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		var active int
 		if err := tx.QueryRowContext(ctx,
-			`SELECT COUNT(1) FROM sleeps WHERE ended_at IS NULL AND deleted_at IS NULL`,
+			`SELECT COUNT(1) FROM sleeps WHERE account_id = ? AND ended_at IS NULL AND deleted_at IS NULL`,
+			AccountID(ctx),
 		).Scan(&active); err != nil {
 			return fmt.Errorf("store: check active sleep: %w", err)
 		}
@@ -110,8 +112,8 @@ func (s *Store) StartSleep(ctx context.Context, now time.Time) (sleep.Session, e
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`INSERT INTO sleeps (started_at, created_at) VALUES (?, ?)`,
-			encodeTime(now), encodeTime(now))
+			`INSERT INTO sleeps (account_id, started_at, created_at) VALUES (?, ?, ?)`,
+			AccountID(ctx), encodeTime(now), encodeTime(now))
 		if err != nil {
 			if isUniqueViolation(err) {
 				return sleep.ErrAlreadyActive
@@ -151,8 +153,8 @@ func (s *Store) CreateSleep(ctx context.Context, start, end time.Time, notes str
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`INSERT INTO sleeps (started_at, ended_at, notes, created_at) VALUES (?, ?, ?, ?)`,
-			encodeTime(start), encodeTime(end), notes, encodeTime(now))
+			`INSERT INTO sleeps (account_id, started_at, ended_at, notes, created_at) VALUES (?, ?, ?, ?, ?)`,
+			AccountID(ctx), encodeTime(start), encodeTime(end), notes, encodeTime(now))
 		if err != nil {
 			return fmt.Errorf("store: insert completed sleep: %w", err)
 		}
@@ -190,8 +192,8 @@ func (s *Store) StopSleep(ctx context.Context, id int64, now time.Time) (sleep.S
 			end = session.StartedAt
 		}
 		res, err := tx.ExecContext(ctx,
-			`UPDATE sleeps SET ended_at = ? WHERE id = ? AND ended_at IS NULL`,
-			encodeTime(end), id)
+			`UPDATE sleeps SET ended_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+			encodeTime(end), id, AccountID(ctx))
 		if err != nil {
 			return fmt.Errorf("store: stop sleep: %w", err)
 		}
@@ -245,8 +247,8 @@ func (s *Store) UpdateSleep(ctx context.Context, id int64, edit sleep.Edit, now 
 			endValue = encodeTime(*edit.EndedAt)
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE sleeps SET started_at = ?, ended_at = ?, notes = ? WHERE id = ? AND deleted_at IS NULL`,
-			encodeTime(edit.StartedAt), endValue, edit.Notes, id); err != nil {
+			`UPDATE sleeps SET started_at = ?, ended_at = ?, notes = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+			encodeTime(edit.StartedAt), endValue, edit.Notes, id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: update sleep: %w", err)
 		}
 		session.StartedAt = edit.StartedAt
@@ -276,14 +278,14 @@ func (s *Store) DeleteSleep(ctx context.Context, id int64, now time.Time) error 
 				end = session.StartedAt
 			}
 			if _, err := tx.ExecContext(ctx,
-				`UPDATE sleeps SET ended_at = ? WHERE id = ? AND ended_at IS NULL`,
-				encodeTime(end), id); err != nil {
+				`UPDATE sleeps SET ended_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+				encodeTime(end), id, AccountID(ctx)); err != nil {
 				return fmt.Errorf("store: close sleep before delete: %w", err)
 			}
 		}
 		res, err := tx.ExecContext(ctx,
-			`UPDATE sleeps SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`,
-			encodeTime(now), id)
+			`UPDATE sleeps SET deleted_at = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+			encodeTime(now), id, AccountID(ctx))
 		if err != nil {
 			return fmt.Errorf("store: soft delete sleep: %w", err)
 		}
@@ -323,7 +325,7 @@ func (s *Store) RestoreSleep(ctx context.Context, id int64, now time.Time) (slee
 			return sleep.ErrOverlap
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE sleeps SET deleted_at = NULL WHERE id = ?`, id); err != nil {
+			`UPDATE sleeps SET deleted_at = NULL WHERE id = ? AND account_id = ?`, id, AccountID(ctx)); err != nil {
 			if isUniqueViolation(err) {
 				return sleep.ErrAlreadyActive
 			}
@@ -341,11 +343,12 @@ func (s *Store) RestoreSleep(ctx context.Context, id int64, now time.Time) (slee
 }
 
 func (s *Store) getSleepAt(ctx context.Context, q queryer, id int64, includeDeleted bool) (sleep.Session, error) {
-	query := `SELECT ` + sleepColumns + ` FROM sleeps WHERE id = ?`
+	query := `SELECT ` + sleepColumns + ` FROM sleeps WHERE id = ? AND account_id = ?`
+	args := []any{id, AccountID(ctx)}
 	if !includeDeleted {
 		query += ` AND deleted_at IS NULL`
 	}
-	session, err := scanSleep(q.QueryRowContext(ctx, query, id))
+	session, err := scanSleep(q.QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return sleep.Session{}, sleep.ErrNotFound
 	}
@@ -366,11 +369,12 @@ func (s *Store) sleepOverlap(ctx context.Context, q queryer, excludeID int64, st
 	if err := q.QueryRowContext(ctx, `
 		SELECT COUNT(1)
 		FROM sleeps
-		WHERE deleted_at IS NULL
+		WHERE account_id = ?
+		  AND deleted_at IS NULL
 		  AND id != ?
 		  AND started_at < ?
 		  AND COALESCE(ended_at, ?) > ?`,
-		excludeID, encodeTime(effectiveEnd), encodeTime(now), encodeTime(start),
+		AccountID(ctx), excludeID, encodeTime(effectiveEnd), encodeTime(now), encodeTime(start),
 	).Scan(&count); err != nil {
 		return false, fmt.Errorf("store: check sleep overlap: %w", err)
 	}

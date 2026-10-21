@@ -1,9 +1,9 @@
 -- Nurtur local accounts.
 --
--- Nurtur is a single-household app and deliberately has no external identity
--- provider. At most one account is created, using the owner-supplied signup
--- key; everyone else signs in with the username and password stored here.
--- Passwords are PBKDF2-SHA256 hashes, never plain text.
+-- Nurtur deliberately has no external identity provider. Anyone with the
+-- owner-supplied signup key can create an account. Accounts are independent:
+-- each one owns its own baby profile and care log. Passwords are PBKDF2-SHA256
+-- hashes, never plain text.
 
 CREATE TABLE accounts (
     id            INTEGER PRIMARY KEY,

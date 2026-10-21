@@ -20,38 +20,17 @@ const (
 	settingBabyName   = "baby_name"
 )
 
-// currentBabyName returns the name saved during onboarding, falling back to the
-// environment value for installs that predate the onboarding field. The
-// environment is never the primary source once a name is stored.
+// currentBabyName returns the name saved for the account bound to ctx,
+// falling back to the environment value for installs that predate onboarding.
+// The environment is never the primary source once a name is stored.
 func (s *Server) currentBabyName(ctx context.Context) string {
-	s.babyMu.RLock()
-	if s.babyLoaded {
-		name := s.babyName
-		s.babyMu.RUnlock()
-		return name
-	}
-	s.babyMu.RUnlock()
-
-	s.babyMu.Lock()
-	defer s.babyMu.Unlock()
-	if !s.babyLoaded {
-		name := strings.TrimSpace(s.defaultBabyName)
-		if raw, ok, err := s.store.Setting(ctx, settingBabyName); err == nil && ok {
-			if stored := strings.TrimSpace(raw); stored != "" {
-				name = stored
-			}
+	name := strings.TrimSpace(s.defaultBabyName)
+	if raw, ok, err := s.store.Setting(ctx, settingBabyName); err == nil && ok {
+		if stored := strings.TrimSpace(raw); stored != "" {
+			name = stored
 		}
-		s.babyName = name
-		s.babyLoaded = true
 	}
-	return s.babyName
-}
-
-func (s *Server) setBabyName(name string) {
-	s.babyMu.Lock()
-	s.babyName = name
-	s.babyLoaded = true
-	s.babyMu.Unlock()
+	return name
 }
 
 // parseBabyName trims and collapses whitespace so a name typed with stray
@@ -67,42 +46,25 @@ func parseBabyName(raw string) (string, error) {
 	return name, nil
 }
 
-// nightWindow returns the configured night window, preferring the settings
-// table over the environment defaults. The value is cached until it changes.
+// nightWindow returns the account's configured night window, preferring stored
+// settings over the environment defaults.
 func (s *Server) nightWindow(ctx context.Context) (time.Duration, time.Duration) {
-	s.nightMu.RLock()
-	if s.nightLoaded {
-		start, end := s.nightStart, s.nightEnd
-		s.nightMu.RUnlock()
+	start, end := s.nightStart, s.nightEnd
+	values, err := s.store.Settings(ctx)
+	if err != nil {
 		return start, end
 	}
-	s.nightMu.RUnlock()
-
-	s.nightMu.Lock()
-	defer s.nightMu.Unlock()
-	if !s.nightLoaded {
-		values, err := s.store.Settings(ctx)
-		if err == nil {
-			if raw := values[settingNightStart]; raw != "" {
-				if d, err := parseClockValue(raw); err == nil {
-					s.nightStart = d
-				}
-			}
-			if raw := values[settingNightEnd]; raw != "" {
-				if d, err := parseClockValue(raw); err == nil {
-					s.nightEnd = d
-				}
-			}
+	if raw := values[settingNightStart]; raw != "" {
+		if d, err := parseClockValue(raw); err == nil {
+			start = d
 		}
-		s.nightLoaded = true
 	}
-	return s.nightStart, s.nightEnd
-}
-
-func (s *Server) invalidateNightWindow() {
-	s.nightMu.Lock()
-	s.nightLoaded = false
-	s.nightMu.Unlock()
+	if raw := values[settingNightEnd]; raw != "" {
+		if d, err := parseClockValue(raw); err == nil {
+			end = d
+		}
+	}
+	return start, end
 }
 
 func parseClockValue(raw string) (time.Duration, error) {
@@ -178,7 +140,6 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.invalidateNightWindow()
 
 	settings, err = s.buildSettings(r.Context())
 	if err != nil {
@@ -211,7 +172,6 @@ func (s *Server) handleSaveBabyName(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.setBabyName(name)
 	settings, err = s.buildSettings(r.Context())
 	if err != nil {
 		s.serverError(w, r, err)

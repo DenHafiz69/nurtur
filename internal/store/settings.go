@@ -7,10 +7,13 @@ import (
 	"sort"
 )
 
-// Settings returns every stored key/value pair. The settings table holds
-// user-editable preferences that are not environment configuration.
+// Settings returns every stored key/value pair for the account bound to ctx.
+// The settings table holds user-editable preferences that are not environment
+// configuration.
 func (s *Store) Settings(ctx context.Context) (map[string]string, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT key, value FROM settings ORDER BY key ASC`)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT key, value FROM settings WHERE account_id = ? ORDER BY key ASC`,
+		AccountID(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("store: list settings: %w", err)
 	}
@@ -30,10 +33,12 @@ func (s *Store) Settings(ctx context.Context) (map[string]string, error) {
 	return out, nil
 }
 
-// Setting returns one value and whether it exists.
+// Setting returns one value for the context account and whether it exists.
 func (s *Store) Setting(ctx context.Context, key string) (string, bool, error) {
 	var value string
-	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, key).Scan(&value)
+	err := s.db.QueryRowContext(ctx,
+		`SELECT value FROM settings WHERE account_id = ? AND key = ?`,
+		AccountID(ctx), key).Scan(&value)
 	if err == sql.ErrNoRows {
 		return "", false, nil
 	}
@@ -49,13 +54,14 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 		return nil
 	}
 	return s.WithTx(ctx, func(tx *sql.Tx) error {
-		return setSettingsTx(ctx, tx, values)
+		return setSettingsTx(ctx, tx, AccountID(ctx), values)
 	})
 }
 
-// setSettingsTx upserts settings inside an existing transaction. Callers pass
-// the batch through it so one logical write stays atomic.
-func setSettingsTx(ctx context.Context, tx *sql.Tx, values map[string]string) error {
+// setSettingsTx upserts settings for one account inside an existing
+// transaction. Callers pass the batch through it so one logical write stays
+// atomic.
+func setSettingsTx(ctx context.Context, tx *sql.Tx, accountID int64, values map[string]string) error {
 	if len(values) == 0 {
 		return nil
 	}
@@ -67,9 +73,9 @@ func setSettingsTx(ctx context.Context, tx *sql.Tx, values map[string]string) er
 
 	for _, key := range keys {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO settings (key, value) VALUES (?, ?)
-			 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-			key, values[key]); err != nil {
+			`INSERT INTO settings (account_id, key, value) VALUES (?, ?, ?)
+			 ON CONFLICT(account_id, key) DO UPDATE SET value = excluded.value`,
+			accountID, key, values[key]); err != nil {
 			return fmt.Errorf("store: set setting %s: %w", key, err)
 		}
 	}
