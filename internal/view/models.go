@@ -28,9 +28,10 @@ type PageData struct {
 	Today  TodaySummary
 	Events []EventRow
 
-	Timeline *TimelinePageView
-	Settings *SettingsView
-	Row      *EventRow
+	Timeline    *TimelinePageView
+	TimelineDay *TimelineDay // set when a timeline mutation refreshes one day header
+	Settings    *SettingsView
+	Row         *EventRow
 
 	// DeletedKey is the DOM id suffix for a deleted timeline row's placeholder.
 	DeletedKey string
@@ -122,14 +123,24 @@ type SleepView struct {
 	Elapsed   time.Duration
 }
 
-// TodaySummary is the compact line above today's events.
+// TodaySummary is the compact strip above today's events.
 type TodaySummary struct {
-	Count       int
-	CountLabel  string
-	SplitLabel  string
+	Feeds       FeedSummary
 	DiaperLabel string
 	SleepLabel  string
 	HasEvents   bool
+}
+
+// FeedSummary is the daily breastfeeding breakdown: how many feeds, how long
+// in total, and how long on each side. CountLabel carries the pluralised count
+// for accessible copy.
+type FeedSummary struct {
+	Count      int
+	CountLabel string
+	TotalLabel string
+	LeftLabel  string
+	RightLabel string
+	HasFeeds   bool
 }
 
 // EventRow is one entry in today's unified list or the full timeline.
@@ -167,10 +178,11 @@ type TimelinePageView struct {
 
 // TimelineDay is one local-date group with its own summary.
 type TimelineDay struct {
-	Key     string
-	Label   string
-	Summary string
-	Rows    []EventRow
+	Key   string
+	Label string
+	Meta  string
+	Feeds FeedSummary
+	Rows  []EventRow
 }
 
 // SyncChipView is the header's sync state indicator.

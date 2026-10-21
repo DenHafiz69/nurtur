@@ -187,7 +187,7 @@ func TestStartSwitchStopFlow(t *testing.T) {
 
 	rec = env.do(t, http.MethodGet, "/", nil, false)
 	body = rec.Body.String()
-	for _, want := range []string{"12:00 PM", "20m", "L 8m · R 12m", "1 feed", "L 8m · R 12m · 20m total"} {
+	for _, want := range []string{"12:00 PM", "20m", "L 8m · R 12m", "1 feed", `class="feed-summary"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard after stop missing %q", want)
 		}

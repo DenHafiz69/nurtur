@@ -64,9 +64,12 @@ type Entry struct {
 	Sleep  *sleep.Session
 }
 
-// DaySummary is the compact count line under a timeline date header.
+// DaySummary is the per-day aggregate shown under a timeline date header.
+// FeedLeft and FeedRight sum segments of feeds that started in the day.
 type DaySummary struct {
-	Feeds   int
-	Diapers int
-	Sleep   time.Duration
+	Feeds     int
+	Diapers   int
+	Sleep     time.Duration
+	FeedLeft  time.Duration
+	FeedRight time.Duration
 }

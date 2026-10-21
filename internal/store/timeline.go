@@ -126,8 +126,9 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 	return out, nil
 }
 
-// TimelineDaySummary counts feeds and diapers that started/logged in [from, to)
-// and sums sleep overlap with that local day.
+// TimelineDaySummary counts feeds and diapers that started/logged in [from, to),
+// sums nursing time per side for feeds that started in that window, and sums
+// sleep overlap with the local day.
 func (s *Store) TimelineDaySummary(ctx context.Context, from, to, now time.Time) (timeline.DaySummary, error) {
 	var summary timeline.DaySummary
 	if !to.After(from) {
@@ -141,6 +142,40 @@ func (s *Store) TimelineDaySummary(ctx context.Context, from, to, now time.Time)
 		AccountID(ctx), encodeTime(from), encodeTime(to),
 	).Scan(&summary.Feeds, &summary.Diapers); err != nil {
 		return timeline.DaySummary{}, fmt.Errorf("store: timeline day counts: %w", err)
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT s.side,
+		       COALESCE(SUM(MAX(0, strftime('%s', COALESCE(s.ended_at, ?)) - strftime('%s', s.started_at))), 0)
+		FROM feed_segments s
+		JOIN feeds f ON f.id = s.feed_id
+		WHERE f.account_id = ? AND f.deleted_at IS NULL
+		  AND f.started_at >= ? AND f.started_at < ?
+		GROUP BY s.side`,
+		encodeTime(now), AccountID(ctx), encodeTime(from), encodeTime(to))
+	if err != nil {
+		return timeline.DaySummary{}, fmt.Errorf("store: timeline day feed totals: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			side    string
+			seconds int64
+		)
+		if err := rows.Scan(&side, &seconds); err != nil {
+			return timeline.DaySummary{}, fmt.Errorf("store: scan timeline feed totals: %w", err)
+		}
+		d := time.Duration(seconds) * time.Second
+		switch feed.Side(side) {
+		case feed.SideLeft:
+			summary.FeedLeft = d
+		case feed.SideRight:
+			summary.FeedRight = d
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return timeline.DaySummary{}, fmt.Errorf("store: timeline day feed totals: %w", err)
 	}
 
 	sessions, err := s.SleepsBetween(ctx, from, to, now, timelineLimit)

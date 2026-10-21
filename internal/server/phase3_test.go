@@ -48,7 +48,7 @@ func TestTimelinePageGroupsByLocalDay(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"History", "Today", "Yesterday", "Nursed", "Wet", "Slept", "timeline-list",
-		"1 feed",
+		"1 feed", `class="feed-summary"`, "<dt>Total</dt>", "<dt>Left</dt>", "<dt>Right</dt>", "20m",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("timeline missing %q\n%s", want, body)
@@ -66,6 +66,28 @@ func TestTimelinePageGroupsByLocalDay(t *testing.T) {
 	}
 	if strings.Contains(partial, "Today") {
 		t.Fatalf("partial leaked today's events:\n%s", partial)
+	}
+}
+
+func TestHistoryDaySummaryRefreshesAfterTimerMutation(t *testing.T) {
+	env := newTestEnv(t)
+
+	form := url.Values{"side": {"left"}}.Encode()
+	req := httptest.NewRequest(http.MethodPost, "/feeds", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Current-URL", "http://example.test/timeline")
+	rec := httptest.NewRecorder()
+	env.handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`id="day-head-2026-10-20"`, `class="feed-summary"`, `hx-swap-oob="outerHTML"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("timer response missing %q\n%s", want, body)
+		}
 	}
 }
 
@@ -88,6 +110,7 @@ func TestTimelineDeleteAndUndoRestoresInPlace(t *testing.T) {
 		"Diaper deleted.",
 		"Undo",
 		`id="status-strip"`,
+		`id="day-head-2026-10-20"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("delete response missing %q\n%s", want, body)

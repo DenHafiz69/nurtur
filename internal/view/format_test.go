@@ -164,12 +164,82 @@ func TestDayLabelRelative(t *testing.T) {
 	}
 }
 
-func TestTimelineSummary(t *testing.T) {
-	if got := TimelineSummary(0, 0, 0); got != "No events" {
+func TestDayMetaLabel(t *testing.T) {
+	if got := DayMetaLabel(0, 0); got != "" {
 		t.Errorf("empty = %q", got)
 	}
-	if got := TimelineSummary(2, 1, 3*time.Hour+20*time.Minute); got != "2 feeds · 1 diaper · 3h 20m sleep" {
-		t.Errorf("summary = %q", got)
+	if got := DayMetaLabel(1, 3*time.Hour+20*time.Minute); got != "1 diaper · 3h 20m sleep" {
+		t.Errorf("meta = %q", got)
+	}
+	if got := DayMetaLabel(0, 30*time.Second); got != "" {
+		t.Errorf("sub-minute sleep = %q", got)
+	}
+}
+
+func TestNewFeedSummary(t *testing.T) {
+	tests := []struct {
+		name        string
+		count       int
+		left, right time.Duration
+		want        FeedSummary
+	}{
+		{
+			name:  "both sides",
+			count: 9,
+			left:  46*time.Minute + 16*time.Second,
+			right: time.Hour + 4*time.Minute,
+			want: FeedSummary{
+				Count:      9,
+				CountLabel: "9 feeds",
+				TotalLabel: "1h 50m",
+				LeftLabel:  "46m",
+				RightLabel: "1h 04m",
+				HasFeeds:   true,
+			},
+		},
+		{
+			name:  "one side",
+			count: 1,
+			left:  12 * time.Minute,
+			want: FeedSummary{
+				Count:      1,
+				CountLabel: "1 feed",
+				TotalLabel: "12m",
+				LeftLabel:  "12m",
+				RightLabel: "0m",
+				HasFeeds:   true,
+			},
+		},
+		{
+			name:  "sub-minute",
+			count: 1,
+			left:  20 * time.Second,
+			right: 10 * time.Second,
+			want: FeedSummary{
+				Count:      1,
+				CountLabel: "1 feed",
+				TotalLabel: "<1m",
+				LeftLabel:  "<1m",
+				RightLabel: "<1m",
+				HasFeeds:   true,
+			},
+		},
+		{
+			name: "no feeds",
+			want: FeedSummary{
+				CountLabel: "No feeds",
+				TotalLabel: "0m",
+				LeftLabel:  "0m",
+				RightLabel: "0m",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewFeedSummary(tt.count, tt.left, tt.right); got != tt.want {
+				t.Errorf("NewFeedSummary = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 

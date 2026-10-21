@@ -53,6 +53,7 @@ type mutateResponse struct {
 	Edit             *view.EditView
 	Row              *view.EventRow
 	Redirect         string
+	ExtraOOB         []string
 	Apply            func(*view.PageData)
 }
 
@@ -106,6 +107,16 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, opts mutateResp
 	oob := mutationOOB(opts.Primary)
 	if opts.Status >= 400 {
 		oob = nil
+	} else {
+		// Timer and sheet mutations can happen from the history page too. Keep
+		// today's day header in sync with whatever just changed.
+		if data.TimelineDay == nil && onTimeline(r) {
+			if day, err := s.timelineDayView(r.Context(), s.clock.Now().UTC()); err == nil {
+				data.TimelineDay = day
+				opts.ExtraOOB = append(opts.ExtraOOB, "timeline-day-oob")
+			}
+		}
+		oob = append(oob, opts.ExtraOOB...)
 	}
 	s.writeFragments(w, r, opts.Status, opts.Primary, data, opts.TimerOOB, oob, opts.Trigger, opts.TriggerAfterSwap, opts.Retarget, opts.Reswap)
 }

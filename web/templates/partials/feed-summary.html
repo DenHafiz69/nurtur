@@ -1,0 +1,23 @@
+{{define "feed-summary"}}
+<section class="feed-summary" aria-label="Breastfeeding summary">
+  <div class="feed-summary-head">
+    <span class="event-icon feed-summary-icon" aria-hidden="true">{{icon "drop-left"}}</span>
+    <span class="feed-summary-title">Breastfeed</span>
+    <span class="chip chip-count" aria-label="{{.CountLabel}}">{{.Count}}</span>
+  </div>
+  <dl class="feed-summary-stats">
+    <div class="feed-summary-stat">
+      <dt>Total</dt>
+      <dd>{{.TotalLabel}}</dd>
+    </div>
+    <div class="feed-summary-stat">
+      <dt>Left</dt>
+      <dd>{{.LeftLabel}}</dd>
+    </div>
+    <div class="feed-summary-stat">
+      <dt>Right</dt>
+      <dd>{{.RightLabel}}</dd>
+    </div>
+  </dl>
+</section>
+{{end}}

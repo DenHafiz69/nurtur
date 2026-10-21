@@ -33,14 +33,29 @@
 
 {{define "timeline-day"}}
 <section class="timeline-day" aria-labelledby="day-{{.Key}}">
-  <div class="timeline-day-head">
-    <h3 id="day-{{.Key}}" class="timeline-day-title">{{.Label}}</h3>
-    <p class="timeline-day-summary">{{.Summary}}</p>
-  </div>
+  {{template "timeline-day-head" .}}
   <ul class="timeline-events">
     {{range .Rows}}{{template "timeline-row" .}}{{end}}
   </ul>
 </section>
+{{end}}
+
+{{define "timeline-day-head"}}
+<div id="day-head-{{.Key}}" class="timeline-day-head">{{template "timeline-day-head-inner" .}}</div>
+{{end}}
+
+{{define "timeline-day-head-inner"}}
+  <div class="timeline-day-title-row">
+    <h3 id="day-{{.Key}}" class="timeline-day-title">{{.Label}}</h3>
+    {{if .Meta}}<p class="timeline-day-summary">{{.Meta}}</p>{{end}}
+  </div>
+  {{if .Feeds.HasFeeds}}{{template "feed-summary" .Feeds}}{{end}}
+{{end}}
+
+{{define "timeline-day-oob"}}
+  {{with .TimelineDay}}
+  <div id="day-head-{{.Key}}" class="timeline-day-head" hx-swap-oob="outerHTML">{{template "timeline-day-head-inner" .}}</div>
+  {{end}}
 {{end}}
 
 {{define "timeline-row"}}

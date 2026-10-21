@@ -90,9 +90,7 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 		sleepLabel = "Sleeping now"
 	}
 	p.Today = view.TodaySummary{
-		Count:       len(feeds),
-		CountLabel:  view.FeedCountLabel(len(feeds)),
-		SplitLabel:  view.TodaySplitLabel(totalLeft, totalRight),
+		Feeds:       view.NewFeedSummary(len(feeds), totalLeft, totalRight),
 		DiaperLabel: view.DiaperCountLabel(len(diapers)),
 		SleepLabel:  sleepLabel,
 		HasEvents:   len(p.Events) > 0,

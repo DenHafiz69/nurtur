@@ -105,9 +105,10 @@ func (s *Server) buildTimeline(ctx context.Context, before time.Time, limit int)
 
 		if len(entries) > 0 {
 			group := view.TimelineDay{
-				Key:     view.DateKey(dayStart, s.loc),
-				Label:   view.DayLabelRelative(dayStart, now, s.loc),
-				Summary: view.TimelineSummary(summary.Feeds, summary.Diapers, summary.Sleep),
+				Key:   view.DateKey(dayStart, s.loc),
+				Label: view.DayLabelRelative(dayStart, now, s.loc),
+				Meta:  view.DayMetaLabel(summary.Diapers, summary.Sleep),
+				Feeds: view.NewFeedSummary(summary.Feeds, summary.FeedLeft, summary.FeedRight),
 			}
 			for _, entry := range entries {
 				group.Rows = append(group.Rows, s.timelineRow(entry, now))
@@ -135,6 +136,23 @@ func (s *Server) buildTimeline(ctx context.Context, before time.Time, limit int)
 		page.NextCursor = nextBoundary.UTC().Format(time.RFC3339)
 	}
 	return page, nil
+}
+
+// timelineDayView rebuilds one local day's header aggregate after a mutation,
+// so a summary card never disagrees with the rows beside it.
+func (s *Server) timelineDayView(ctx context.Context, anchor time.Time) (*view.TimelineDay, error) {
+	now := s.clock.Now().UTC()
+	start, end := clock.DayBounds(anchor, s.loc)
+	summary, err := s.store.TimelineDaySummary(ctx, start, end, now)
+	if err != nil {
+		return nil, err
+	}
+	return &view.TimelineDay{
+		Key:   view.DateKey(start, s.loc),
+		Label: view.DayLabelRelative(start, now, s.loc),
+		Meta:  view.DayMetaLabel(summary.Diapers, summary.Sleep),
+		Feeds: view.NewFeedSummary(summary.Feeds, summary.FeedLeft, summary.FeedRight),
+	}, nil
 }
 
 func previousLocalDayStart(boundary time.Time, loc *time.Location) time.Time {
@@ -300,6 +318,12 @@ func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Capture the row's day before deleting so its summary card can refresh.
+	var dayAnchor time.Time
+	if row, err := s.timelineRowByID(r.Context(), kind, id); err == nil {
+		dayAnchor = row.Anchor
+	}
+
 	now := s.clock.Now()
 	var err error
 	switch kind {
@@ -342,6 +366,10 @@ func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
 	if kind == timeline.Feed {
 		trigger = "timer-cleared"
 	}
+	var day *view.TimelineDay
+	if !dayAnchor.IsZero() {
+		day, _ = s.timelineDayView(r.Context(), dayAnchor)
+	}
 	s.respond(w, r, mutateResponse{
 		Primary:  "timeline-placeholder",
 		Toast:    toast,
@@ -349,7 +377,11 @@ func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
 		Trigger:  trigger,
 		Redirect: "/timeline",
 		Reswap:   "outerHTML",
-		Apply:    func(data *view.PageData) { data.DeletedKey = key },
+		ExtraOOB: []string{"timeline-day-oob"},
+		Apply: func(data *view.PageData) {
+			data.DeletedKey = key
+			data.TimelineDay = day
+		},
 	})
 }
 
@@ -404,6 +436,7 @@ func (s *Server) handleTimelineRestore(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	day, _ := s.timelineDayView(r.Context(), row.Anchor)
 	s.respond(w, r, mutateResponse{
 		Primary:          "timeline-row-fragment",
 		Row:              &row,
@@ -413,6 +446,8 @@ func (s *Server) handleTimelineRestore(w http.ResponseWriter, r *http.Request) {
 		TriggerAfterSwap: true,
 		Reswap:           "outerHTML",
 		Redirect:         "/timeline",
+		ExtraOOB:         []string{"timeline-day-oob"},
+		Apply:            func(data *view.PageData) { data.TimelineDay = day },
 	})
 }
 
@@ -452,6 +487,7 @@ func (s *Server) respondTimelineRow(w http.ResponseWriter, r *http.Request, kind
 		s.serverError(w, r, err)
 		return true
 	}
+	day, _ := s.timelineDayView(r.Context(), row.Anchor)
 	s.respond(w, r, mutateResponse{
 		Primary:          "timeline-row-fragment",
 		Row:              &row,
@@ -462,6 +498,8 @@ func (s *Server) respondTimelineRow(w http.ResponseWriter, r *http.Request, kind
 		Retarget:         "#" + row.RowID,
 		Reswap:           "outerHTML",
 		Redirect:         "/timeline",
+		ExtraOOB:         []string{"timeline-day-oob"},
+		Apply:            func(data *view.PageData) { data.TimelineDay = day },
 	})
 	return true
 }

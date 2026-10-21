@@ -8,13 +8,8 @@
 
 {{define "timeline-today-inner"}}
   {{if .Today.HasEvents}}
+    {{if .Today.Feeds.HasFeeds}}{{template "feed-summary" .Today.Feeds}}{{end}}
     <p class="today-summary">
-      <span>{{.Today.CountLabel}}</span>
-      {{if gt .Today.Count 0}}
-        <span class="summary-sep" aria-hidden="true">·</span>
-        <span>{{.Today.SplitLabel}}</span>
-      {{end}}
-      <span class="summary-sep" aria-hidden="true">·</span>
       <span>{{.Today.DiaperLabel}}</span>
       <span class="summary-sep" aria-hidden="true">·</span>
       <span>{{.Today.SleepLabel}}</span>

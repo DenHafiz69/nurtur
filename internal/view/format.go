@@ -98,23 +98,36 @@ func FeedDetail(left, right time.Duration) string {
 	return label
 }
 
-// TodaySplitLabel is used on the summary card.
-func TodaySplitLabel(left, right time.Duration) string {
-	if left <= 0 && right <= 0 {
-		return "No nursing yet"
+// FormatDurationCompact keeps short durations honest on a summary card, where
+// a rounded "0m" would hide a real (if brief) feed.
+func FormatDurationCompact(d time.Duration) string {
+	if d <= 0 {
+		return "0m"
 	}
-	if left+right < time.Minute {
-		return "Under a minute"
+	if d < time.Minute {
+		return "<1m"
 	}
-	parts := make([]string, 0, 3)
-	if left > 0 {
-		parts = append(parts, "L "+FormatDuration(left))
+	return FormatDuration(d)
+}
+
+// NewFeedSummary builds the daily nursing breakdown used on the dashboard and
+// in history. Negative values clamp to zero so bad data never renders as time
+// going backwards.
+func NewFeedSummary(count int, left, right time.Duration) FeedSummary {
+	if left < 0 {
+		left = 0
 	}
-	if right > 0 {
-		parts = append(parts, "R "+FormatDuration(right))
+	if right < 0 {
+		right = 0
 	}
-	parts = append(parts, FormatDuration(left+right)+" total")
-	return strings.Join(parts, " · ")
+	return FeedSummary{
+		Count:      count,
+		CountLabel: FeedCountLabel(count),
+		TotalLabel: FormatDurationCompact(left + right),
+		LeftLabel:  FormatDurationCompact(left),
+		RightLabel: FormatDurationCompact(right),
+		HasFeeds:   count > 0,
+	}
 }
 
 // FeedCountLabel is the count line on the summary card.
@@ -220,20 +233,15 @@ func DateKey(day time.Time, loc *time.Location) string {
 	return day.In(loc).Format("2006-01-02")
 }
 
-// TimelineSummary is the count line under a history date header.
-func TimelineSummary(feeds, diapers int, sleep time.Duration) string {
-	parts := make([]string, 0, 3)
-	if feeds > 0 {
-		parts = append(parts, FeedCountLabel(feeds))
-	}
+// DayMetaLabel is the secondary line under a history date header. Nursing has
+// its own summary card, so this only covers diapers and sleep.
+func DayMetaLabel(diapers int, sleep time.Duration) string {
+	parts := make([]string, 0, 2)
 	if diapers > 0 {
 		parts = append(parts, DiaperCountLabel(diapers))
 	}
 	if sleep >= time.Minute {
 		parts = append(parts, FormatDuration(sleep)+" sleep")
-	}
-	if len(parts) == 0 {
-		return "No events"
 	}
 	return strings.Join(parts, " · ")
 }

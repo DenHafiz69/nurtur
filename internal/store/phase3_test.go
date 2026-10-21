@@ -129,6 +129,72 @@ func TestTimelineDaySummaryCountsAndSleepOverlap(t *testing.T) {
 	if summary.Sleep != 3*time.Hour {
 		t.Errorf("sleep = %s, want 3h", summary.Sleep)
 	}
+	if summary.FeedLeft != 15*time.Minute {
+		t.Errorf("feed left = %s, want 15m", summary.FeedLeft)
+	}
+	if summary.FeedRight != 0 {
+		t.Errorf("feed right = %s, want 0", summary.FeedRight)
+	}
+}
+
+func TestTimelineDaySummaryAttributesFeedToStartDay(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	dayEnd := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	dayStart := dayEnd.Add(-24 * time.Hour)
+
+	// Completed feed entirely inside the day.
+	f, err := st.CreateFeed(ctx, feed.SideLeft, dayStart.Add(2*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.StopFeed(ctx, f.ID, dayStart.Add(2*time.Hour+10*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Feed that starts before midnight and runs into the next day.
+	crossing, err := st.CreateFeed(ctx, feed.SideRight, dayEnd.Add(-10*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.StopFeed(ctx, crossing.ID, dayEnd.Add(5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Deleted feeds do not contribute.
+	deleted, err := st.CreateFeed(ctx, feed.SideLeft, dayStart.Add(3*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.StopFeed(ctx, deleted.ID, dayStart.Add(3*time.Hour+5*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.DeleteFeed(ctx, deleted.ID, testNow); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := st.TimelineDaySummary(ctx, dayStart, dayEnd, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Feeds != 2 {
+		t.Errorf("feeds = %d, want 2", summary.Feeds)
+	}
+	if summary.FeedLeft != 10*time.Minute {
+		t.Errorf("feed left = %s, want 10m", summary.FeedLeft)
+	}
+	// The cross-midnight feed belongs wholly to the day it started.
+	if summary.FeedRight != 15*time.Minute {
+		t.Errorf("feed right = %s, want 15m", summary.FeedRight)
+	}
+
+	next, err := st.TimelineDaySummary(ctx, dayEnd, dayEnd.Add(24*time.Hour), testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Feeds != 0 || next.FeedLeft != 0 || next.FeedRight != 0 {
+		t.Errorf("next day = %+v, want no feeds", next)
+	}
 }
 
 func TestRestoreFeedRoundTrip(t *testing.T) {
