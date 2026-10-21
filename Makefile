@@ -3,7 +3,7 @@ SHELL := /bin/sh
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BIN     := bin/nurtur
 
-.PHONY: dev build test race vet staticcheck fmt clean e2e
+.PHONY: dev build test race vet staticcheck fmt clean e2e docker-up
 
 # Local development uses the same Turso engine, without cloud sync.
 dev:
@@ -26,6 +26,10 @@ staticcheck:
 
 e2e:
 	cd e2e && npm test
+
+# Rebuild the image and start the local container in the background.
+docker-up:
+	docker compose up -d --build
 
 fmt:
 	gofmt -w $$(find . -name '*.go' -not -path './.git/*')
