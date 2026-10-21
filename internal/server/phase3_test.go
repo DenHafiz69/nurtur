@@ -49,6 +49,7 @@ func TestTimelinePageGroupsByLocalDay(t *testing.T) {
 	for _, want := range []string{
 		"History", "Today", "Yesterday", "Nursed", "Wet", "Slept", "timeline-list",
 		"1 feed", `class="feed-summary"`, "<dt>Total</dt>", "<dt>Left</dt>", "<dt>Right</dt>", "20m",
+		`<details class="timeline-day"`, `<summary id="day-head-`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("timeline missing %q\n%s", want, body)

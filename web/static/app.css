@@ -2241,9 +2241,7 @@ textarea {
 }
 
 .timeline-day {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: block;
 }
 
 .timeline-day-head {
@@ -2251,6 +2249,16 @@ textarea {
   flex-direction: column;
   gap: 8px;
   padding: 0 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.timeline-day-head::-webkit-details-marker {
+  display: none;
+}
+
+.timeline-day-head::marker {
+  content: "";
 }
 
 .timeline-day-title-row {
@@ -2258,6 +2266,36 @@ textarea {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+}
+
+.timeline-day-aside {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.timeline-day-caret {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-soft);
+}
+
+.timeline-day-caret .icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.timeline-day[open] .timeline-day-caret .icon {
+  transform: rotate(180deg);
+}
+
+.timeline-day .timeline-events {
+  margin-top: 10px;
 }
 
 .timeline-day-title {
@@ -2513,7 +2551,7 @@ textarea {
   }
 
   .timeline-day-summary {
-    max-width: 46%;
+    max-width: 55vw;
   }
 }
 
