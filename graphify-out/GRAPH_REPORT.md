@@ -1,7 +1,7 @@
 # Graph Report - nurtur  (2026-10-21)
 
 ## Corpus Check
-- 71 files · ~69,894 words
+- 71 files · ~69,919 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 11 file(s) not represented in the graph (top: (none) 5, .woff2 2, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3c09e643`
+- Built from commit: `53069b8a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
