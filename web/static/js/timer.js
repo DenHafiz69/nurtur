@@ -4,7 +4,8 @@
  *   - ticks the running clock from server timestamps,
  *   - mirrors the active timer in localStorage for fast recovery,
  *   - reconciles with /partials/feed/timer on resume,
- *   - handles the theme toggle, <dialog>, toasts, and relative labels.
+ *   - handles the theme toggle, the quick-log drawer, <dialog>, toasts, and
+ *     relative labels.
  *
  * No inline handlers: the CSP allows only this file plus the tiny theme
  * bootstrap nonce in <head>.
@@ -94,6 +95,24 @@
   window.setInterval(function () {
     if (currentThemeMode() === "auto") applyTheme("auto", false);
   }, 60 * 1000);
+
+  /* ---------- Quick-log dock ---------- */
+
+  // Home renders the drawer open and History renders it collapsed. Once the
+  // user chooses, keep that choice on every screen instead of letting the next
+  // server render reopen (or close) it.
+  var DOCK_KEY = "nurtur.dock";
+  var dockDrawer = document.querySelector(".dock-drawer");
+  if (dockDrawer) {
+    var dockPreference = null;
+    try { dockPreference = localStorage.getItem(DOCK_KEY); } catch (e) {}
+    if (dockPreference === "open" || dockPreference === "closed") {
+      dockDrawer.open = dockPreference === "open";
+    }
+    dockDrawer.addEventListener("toggle", function () {
+      try { localStorage.setItem(DOCK_KEY, dockDrawer.open ? "open" : "closed"); } catch (e) {}
+    });
+  }
 
   /* ---------- Time formatting (mirrors internal/view) ---------- */
 
