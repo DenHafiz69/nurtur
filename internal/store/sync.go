@@ -2,12 +2,17 @@ package store
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	turso "turso.tech/database/tursogo"
 )
+
+// ErrSyncBusy is returned when a status request cannot read engine stats
+// because a push, pull, or checkpoint is already in flight.
+var ErrSyncBusy = errors.New("sync: engine busy")
 
 // Syncer is the narrow interface the sync worker needs. Domain code never
 // touches Turso Cloud directly; tests inject a fake.
@@ -39,6 +44,11 @@ type SyncConfig struct {
 	Timeout            time.Duration
 	BackoffMin         time.Duration
 	BackoffMax         time.Duration
+	// StallTimeout is how long a single push, pull, or checkpoint may run
+	// before the worker reports the sync engine as stalled. The Turso engine
+	// can wedge permanently after some network failures, so the process should
+	// be restarted once this fires.
+	StallTimeout time.Duration
 }
 
 // DefaultSyncConfig returns production defaults.
@@ -53,6 +63,7 @@ func DefaultSyncConfig(pullInterval time.Duration) SyncConfig {
 		Timeout:            20 * time.Second,
 		BackoffMin:         2 * time.Second,
 		BackoffMax:         60 * time.Second,
+		StallTimeout:       5 * time.Minute,
 	}
 }
 
@@ -73,6 +84,9 @@ func (c SyncConfig) normalized() SyncConfig {
 	if c.BackoffMax >= d.BackoffMin {
 		d.BackoffMax = c.BackoffMax
 	}
+	if c.StallTimeout > 0 {
+		d.StallTimeout = c.StallTimeout
+	}
 	return d
 }
 
@@ -89,6 +103,8 @@ type SyncStatus struct {
 	LastPullError     string     `json:"last_pull_error,omitempty"`
 	LastErrorAt       *time.Time `json:"last_error_at,omitempty"`
 	Retries           int        `json:"retries"`
+	Operation         string     `json:"operation,omitempty"`
+	OperationAge      int64      `json:"operation_age_seconds,omitempty"`
 }
 
 // SyncWorker serialises all Turso Cloud traffic. Mutations only call Notify,
@@ -105,12 +121,14 @@ type SyncWorker struct {
 
 	startOnce sync.Once
 	closeOnce sync.Once
+	stallOnce sync.Once
 
 	mu            sync.Mutex
 	started       bool
 	dirty         bool
 	pushing       bool
 	pendingSince  time.Time
+	changeSeq     uint64
 	lastPush      time.Time
 	lastPull      time.Time
 	lastPushErr   string
@@ -118,6 +136,11 @@ type SyncWorker struct {
 	lastPullErr   string
 	lastPullErrAt time.Time
 	retries       int
+	opName        string
+	opStarted     time.Time
+	statsBusy     bool
+
+	stalledCh chan struct{}
 }
 
 // NewSyncWorker builds a worker around a Syncer.
@@ -126,13 +149,14 @@ func NewSyncWorker(syncer Syncer, cfg SyncConfig, logger *slog.Logger) *SyncWork
 		logger = slog.Default()
 	}
 	return &SyncWorker{
-		syncer:   syncer,
-		cfg:      cfg.normalized(),
-		log:      logger,
-		notifyCh: make(chan struct{}, 1),
-		pullCh:   make(chan struct{}, 1),
-		stopCh:   make(chan struct{}),
-		doneCh:   make(chan struct{}),
+		syncer:    syncer,
+		cfg:       cfg.normalized(),
+		log:       logger,
+		notifyCh:  make(chan struct{}, 1),
+		pullCh:    make(chan struct{}, 1),
+		stopCh:    make(chan struct{}),
+		doneCh:    make(chan struct{}),
+		stalledCh: make(chan struct{}),
 	}
 }
 
@@ -143,15 +167,22 @@ func (w *SyncWorker) Start(ctx context.Context) {
 		w.mu.Lock()
 		w.started = true
 		w.mu.Unlock()
+		go w.watch(ctx)
 		go w.run(ctx)
 	})
 }
+
+// Stalled fires once when a single sync operation has been running longer than
+// StallTimeout. The Turso engine cannot be recovered in-process after that, so
+// the caller should restart the process.
+func (w *SyncWorker) Stalled() <-chan struct{} { return w.stalledCh }
 
 // Notify records a local mutation and schedules a debounced push. It is safe to
 // call from request handlers and never blocks on the network.
 func (w *SyncWorker) Notify() {
 	now := time.Now().UTC()
 	w.mu.Lock()
+	w.changeSeq++
 	if !w.dirty {
 		w.dirty = true
 		w.pendingSince = now
@@ -223,6 +254,10 @@ func (w *SyncWorker) Status() SyncStatus {
 		t := w.lastPullErrAt
 		st.LastErrorAt = &t
 	}
+	if !w.opStarted.IsZero() {
+		st.Operation = w.opName
+		st.OperationAge = int64(time.Since(w.opStarted).Seconds())
+	}
 	return st
 }
 
@@ -233,9 +268,105 @@ func (w *SyncWorker) Stats(ctx context.Context) (SyncStats, error) {
 	if !ok {
 		return SyncStats{}, nil
 	}
-	callCtx, cancel := context.WithTimeout(ctx, w.cfg.Timeout)
-	defer cancel()
-	return stats.Stats(callCtx)
+
+	w.mu.Lock()
+	busy := !w.opStarted.IsZero() || w.statsBusy
+	if !busy {
+		w.statsBusy = true
+	}
+	w.mu.Unlock()
+	if busy {
+		return SyncStats{}, ErrSyncBusy
+	}
+
+	// Never pass a cancelable context into the Turso engine: cancelling an
+	// in-flight sync operation permanently wedges its native state. The
+	// goroutine may outlive the request; the result channel is buffered.
+	type result struct {
+		stats SyncStats
+		err   error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		defer func() {
+			w.mu.Lock()
+			w.statsBusy = false
+			w.mu.Unlock()
+		}()
+		st, err := stats.Stats(context.WithoutCancel(ctx))
+		ch <- result{stats: st, err: err}
+	}()
+
+	select {
+	case r := <-ch:
+		return r.stats, r.err
+	case <-ctx.Done():
+		return SyncStats{}, ctx.Err()
+	}
+}
+
+// watch reports a wedged engine without touching it. It runs separately from
+// the event loop because a stuck push or pull blocks that loop entirely.
+func (w *SyncWorker) watch(ctx context.Context) {
+	interval := w.cfg.StallTimeout / 4
+	if interval > 30*time.Second {
+		interval = 30 * time.Second
+	}
+	if interval < 50*time.Millisecond {
+		interval = 50 * time.Millisecond
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-w.stopCh:
+			return
+		case <-ticker.C:
+			w.mu.Lock()
+			name := w.opName
+			started := w.opStarted
+			w.mu.Unlock()
+			if name == "" || started.IsZero() {
+				continue
+			}
+			if elapsed := time.Since(started); elapsed >= w.cfg.StallTimeout {
+				w.log.Error("sync engine stalled",
+					"operation", name,
+					"elapsed", elapsed.Round(time.Second),
+					"hint", "restart the process to reconnect",
+				)
+				w.stallOnce.Do(func() { close(w.stalledCh) })
+				return
+			}
+		}
+	}
+}
+
+// beginOp records the operation currently inside the engine. Operations are
+// serialized by the event loop, so one slot is enough.
+func (w *SyncWorker) beginOp(name string) {
+	w.mu.Lock()
+	w.opName = name
+	w.opStarted = time.Now()
+	w.mu.Unlock()
+}
+
+func (w *SyncWorker) endOp() {
+	w.mu.Lock()
+	w.opName = ""
+	w.opStarted = time.Time{}
+	w.mu.Unlock()
+}
+
+// syncContext deliberately strips cancellation. Turso's Push/Pull leave the
+// native engine unusable when their context is cancelled mid-request, which is
+// exactly what a timeout used to do. A stalled operation is handled by the
+// watchdog instead.
+func syncContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 func (w *SyncWorker) run(ctx context.Context) {
@@ -339,8 +470,12 @@ func (w *SyncWorker) isDirty() bool {
 }
 
 func (w *SyncWorker) push(ctx context.Context) error {
+	w.beginOp("push")
+	defer w.endOp()
+
 	w.mu.Lock()
 	w.pushing = true
+	startSeq := w.changeSeq
 	w.mu.Unlock()
 	defer func() {
 		w.mu.Lock()
@@ -348,9 +483,7 @@ func (w *SyncWorker) push(ctx context.Context) error {
 		w.mu.Unlock()
 	}()
 
-	callCtx, cancel := context.WithTimeout(ctx, w.cfg.Timeout)
-	defer cancel()
-	err := w.syncer.Push(callCtx)
+	err := w.syncer.Push(syncContext(ctx))
 
 	now := time.Now().UTC()
 	w.mu.Lock()
@@ -362,9 +495,13 @@ func (w *SyncWorker) push(ctx context.Context) error {
 		w.lastPush = now
 		w.lastPushErr = ""
 		w.lastPushErrAt = time.Time{}
-		w.dirty = false
-		w.pendingSince = time.Time{}
 		w.retries = 0
+		// A write may have landed while the push was in flight. Only clear
+		// the dirty flag if the snapshot we pushed is still the latest.
+		if w.changeSeq == startSeq {
+			w.dirty = false
+			w.pendingSince = time.Time{}
+		}
 	}
 	w.mu.Unlock()
 
@@ -377,9 +514,9 @@ func (w *SyncWorker) push(ctx context.Context) error {
 }
 
 func (w *SyncWorker) pull(ctx context.Context) {
-	callCtx, cancel := context.WithTimeout(ctx, w.cfg.Timeout)
-	defer cancel()
-	changed, err := w.syncer.Pull(callCtx)
+	w.beginOp("pull")
+	defer w.endOp()
+	changed, err := w.syncer.Pull(syncContext(ctx))
 
 	now := time.Now().UTC()
 	w.mu.Lock()
@@ -403,9 +540,9 @@ func (w *SyncWorker) pull(ctx context.Context) {
 }
 
 func (w *SyncWorker) checkpoint(ctx context.Context) {
-	callCtx, cancel := context.WithTimeout(ctx, w.cfg.Timeout)
-	defer cancel()
-	if err := w.syncer.Checkpoint(callCtx); err != nil {
+	w.beginOp("checkpoint")
+	defer w.endOp()
+	if err := w.syncer.Checkpoint(syncContext(ctx)); err != nil {
 		w.log.Warn("sync checkpoint failed", "error", err)
 		return
 	}
@@ -423,9 +560,7 @@ func (w *SyncWorker) flush() {
 			w.log.Error("sync flush failed; changes remain local", "error", err)
 		}
 	}
-	if err := w.syncer.Checkpoint(ctx); err != nil {
-		w.log.Warn("sync shutdown checkpoint failed", "error", err)
-	}
+	w.checkpoint(ctx)
 }
 
 func (w *SyncWorker) nextBackoff(current time.Duration) time.Duration {

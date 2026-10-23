@@ -133,11 +133,23 @@ func run() error {
 		}
 	}()
 
+	var stalled <-chan struct{}
+	if worker != nil {
+		stalled = worker.Stalled()
+	}
+
 	select {
 	case err := <-errCh:
 		return fmt.Errorf("http server: %w", err)
 	case <-ctx.Done():
 		logger.Info("shutdown requested")
+	case <-stalled:
+		// The Turso engine can wedge after a network failure, and it holds a
+		// lock that makes every later push and pull hang. The engine cannot be
+		// recreated in-process, so exit and let Docker or systemd restart us.
+		// Local writes are already durable in the WAL.
+		logger.Error("sync engine stalled; exiting so the supervisor can restart")
+		os.Exit(1)
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

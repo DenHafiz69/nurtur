@@ -17,7 +17,9 @@ type fakeSyncer struct {
 	checkpoints int
 	pushTimes   []time.Time
 	pullHook    func()
+	pushHook    func()
 	pushErr     func(attempt int) error
+	pullBlock   chan struct{}
 }
 
 func (f *fakeSyncer) Push(ctx context.Context) error {
@@ -26,7 +28,11 @@ func (f *fakeSyncer) Push(ctx context.Context) error {
 	attempt := f.pushes
 	f.pushTimes = append(f.pushTimes, time.Now())
 	errFn := f.pushErr
+	hook := f.pushHook
 	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	if errFn != nil {
 		return errFn(attempt)
 	}
@@ -37,7 +43,11 @@ func (f *fakeSyncer) Pull(ctx context.Context) (bool, error) {
 	f.mu.Lock()
 	f.pulls++
 	hook := f.pullHook
+	block := f.pullBlock
 	f.mu.Unlock()
+	if block != nil {
+		<-block
+	}
 	if hook != nil {
 		hook()
 	}
@@ -244,6 +254,114 @@ func TestNotifyNeverBlocks(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("Notify blocked for %v", elapsed)
+	}
+}
+
+func TestSyncPushKeepsDirtyWhenWriteArrivesDuringPush(t *testing.T) {
+	fake := &fakeSyncer{}
+	var once sync.Once
+	w := NewSyncWorker(fake, SyncConfig{
+		Debounce:           10 * time.Millisecond,
+		PullInterval:       time.Hour,
+		CheckpointInterval: time.Hour,
+		Timeout:            time.Second,
+	}, discardLogger())
+	fake.mu.Lock()
+	fake.pushHook = func() { once.Do(w.Notify) }
+	fake.mu.Unlock()
+	w.Start(context.Background())
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = w.Close(ctx)
+	})
+
+	waitFor(t, "startup pull", func() bool {
+		_, pulls, _ := fake.counts()
+		return pulls == 1
+	})
+	w.Notify()
+	waitFor(t, "second push after mid-flight write", func() bool {
+		pushes, _, _ := fake.counts()
+		return pushes >= 2
+	})
+	waitFor(t, "worker clean after both pushes", func() bool {
+		return !w.Status().Dirty
+	})
+}
+
+func TestSyncWorkerReportsStalledEngine(t *testing.T) {
+	block := make(chan struct{})
+	fake := &fakeSyncer{pullBlock: block}
+	w := NewSyncWorker(fake, SyncConfig{
+		PullInterval:       time.Hour,
+		CheckpointInterval: time.Hour,
+		Timeout:            time.Second,
+		StallTimeout:       60 * time.Millisecond,
+	}, discardLogger())
+	w.Start(context.Background())
+
+	select {
+	case <-w.Stalled():
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker did not report a stalled pull")
+	}
+	if st := w.Status(); st.Operation != "pull" {
+		t.Fatalf("operation = %q, want pull", st.Operation)
+	}
+
+	close(block)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = w.Close(ctx)
+}
+
+type fakeStatsSyncer struct {
+	*fakeSyncer
+	mu    sync.Mutex
+	delay time.Duration
+	calls int
+}
+
+func (f *fakeStatsSyncer) Stats(ctx context.Context) (SyncStats, error) {
+	f.mu.Lock()
+	f.calls++
+	delay := f.delay
+	f.mu.Unlock()
+	time.Sleep(delay)
+	return SyncStats{PendingOps: 7}, nil
+}
+
+func TestSyncStatsDoesNotBlockOnSlowEngine(t *testing.T) {
+	fake := &fakeStatsSyncer{fakeSyncer: &fakeSyncer{}, delay: 100 * time.Millisecond}
+	w := NewSyncWorker(fake, SyncConfig{Timeout: time.Second}, discardLogger())
+
+	short, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	if _, err := w.Stats(short); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Stats(short) error = %v, want deadline exceeded", err)
+	}
+	if _, err := w.Stats(context.Background()); !errors.Is(err, ErrSyncBusy) {
+		t.Fatalf("Stats while busy error = %v, want ErrSyncBusy", err)
+	}
+	waitFor(t, "slow stats to finish", func() bool {
+		fake.mu.Lock()
+		defer fake.mu.Unlock()
+		return fake.calls == 1
+	})
+	time.Sleep(110 * time.Millisecond)
+	stats, err := w.Stats(context.Background())
+	if err != nil || stats.PendingOps != 7 {
+		t.Fatalf("Stats after recovery = %+v, %v", stats, err)
+	}
+}
+
+func TestSyncStatsSkipsWhileOperationInFlight(t *testing.T) {
+	w := NewSyncWorker(&fakeStatsSyncer{fakeSyncer: &fakeSyncer{}}, SyncConfig{}, discardLogger())
+	w.beginOp("push")
+	defer w.endOp()
+	if _, err := w.Stats(context.Background()); !errors.Is(err, ErrSyncBusy) {
+		t.Fatalf("Stats error = %v, want ErrSyncBusy", err)
 	}
 }
 
