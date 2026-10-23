@@ -209,6 +209,11 @@ service.
 - The alert runs in the open page or installed PWA (including while it is
   backgrounded). It cannot fire while the phone is locked or the browser is
   fully closed.
+- A notification belongs to the window that raised it: a ping from the
+  **installed app** returns to that app, while a ping from a browser tab opens
+  the browser. Add Nurtur to the home screen and run it from there for
+  app-style notifications. Notification clicks focus an existing Nurtur
+  window when one is open.
 - The last fired milestone is stored in `localStorage`, so a reload does not
   duplicate a ping, and a long suspension produces one catch-up ping rather than
   a burst.

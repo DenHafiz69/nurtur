@@ -74,6 +74,9 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await page.getByRole("button", { name: "Save name" }).click();
     await expect(page.getByText("Baby name saved.")).toBeVisible();
     await expect(page.locator(".baby-name")).toHaveText("Aisyah");
+
+    // A browser tab is not standalone, so the install hint points at the app.
+    await expect(page.getByText(/add Nurtur to your home screen/)).toBeVisible();
   });
 
   test("history collapses quick logging into an expandable drawer", async ({ page }) => {

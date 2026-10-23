@@ -476,6 +476,14 @@
       // A denied permission cannot prompt again; the copy explains the fallback.
       button.hidden = permission !== "default";
     });
+    document.querySelectorAll("[data-install-hint]").forEach(function (el) {
+      el.hidden = isStandalone();
+    });
+  }
+
+  function isStandalone() {
+    if (window.navigator.standalone === true) return true;
+    return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   }
 
   function requestNotificationPermission() {

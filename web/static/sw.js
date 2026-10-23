@@ -4,7 +4,7 @@
  * a bundled shell would show stale data and could outlive a passcode gate.
  * Mutation responses are never cached because only GET requests are handled.
  */
-const VERSION = "nurtur-v8";
+const VERSION = "nurtur-v9";
 const SHELL = [
   "/offline",
   "/static/app.css",
@@ -35,14 +35,22 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const data = event.notification.data || {};
+  const target = data.url || "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      for (const client of windows) {
-        if (new URL(client.url).pathname === "/" && "focus" in client) {
-          return client.focus();
-        }
+      const path = new URL(target, self.location.origin).pathname;
+      // Prefer a window already on the dashboard, then any Nurtur window. This
+      // keeps the installed app in front instead of opening a second browser
+      // tab when it is already running on another page.
+      const exact = windows.find((client) => new URL(client.url).pathname === path);
+      const existing = exact || windows.find((client) => new URL(client.url).origin === self.location.origin);
+      if (existing && "focus" in existing) {
+        return existing.focus().then(() => {
+          if (!exact && "navigate" in existing) return existing.navigate(target);
+        });
       }
-      return self.clients.openWindow("/");
+      return self.clients.openWindow(target);
     })
   );
 });
