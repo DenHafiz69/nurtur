@@ -96,6 +96,12 @@ Cloud. Pulls run at startup, every `NURTUR_SYNC_INTERVAL`, and on shutdown the
 queue is flushed and the WAL checkpointed. A cloud outage degrades sync, never
 logging.
 
+A push or pull that cannot make progress for five minutes is treated as a
+stalled native sync engine. The process exits so Docker or systemd can restart
+it; local writes are already durable in the WAL and the restart resumes the
+queued push. `/healthz?verbose=1` reports the operation in flight and its age
+while the worker is still waiting on it.
+
 **Run one server instance per database.** The sync engine and the one-active-feed
 constraints assume a single writer. This is a solo-user app, not a multi-tenant
 service.
@@ -323,8 +329,9 @@ library through `purego`. The service runs as a non-root user, keeps the
 database on `/data`, and ships a `curl /healthz` healthcheck.
 
 `GET /healthz` reports database health; `GET /healthz?verbose=1` adds the last
-push/pull, pending-sync age, CDC operations, and WAL size. Peer at the JSON when
-sync looks stuck.
+push/pull, pending-sync age, the operation in flight, CDC operations, and WAL
+size. Stats are skipped with `sync: engine busy` rather than blocking a health
+request behind a slow push.
 
 ### Prebuilt images (GHCR)
 
