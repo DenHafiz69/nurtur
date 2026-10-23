@@ -41,6 +41,7 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 		AuthEnabled:     s.auth.enabled(),
 		SyncChip:        s.syncChip(),
 	}
+	p.FeedAlertMinutes = s.feedAlertMinutes(ctx)
 	p.Greeting = view.Greeting(now.In(s.loc).Hour())
 	p.TodayLabel = now.In(s.loc).Format("Monday, January 2")
 
@@ -340,6 +341,7 @@ func (s *Server) activeView(ctx context.Context, f *feed.Feed, now time.Time) *v
 		StartedAt:     started,
 		ServerNow:     now,
 		Elapsed:       elapsed,
+		TotalElapsed:  left + right,
 		SplitLabel:    view.SplitLabel(left, right, side),
 	}
 }

@@ -14,6 +14,7 @@
 
   var CACHE_KEY = "nurtur.timer.v1";
   var THEME_KEY = "nurtur.theme";
+  var FEED_ALERT_KEY = "nurtur.feedAlert.v1";
 
   /* ---------- HTMX configuration ---------- */
 
@@ -258,25 +259,39 @@
   function tick() {
     tickLiveClocks();
     var card = timerCard();
-    if (!card) return;
 
-    if (card.dataset.feedId) {
-      var state = syncFromCard(card);
-      if (!state) return;
-      var digits = card.querySelector("[data-timer-digits]");
-      if (digits) {
-        var elapsed = activeTimerElapsed();
-        var text = formatTimer(elapsed);
-        if (digits.textContent !== text) digits.textContent = text;
-        announce(elapsed);
+    if (card) {
+      if (card.dataset.feedId) {
+        var state = syncFromCard(card);
+        if (state) {
+          var digits = card.querySelector("[data-timer-digits]");
+          if (digits) {
+            var elapsed = activeTimerElapsed();
+            var text = formatTimer(elapsed);
+            if (digits.textContent !== text) digits.textContent = text;
+            announce(elapsed);
+          }
+          hideCachedHint(card);
+          var liveSource = feedAlertFromCard(card);
+          if (liveSource) feedAlertTick(liveSource);
+          else clearFeedAlertIfIdle();
+        }
+      } else {
+        showCachedHint(card);
+        clearFeedAlertIfIdle();
       }
-      hideCachedHint(card);
       updateOfflineHint();
       return;
     }
 
-    showCachedHint(card);
-    updateOfflineHint();
+    // Settings has no timer card; the body carries the active feed so the ping
+    // still fires while the user changes a setting mid-feed.
+    var bodySource = feedAlertFromBody();
+    if (bodySource) {
+      feedAlertTick(bodySource);
+    } else {
+      clearFeedAlertIfIdle();
+    }
   }
 
   function showCachedHint(card) {
@@ -304,6 +319,276 @@
     var show = isOffline && (!!card.dataset.feedId || !!cachedTimer);
     hint.hidden = !show;
   }
+
+  /* ---------- Nursing alert ---------- */
+
+  // A feed pings at every multiple of the configured threshold. The marker is
+  // keyed by feed ID so a new feeding re-arms the alert, while a reload or a
+  // backgrounded tab resumes at the next milestone without a burst.
+  function feedAlertFromCard(card) {
+    var total = parseInt(card.dataset.feedTotalMs || "", 10);
+    var serverNow = Date.parse(card.dataset.serverNow || "");
+    var minutes = parseAlertMinutes(card.dataset.alertMinutes);
+    if (!isFinite(total) || !isFinite(serverNow) || !minutes) return null;
+    return {
+      feedId: String(card.dataset.feedId),
+      minutes: minutes,
+      elapsed: function () {
+        return Math.max(0, total + (Date.now() - timerState.offset - serverNow));
+      }
+    };
+  }
+
+  function feedAlertFromBody() {
+    var body = document.body;
+    if (!body || !body.dataset.activeFeedId) return null;
+    var total = parseInt(body.dataset.feedTotalMs || "", 10);
+    var serverNow = Date.parse(body.dataset.serverNow || "");
+    // The settings panel is swapped in place, so read its fresh value first.
+    var panel = document.getElementById("settings-panel");
+    var raw = panel && panel.dataset.alertMinutes ? panel.dataset.alertMinutes : body.dataset.alertMinutes;
+    var minutes = parseAlertMinutes(raw);
+    if (!isFinite(total) || !isFinite(serverNow) || !minutes) return null;
+    return {
+      feedId: String(body.dataset.activeFeedId),
+      minutes: minutes,
+      elapsed: function () {
+        return Math.max(0, total + (Date.now() - labelOffset - serverNow));
+      }
+    };
+  }
+
+  function parseAlertMinutes(raw) {
+    var minutes = parseInt(raw || "", 10);
+    if (!isFinite(minutes) || minutes < 0) return 0;
+    return minutes;
+  }
+
+  // Keep the marker in memory between ticks; localStorage is only touched on
+  // load and on a milestone change.
+  var feedAlertState = null;
+  var feedAlertLoaded = false;
+
+  function loadFeedAlert() {
+    if (feedAlertLoaded) return feedAlertState;
+    feedAlertLoaded = true;
+    try {
+      var raw = localStorage.getItem(FEED_ALERT_KEY);
+      if (!raw) return null;
+      var value = JSON.parse(raw);
+      if (!value || !value.feedId) return null;
+      var minutes = parseAlertMinutes(value.minutes);
+      var index = parseInt(value.lastIndex, 10);
+      if (!minutes || !isFinite(index) || index < 0) return null;
+      feedAlertState = { feedId: String(value.feedId), minutes: minutes, lastIndex: index };
+      return feedAlertState;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveFeedAlert(alert) {
+    feedAlertState = alert;
+    feedAlertLoaded = true;
+    try { localStorage.setItem(FEED_ALERT_KEY, JSON.stringify(alert)); } catch (e) {}
+  }
+
+  function clearFeedAlertIfIdle() {
+    if (loadFeedAlert()) {
+      feedAlertState = null;
+      feedAlertLoaded = true;
+      try { localStorage.removeItem(FEED_ALERT_KEY); } catch (e) {}
+    }
+  }
+
+  function feedAlertTick(source) {
+    var elapsedMs = source.elapsed();
+    var index = Math.floor(elapsedMs / (source.minutes * 60000));
+    var alert = loadFeedAlert();
+
+    if (!alert || alert.feedId !== source.feedId) {
+      alert = { feedId: source.feedId, minutes: source.minutes, lastIndex: index };
+      saveFeedAlert(alert);
+      if (index > 0) pingFeed(Math.floor(elapsedMs / 60000), source.feedId);
+      return;
+    }
+
+    if (alert.minutes !== source.minutes) {
+      // Changing the threshold mid-feed applies from the next milestone rather
+      // than firing for every multiple that has already passed.
+      alert.minutes = source.minutes;
+      alert.lastIndex = index;
+      saveFeedAlert(alert);
+      return;
+    }
+
+    if (index > alert.lastIndex) {
+      alert.lastIndex = index;
+      saveFeedAlert(alert);
+      pingFeed(Math.floor(elapsedMs / 60000), source.feedId);
+    }
+  }
+
+  function pingFeed(minutes, feedId) {
+    var visible = document.visibilityState === "visible";
+    var spoken = minutes < 1 ? "less than a minute" : minutes + (minutes === 1 ? " minute" : " minutes");
+    showFeedNotification(spoken, feedId, visible);
+    try {
+      if (navigator.vibrate) navigator.vibrate([180, 120, 180]);
+    } catch (e) {}
+
+    if (!visible) return;
+    playPingSound();
+    localToast("Nursing for " + spoken + ". Tap Done when finished.", "info");
+  }
+
+  /* ---------- Device notifications ---------- */
+
+  function notificationPermission() {
+    if (typeof Notification === "undefined" || typeof Notification.requestPermission !== "function") {
+      return "unsupported";
+    }
+    return Notification.permission === "granted" || Notification.permission === "denied"
+      ? Notification.permission
+      : "default";
+  }
+
+  function refreshNotificationUI() {
+    var permission = notificationPermission();
+    var message;
+    switch (permission) {
+      case "granted":
+        message = "Device notifications: on. The ping can appear outside this tab.";
+        break;
+      case "denied":
+        message = "Device notifications: blocked in browser settings. The in-app ping still works.";
+        break;
+      case "unsupported":
+        message = "Device notifications: not supported here. The in-app ping still works.";
+        break;
+      default:
+        message = "Device notifications: off. The in-app ping, sound, and vibration still work.";
+    }
+    document.querySelectorAll("[data-notification-status]").forEach(function (el) {
+      if (el.textContent !== message) el.textContent = message;
+    });
+    document.querySelectorAll("[data-enable-notifications]").forEach(function (button) {
+      // A denied permission cannot prompt again; the copy explains the fallback.
+      button.hidden = permission !== "default";
+    });
+  }
+
+  function requestNotificationPermission() {
+    if (notificationPermission() === "unsupported") {
+      refreshNotificationUI();
+      return;
+    }
+    try {
+      var result = Notification.requestPermission(refreshNotificationUI);
+      if (result && typeof result.then === "function") {
+        result.then(refreshNotificationUI).catch(refreshNotificationUI);
+      }
+    } catch (e) {
+      refreshNotificationUI();
+    }
+  }
+
+  function showFeedNotification(spoken, feedId, visible) {
+    if (notificationPermission() !== "granted") return;
+    var title = "Nursing for " + spoken;
+    var options = {
+      body: "Still feeding? Tap Done when finished.",
+      tag: "nurtur-feed-" + feedId,
+      renotify: true,
+      // The visible tab plays its own softer WebAudio ping instead.
+      silent: !!visible,
+      icon: "/static/img/icon-192.png",
+      badge: "/static/img/icon-192.png",
+      data: { url: "/" }
+    };
+
+    try {
+      if (navigator.serviceWorker && typeof navigator.serviceWorker.getRegistration === "function") {
+        navigator.serviceWorker.getRegistration().then(function (registration) {
+          if (registration && typeof registration.showNotification === "function") {
+            var shown = registration.showNotification(title, options);
+            if (shown && typeof shown.catch === "function") {
+              shown.catch(function () { legacyNotification(title, options); });
+            }
+            return;
+          }
+          legacyNotification(title, options);
+        }).catch(function () {
+          legacyNotification(title, options);
+        });
+        return;
+      }
+    } catch (e) {}
+    legacyNotification(title, options);
+  }
+
+  function legacyNotification(title, options) {
+    try { new Notification(title, options); } catch (e) {}
+  }
+
+  var audioContext = null;
+
+  function unlockAudio() {
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return;
+    try {
+      if (!audioContext) audioContext = new Ctor();
+      if (audioContext.state === "suspended") {
+        var resumed = audioContext.resume();
+        if (resumed && typeof resumed.catch === "function") resumed.catch(function () {});
+      }
+      if (!audioContext.__nurturUnlocked) {
+        var buffer = audioContext.createBuffer(1, 1, 22050);
+        var source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+        audioContext.__nurturUnlocked = true;
+      }
+    } catch (e) {}
+  }
+
+  function playPingSound() {
+    unlockAudio();
+    if (!audioContext) return;
+    try {
+      if (audioContext.state === "suspended") {
+        var resumed = audioContext.resume();
+        if (resumed && typeof resumed.catch === "function") resumed.catch(function () {});
+      }
+      var start = audioContext.currentTime;
+      tone(start, 880);
+      tone(start + 0.18, 1174.66);
+    } catch (e) {}
+  }
+
+  function tone(start, frequency) {
+    var oscillator = audioContext.createOscillator();
+    var gain = audioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.26);
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(start);
+    oscillator.stop(start + 0.28);
+  }
+
+  // Notification permission needs an explicit gesture, so the settings button
+  // owns the prompt. Audio also unlocks from the first tap anywhere.
+  document.addEventListener("click", function (event) {
+    var trigger = event.target.closest ? event.target.closest("[data-enable-notifications]") : null;
+    if (trigger) requestNotificationPermission();
+  });
+  document.addEventListener("pointerdown", unlockAudio, { passive: true });
+  document.addEventListener("keydown", unlockAudio);
 
   /* ---------- Reconciliation with the server ---------- */
 
@@ -341,6 +626,7 @@
       hideCachedHint(card);
     } else {
       clearCache();
+      clearFeedAlertIfIdle();
     }
     updateOfflineHint();
   }
@@ -447,6 +733,7 @@
     timerState.feedId = null;
     timerState.side = null;
     clearCache();
+    clearFeedAlertIfIdle();
     updateOfflineHint();
   });
 
@@ -531,6 +818,7 @@
     }
     updateRelativeLabels();
     tickLiveClocks();
+    refreshNotificationUI();
   }
 
   document.body.addEventListener("htmx:afterSwap", function (event) {
@@ -623,6 +911,7 @@
   updateRelativeLabels();
   armToast();
   updateConnectivity();
+  refreshNotificationUI();
   tick();
   window.setInterval(tick, 250);
   window.setInterval(updateRelativeLabels, 30000);

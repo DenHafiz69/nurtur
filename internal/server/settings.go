@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -15,14 +16,20 @@ import (
 )
 
 const (
-	settingNightStart    = "night_start"
-	settingNightEnd      = "night_end"
-	settingBabyName      = "baby_name"
-	settingBabyBirthDate = "baby_birth_date"
-	settingBabyGender    = "baby_gender"
+	settingNightStart       = "night_start"
+	settingNightEnd         = "night_end"
+	settingBabyName         = "baby_name"
+	settingBabyBirthDate    = "baby_birth_date"
+	settingBabyGender       = "baby_gender"
+	settingFeedAlertMinutes = "feed_alert_minutes"
 
 	babyGenderGirl = "girl"
 	babyGenderBoy  = "boy"
+
+	// defaultFeedAlertMinutes is the nursing ping threshold when an account has
+	// never saved one. Zero stored minutes turns the ping off.
+	defaultFeedAlertMinutes = 10
+	maxFeedAlertMinutes     = 120
 
 	// maxBabyAgeYears keeps an obvious typo from saving a birth date that would
 	// render a five-year-old as a "newborn" or an adult as a baby.
@@ -38,6 +45,7 @@ var (
 	errBirthDateTooOld   = errors.New("baby birth date must be within the last 5 years")
 	errGenderRequired    = errors.New("baby gender is required")
 	errGenderInvalid     = errors.New("baby gender must be girl or boy")
+	errFeedAlertInvalid  = errors.New("feed alert minutes must be a whole number from 0 to 120")
 )
 
 // babyProfile is the account's one baby. BirthDate and Gender are written once
@@ -227,6 +235,38 @@ func formatClockValue(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d", hour, minute)
 }
 
+// feedAlertMinutes returns the account's nursing ping threshold in minutes.
+// Zero disables the ping. A missing or unreadable value falls back to the
+// default so an older install still gets a sensible alert.
+func (s *Server) feedAlertMinutes(ctx context.Context) int {
+	raw, ok, err := s.store.Setting(ctx, settingFeedAlertMinutes)
+	if err != nil || !ok {
+		return defaultFeedAlertMinutes
+	}
+	minutes, err := parseFeedAlertMinutes(raw)
+	if err != nil {
+		return defaultFeedAlertMinutes
+	}
+	return minutes
+}
+
+// parseFeedAlertMinutes accepts zero (off) through maxFeedAlertMinutes.
+func parseFeedAlertMinutes(raw string) (int, error) {
+	minutes, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || minutes < 0 || minutes > maxFeedAlertMinutes {
+		return 0, errFeedAlertInvalid
+	}
+	return minutes, nil
+}
+
+// feedAlertMessage renders a parse error as form copy.
+func feedAlertMessage(err error) string {
+	if errors.Is(err, errFeedAlertInvalid) {
+		return "Enter 0 to turn alerts off, or a whole number from 1 to 120."
+	}
+	return "That alert setting doesn't look right. Try again?"
+}
+
 func (s *Server) handleSettingsPage(w http.ResponseWriter, r *http.Request) {
 	data, err := s.buildPage(r.Context(), nonceFrom(r.Context()), nil)
 	if err != nil {
@@ -329,6 +369,39 @@ func (s *Server) handleSaveBabyName(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleSaveFeedAlert(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+	minutes, parseErr := parseFeedAlertMinutes(r.FormValue("feed_alert_minutes"))
+	settings, err := s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if parseErr != nil {
+		settings.FeedAlertErr = feedAlertMessage(parseErr)
+		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
+		return
+	}
+	if err := s.store.SetSettings(r.Context(), map[string]string{
+		settingFeedAlertMinutes: strconv.Itoa(minutes),
+	}); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	settings, err = s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.respondSettings(w, r, http.StatusOK, settings, &view.Toast{
+		Message: "Nursing alert saved.",
+		Kind:    "success",
+	})
+}
+
 func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status int, settings *view.SettingsView, toast *view.Toast) {
 	s.respond(w, r, mutateResponse{
 		Status:   status,
@@ -354,11 +427,14 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 		AuthEnabled: s.auth.enabled(),
 		NightStart:  formatClockValue(nightStart),
 		NightEnd:    formatClockValue(nightEnd),
-		SyncMode:    "Local only",
-		SyncStatus:  "No cloud copy configured",
-		LastPush:    "—",
-		LastPull:    "—",
-		Pending:     "—",
+
+		FeedAlertMinutes: s.feedAlertMinutes(ctx),
+
+		SyncMode:   "Local only",
+		SyncStatus: "No cloud copy configured",
+		LastPush:   "—",
+		LastPull:   "—",
+		Pending:    "—",
 		ThemeNote: fmt.Sprintf(
 			"Theme follows the time of day (night %s–%s) unless you override it from the header.",
 			formatClockValue(nightStart), formatClockValue(nightEnd)),

@@ -112,6 +112,50 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(html).toHaveAttribute("data-theme", "day");
   });
 
+  test("nursing alert pings at the threshold and repeats until done", async ({ page }) => {
+    // Control Date/timers so the ten-minute threshold can be crossed quickly.
+    await page.clock.install();
+    await page.goto("/settings");
+    await page.locator('input[name="feed_alert_minutes"]').fill("1");
+    await page.getByRole("button", { name: "Save alert" }).click();
+    await expect(page.getByText("Nursing alert saved.")).toBeVisible();
+    await expect(page.locator('input[name="feed_alert_minutes"]')).toHaveValue("1");
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Left", exact: true }).click();
+    await expect(page.locator(".timer-label")).toContainText("Nursing Left");
+
+    await page.clock.fastForward(61_000);
+    await expect(page.getByText(/Nursing for 1 minute\./)).toBeVisible();
+
+    await page.clock.fastForward(60_000);
+    await expect(page.getByText(/Nursing for 2 minutes\./)).toBeVisible();
+
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.locator(".timer-label")).toHaveCount(0);
+  });
+
+  test("nursing alert still pings on the settings page", async ({ page }) => {
+    await page.clock.install();
+    await page.goto("/settings");
+    await page.locator('input[name="feed_alert_minutes"]').fill("1");
+    await page.getByRole("button", { name: "Save alert" }).click();
+    await expect(page.getByText("Nursing alert saved.")).toBeVisible();
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Left", exact: true }).click();
+    await expect(page.locator(".timer-label")).toContainText("Nursing Left");
+
+    // Settings has no timer card, so the alert relies on the page-level feed data.
+    await page.goto("/settings");
+    await page.clock.fastForward(61_000);
+    await expect(page.getByText(/Nursing for 1 minute\./)).toBeVisible();
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.locator(".timer-label")).toHaveCount(0);
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);

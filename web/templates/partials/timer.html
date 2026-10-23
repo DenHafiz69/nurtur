@@ -1,5 +1,5 @@
 {{define "timer"}}
-<div id="timer-card" class="timer-card {{if .Active}}is-nursing{{else}}is-idle{{end}}"{{if .TimerOOB}} hx-swap-oob="outerHTML"{{end}}{{with .Active}} data-feed-id="{{.ID}}" data-side="{{.Side}}" data-started-at="{{iso .StartedAt}}" data-server-now="{{iso .ServerNow}}"{{end}}>
+<div id="timer-card" class="timer-card {{if .Active}}is-nursing{{else}}is-idle{{end}}"{{if .TimerOOB}} hx-swap-oob="outerHTML"{{end}} data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-feed-id="{{.ID}}" data-side="{{.Side}}" data-started-at="{{iso .StartedAt}}" data-server-now="{{iso .ServerNow}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{end}}>
   {{if .Active}}
     <div class="timer-display">
       <span class="timer-pip">{{pip "nursing"}}</span>

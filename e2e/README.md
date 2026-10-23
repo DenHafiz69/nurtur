@@ -1,7 +1,8 @@
 # Browser smoke test
 
 Playwright covers the path that cannot be unit-tested: a 390×844 viewport, a
-reload mid-feed, OOB swaps, delete/undo in place, and the export endpoints.
+reload mid-feed, OOB swaps, delete/undo in place, the nursing alert threshold,
+and the export endpoints.
 
 ```sh
 cd e2e

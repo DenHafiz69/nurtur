@@ -43,6 +43,9 @@ type PageData struct {
 	AuthEnabled bool
 	SyncChip    *SyncChipView
 
+	// FeedAlertMinutes is the nursing ping threshold. Zero disables it.
+	FeedAlertMinutes int
+
 	// Login page state.
 	AuthMode      string // chooser, login, signup
 	AccountLogin  bool   // username/password form rather than the legacy passcode
@@ -83,6 +86,7 @@ type ActiveView struct {
 	StartedAt     time.Time
 	ServerNow     time.Time
 	Elapsed       time.Duration
+	TotalElapsed  time.Duration
 	SplitLabel    string
 }
 
@@ -212,14 +216,18 @@ type SettingsView struct {
 	NightStart  string
 	NightEnd    string
 	NightErr    string
-	SyncMode    string
-	SyncStatus  string
-	SyncDetail  string
-	LastPush    string
-	LastPull    string
-	Pending     string
-	Degraded    bool
-	ThemeNote   string
+
+	FeedAlertMinutes int
+	FeedAlertErr     string
+
+	SyncMode   string
+	SyncStatus string
+	SyncDetail string
+	LastPush   string
+	LastPull   string
+	Pending    string
+	Degraded   bool
+	ThemeNote  string
 }
 
 // Toast is a transient mutation result. An action turns it into a quick

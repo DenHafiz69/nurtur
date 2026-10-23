@@ -11,7 +11,7 @@
 {{end}}
 
 {{define "settings-panel"}}
-<div id="settings-panel" class="settings-panel">
+<div id="settings-panel" class="settings-panel" data-alert-minutes="{{.Settings.FeedAlertMinutes}}">
 
   <section class="settings-card" aria-labelledby="settings-baby">
     <h3 id="settings-baby" class="settings-title">Baby</h3>
@@ -50,6 +50,24 @@
         <button type="submit" class="btn btn-primary">Save night window</button>
       </div>
     </form>
+  </section>
+
+  <section class="settings-card" aria-labelledby="settings-alert">
+    <h3 id="settings-alert" class="settings-title">Nursing alert</h3>
+    <p class="settings-note">Ping when a feeding reaches this many minutes, and again at each interval until you tap Done. Set 0 to turn it off.</p>
+    <form class="settings-form" method="post" action="/settings/feed-alert" hx-post="/settings/feed-alert" hx-target="#settings-panel" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <label class="field">
+        <span class="field-label">Ping after (minutes)</span>
+        <input type="number" name="feed_alert_minutes" value="{{.Settings.FeedAlertMinutes}}" min="0" max="120" step="1" inputmode="numeric" required>
+      </label>
+      {{if .Settings.FeedAlertErr}}<p class="field-error" role="alert">{{.Settings.FeedAlertErr}}</p>{{end}}
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">Save alert</button>
+      </div>
+    </form>
+    <p class="settings-note" data-notification-status>Device notifications: off. The in-app ping, sound, and vibration still work.</p>
+    <button type="button" class="btn btn-ghost settings-wide" data-enable-notifications hidden>{{icon "bell"}}<span>Turn on device notifications</span></button>
+    <p class="settings-note">The ping runs while Nurtur is open in this browser or installed app. It can't wake a locked phone.</p>
   </section>
 
   <section class="settings-card" aria-labelledby="settings-theme">

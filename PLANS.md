@@ -921,7 +921,9 @@ Implement the Phase 1 subset of **UI Design Direction** above.
 - Multiple babies.
 - A native mobile app or direct phone-to-cloud sync. The server syncs to Turso Cloud; the phone is a thin HTMX client.
 - Growth charts, milestone tracking, pumping logs, medication logs.
-- Push notifications or reminders.
+- Push notifications or reminders. (The Settings page offers a local nursing
+  ping while Nurtur is open; waking a locked phone with Web Push is not
+  supported.)
 - Full offline write queue on the phone (the shell may be offline-capable; writes require the local server).
 - Analytics, ads, third-party runtime scripts, or external font/CDN requests. Fonts and all assets are self-hosted.
 

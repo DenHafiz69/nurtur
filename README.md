@@ -196,12 +196,29 @@ service.
 - The `localStorage` timer recovery keeps working with the service worker
   installed.
 
+### Nursing alert
+
+- The **Settings → Nursing alert** card pings when a feeding's **total** nursing
+  time (both sides) crosses the threshold. The default is 10 minutes; `0` turns
+  it off. It repeats at every multiple of the threshold until **Done** is tapped.
+- A ping shows an in-app toast, vibrates where supported, and plays a soft
+  two-note tone. Enable device notifications with the button on the same card
+  for a system notification too. Browser notifications need HTTPS (or
+  `localhost`).
+- Switching sides does not reset the count. A new feeding re-arms the alert.
+- The alert runs in the open page or installed PWA (including while it is
+  backgrounded). It cannot fire while the phone is locked or the browser is
+  fully closed.
+- The last fired milestone is stored in `localStorage`, so a reload does not
+  duplicate a ping, and a long suspension produces one catch-up ping rather than
+  a burst.
+
 ### Settings and export
 
 - `/settings` shows the baby name (editable), the timezone (from the
-  environment), the editable night window, theme help, sync state, database
-  path/size, and backup links. The birth date and gender are deliberately not
-  editable.
+  environment), the editable night window, the nursing alert threshold, theme
+  help, sync state, database path/size, and backup links. The birth date and
+  gender are deliberately not editable.
 - `GET /export.json` is a structured copy with feeds (and segments), diapers,
   sleeps, settings, and per-side minute totals.
 - `GET /export.csv` is one row per event. Columns:

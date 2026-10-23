@@ -4,7 +4,7 @@
  * a bundled shell would show stale data and could outlive a passcode gate.
  * Mutation responses are never cached because only GET requests are handled.
  */
-const VERSION = "nurtur-v7";
+const VERSION = "nurtur-v8";
 const SHELL = [
   "/offline",
   "/static/app.css",
@@ -30,6 +30,20 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(keys.filter((key) => key !== VERSION).map((key) => caches.delete(key)))
     ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if (new URL(client.url).pathname === "/" && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow("/");
+    })
   );
 });
 

@@ -17,6 +17,7 @@ var icons = map[string]template.HTML{
 	"close":        `<path d="m6 6 12 12M18 6 6 18"/>`,
 	"star":         `<path d="M12 3l2.2 5.1 5.5.5-4.2 3.7 1.3 5.4L12 14.9l-4.8 2.8 1.3-5.4-4.2-3.7 5.5-.5L12 3Z"/>`,
 	"alert":        `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5"/><circle cx="12" cy="16.4" r=".6" fill="currentColor" stroke="none"/>`,
+	"bell":         `<path d="M6.5 16.5h11l-1.2-2.1a2 2 0 0 1-.3-1V10a4 4 0 0 0-8 0v3.4a2 2 0 0 1-.3 1l-1.2 2.1Z"/><path d="M10 19a2 2 0 0 0 4 0"/>`,
 	"clock":        `<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`,
 	"cloud":        `<path d="M7 18h9.5a4 4 0 0 0 .3-8 5.5 5.5 0 0 0-10.5 1.6A3.3 3.3 0 0 0 7 18Z"/>`,
 	"diaper":       `<path d="M5 8h14l-1.1 6a4 4 0 0 1-4 3.4h-3.8a4 4 0 0 1-4-3.4L5 8Z"/><path d="M8 8V6.5A1.5 1.5 0 0 1 9.5 5h5A1.5 1.5 0 0 1 16 6.5V8"/>`,

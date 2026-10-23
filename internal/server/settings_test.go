@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestSaveBabyNameUpdatesDashboardAndSettings(t *testing.T) {
@@ -87,5 +88,160 @@ func TestBabyNameFallsBackToEnvironment(t *testing.T) {
 	rec := env.do(t, http.MethodGet, "/", nil, false)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Pip") {
 		t.Fatalf("environment name not used:\n%s", rec.Body.String())
+	}
+}
+
+func TestFeedAlertDefaultsToTenMinutes(t *testing.T) {
+	env := newTestEnv(t)
+
+	rec := env.do(t, http.MethodGet, "/settings", nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("settings = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `name="feed_alert_minutes" value="10"`) {
+		t.Fatalf("settings does not show the default alert:\n%s", rec.Body.String())
+	}
+
+	rec = env.do(t, http.MethodGet, "/", nil, false)
+	if !strings.Contains(rec.Body.String(), `data-alert-minutes="10"`) {
+		t.Fatalf("dashboard does not carry the alert threshold:\n%s", rec.Body.String())
+	}
+}
+
+func TestSaveFeedAlertMinutes(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+
+	rec := env.do(t, http.MethodPost, "/settings/feed-alert", url.Values{
+		"feed_alert_minutes": {"15"},
+	}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save alert = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Nursing alert saved.") {
+		t.Fatalf("save response missing toast:\n%s", rec.Body.String())
+	}
+
+	stored, ok, err := env.store.Setting(ctx, settingFeedAlertMinutes)
+	if err != nil || !ok || stored != "15" {
+		t.Fatalf("stored alert = %q, ok=%v, err=%v", stored, ok, err)
+	}
+
+	rec = env.do(t, http.MethodGet, "/settings", nil, false)
+	if !strings.Contains(rec.Body.String(), `name="feed_alert_minutes" value="15"`) {
+		t.Fatalf("settings does not show the saved alert:\n%s", rec.Body.String())
+	}
+
+	if rec = env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true); rec.Code != http.StatusOK {
+		t.Fatalf("start feed = %d", rec.Code)
+	}
+	rec = env.do(t, http.MethodGet, "/", nil, false)
+	if !strings.Contains(rec.Body.String(), `data-alert-minutes="15"`) {
+		t.Fatalf("timer card does not carry the saved alert:\n%s", rec.Body.String())
+	}
+}
+
+func TestFeedAlertValidation(t *testing.T) {
+	cases := []struct {
+		name    string
+		raw     string
+		status  int
+		stored  string
+		errCopy string
+	}{
+		{name: "empty", raw: "   ", status: http.StatusUnprocessableEntity, errCopy: "Enter 0 to turn alerts off"},
+		{name: "not a number", raw: "soon", status: http.StatusUnprocessableEntity, errCopy: "Enter 0 to turn alerts off"},
+		{name: "negative", raw: "-1", status: http.StatusUnprocessableEntity, errCopy: "Enter 0 to turn alerts off"},
+		{name: "too high", raw: "121", status: http.StatusUnprocessableEntity, errCopy: "Enter 0 to turn alerts off"},
+		{name: "off", raw: "0", status: http.StatusOK, stored: "0"},
+		{name: "upper bound", raw: "120", status: http.StatusOK, stored: "120"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newTestEnv(t)
+			rec := env.do(t, http.MethodPost, "/settings/feed-alert", url.Values{
+				"feed_alert_minutes": {tc.raw},
+			}, true)
+			if rec.Code != tc.status {
+				t.Fatalf("status = %d, want %d\n%s", rec.Code, tc.status, rec.Body.String())
+			}
+			if tc.errCopy != "" && !strings.Contains(rec.Body.String(), tc.errCopy) {
+				t.Fatalf("response missing %q:\n%s", tc.errCopy, rec.Body.String())
+			}
+			stored, ok, err := env.store.Setting(context.Background(), settingFeedAlertMinutes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.stored == "" {
+				if ok {
+					t.Fatalf("invalid value stored: %q", stored)
+				}
+				return
+			}
+			if !ok || stored != tc.stored {
+				t.Fatalf("stored alert = %q, ok=%v, want %q", stored, ok, tc.stored)
+			}
+		})
+	}
+}
+
+func TestParseFeedAlertMinutes(t *testing.T) {
+	for _, raw := range []string{"0", "10", "120", " 15 "} {
+		if _, err := parseFeedAlertMinutes(raw); err != nil {
+			t.Errorf("parseFeedAlertMinutes(%q) = %v", raw, err)
+		}
+	}
+	for _, raw := range []string{"", "ten", "-1", "121", "1.5"} {
+		if _, err := parseFeedAlertMinutes(raw); err == nil {
+			t.Errorf("parseFeedAlertMinutes(%q) accepted an invalid value", raw)
+		}
+	}
+}
+
+func TestTimerCarriesTotalElapsedAcrossSides(t *testing.T) {
+	env := newTestEnv(t)
+
+	if rec := env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true); rec.Code != http.StatusOK {
+		t.Fatalf("start feed = %d\n%s", rec.Code, rec.Body.String())
+	}
+	env.clock.Advance(6 * time.Minute)
+	// Switch after six minutes; the alert counts both sides together.
+	rec := env.do(t, http.MethodPost, "/feeds/1/switch", url.Values{"side": {"right"}}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("switch = %d\n%s", rec.Code, rec.Body.String())
+	}
+	env.clock.Advance(4 * time.Minute)
+
+	rec = env.do(t, http.MethodGet, "/partials/feed/timer", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("timer fragment = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `data-feed-total-ms="600000"`) {
+		t.Fatalf("timer fragment missing the 10-minute total:\n%s", body)
+	}
+	if !strings.Contains(body, `data-alert-minutes="10"`) {
+		t.Fatalf("timer fragment missing the alert threshold:\n%s", body)
+	}
+}
+
+func TestSettingsPageCarriesActiveFeedForAlert(t *testing.T) {
+	env := newTestEnv(t)
+
+	if rec := env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true); rec.Code != http.StatusOK {
+		t.Fatalf("start feed = %d", rec.Code)
+	}
+	env.clock.Advance(3 * time.Minute)
+
+	rec := env.do(t, http.MethodGet, "/settings", nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("settings = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `data-active-feed-id="1"`) || !strings.Contains(body, `data-feed-total-ms="180000"`) {
+		t.Fatalf("settings does not expose the active feed for the alert:\n%s", body)
+	}
+	if !strings.Contains(body, `data-alert-minutes="10"`) {
+		t.Fatalf("settings panel does not carry the alert threshold:\n%s", body)
 	}
 }

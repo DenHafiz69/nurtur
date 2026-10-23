@@ -177,6 +177,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings", s.handleSettingsPage)
 	mux.HandleFunc("POST /settings", s.handleSaveSettings)
 	mux.HandleFunc("POST /settings/baby", s.handleSaveBabyName)
+	mux.HandleFunc("POST /settings/feed-alert", s.handleSaveFeedAlert)
 	mux.HandleFunc("GET /export.csv", s.handleExportCSV)
 	mux.HandleFunc("GET /export.json", s.handleExportJSON)
 	mux.HandleFunc("GET /export.sql", s.handleExportSQL)
