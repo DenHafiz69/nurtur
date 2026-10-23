@@ -76,11 +76,21 @@
     {{if ne .View "settings"}}
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
-      <div class="dock-stack">
-        {{template "timer" .}}
-        {{template "diaper-row" .}}
-        {{template "sleep-pill" .}}
-      </div>
+      <details class="dock-drawer"{{if ne .View "timeline"}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
+        <summary class="dock-toggle" title="Show or hide quick logging">
+          <span class="dock-toggle-grip" aria-hidden="true"></span>
+          <span class="dock-toggle-label sr-only">Quick log</span>
+          <span class="dock-toggle-icon dock-toggle-chevron" aria-hidden="true">{{icon "chevron-down"}}</span>
+          <span class="dock-toggle-icon dock-toggle-plus" aria-hidden="true">{{icon "plus"}}</span>
+        </summary>
+        <div class="dock-panel">
+          <div class="dock-stack">
+            {{template "timer" .}}
+            {{template "diaper-row" .}}
+            {{template "sleep-pill" .}}
+          </div>
+        </div>
+      </details>
     </footer>
     {{end}}
 

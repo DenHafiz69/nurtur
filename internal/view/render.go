@@ -60,6 +60,12 @@ func (p *PageData) Clock(t time.Time) string {
 	return FormatClock(t, p.location())
 }
 
+// TimelineHasToday reports whether the current history page contains today's
+// group, so quick-log forms can ask the server to update that group in place.
+func (p *PageData) TimelineHasToday() bool {
+	return p.View == "timeline" && p.Timeline != nil && p.Timeline.HasToday
+}
+
 // DateInput formats a datetime-local value in the configured timezone.
 func (p *PageData) DateInput(t time.Time) string {
 	return t.In(p.location()).Format("2006-01-02T15:04:05")

@@ -34,7 +34,7 @@
 {{define "timeline-day"}}
 <details class="timeline-day" aria-labelledby="day-{{.Key}}">
   {{template "timeline-day-head" .}}
-  <ul class="timeline-events">
+  <ul id="timeline-events-{{.Key}}" class="timeline-events">
     {{range .Rows}}{{template "timeline-row" .}}{{end}}
   </ul>
 </details>

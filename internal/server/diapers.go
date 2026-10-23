@@ -47,7 +47,19 @@ func (s *Server) handleCreateDiaper(w http.ResponseWriter, r *http.Request) {
 		toast.Message = d.Kind.Noun() + " was just logged."
 		toast.Kind = "info"
 	}
-	s.renderMutation(w, r, "status-strip", toast)
+	opts := mutateResponse{
+		Primary:          "status-strip",
+		Toast:            toast,
+		Trigger:          "sheet-saved",
+		TriggerAfterSwap: true,
+	}
+	if created && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Diaper, d.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "insert"
+		}
+	}
+	s.respond(w, r, opts)
 }
 
 func (s *Server) handleDiaperSheet(w http.ResponseWriter, r *http.Request) {

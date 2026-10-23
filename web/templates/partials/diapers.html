@@ -1,14 +1,14 @@
 {{define "diaper-row"}}
 <section class="diaper-row" aria-label="Log a diaper">
-  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
     <input type="hidden" name="type" value="wet">
     <button type="submit" class="diaper-pill diaper-wet">{{icon "drop"}}<span>Wet</span></button>
   </form>
-  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
     <input type="hidden" name="type" value="dirty">
     <button type="submit" class="diaper-pill diaper-dirty">{{icon "dirty"}}<span>Dirty</span></button>
   </form>
-  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
     <input type="hidden" name="type" value="both">
     <button type="submit" class="diaper-pill diaper-both">{{icon "diaper"}}<span>Both</span></button>
   </form>
@@ -36,15 +36,15 @@
 
   <p class="sheet-copy">One tap logs it. Details are always optional.</p>
   <section class="diaper-row sheet-diaper-row" aria-label="Log a diaper">
-    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
       <input type="hidden" name="type" value="wet">
       <button type="submit" class="diaper-pill diaper-wet">{{icon "drop"}}<span>Wet</span></button>
     </form>
-    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
       <input type="hidden" name="type" value="dirty">
       <button type="submit" class="diaper-pill diaper-dirty">{{icon "dirty"}}<span>Dirty</span></button>
     </form>
-    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
       <input type="hidden" name="type" value="both">
       <button type="submit" class="diaper-pill diaper-both">{{icon "diaper"}}<span>Both</span></button>
     </form>

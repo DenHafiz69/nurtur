@@ -805,11 +805,112 @@ button {
 
 .dock {
   position: relative;
+  z-index: 20;
   flex: none;
-  padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+}
+
+.dock-drawer[open] {
+  padding: 0 16px calc(10px + env(safe-area-inset-bottom));
   border-top: 1.5px dashed var(--line);
   background: var(--bg);
   box-shadow: 0 -8px 22px var(--dock-shadow);
+}
+
+/* The summary is the drawer's grab handle when open and its floating
+   quick-log button when closed. It is native <details>, so it still works
+   without JavaScript. */
+.dock-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  list-style: none;
+  touch-action: manipulation;
+}
+
+.dock-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.dock-toggle::marker {
+  content: "";
+}
+
+.dock-toggle-grip {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.dock-toggle-icon {
+  display: grid;
+  place-items: center;
+}
+
+.dock-toggle-icon .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.dock-toggle-plus {
+  display: none;
+}
+
+.dock-drawer:not([open]) .dock-toggle {
+  position: absolute;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  min-height: 62px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--coral);
+  color: var(--on-coral);
+  box-shadow: 0 5px 0 var(--shadow);
+  transition: transform 90ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.dock-drawer:not([open]) .dock-toggle:active {
+  transform: scale(0.95);
+}
+
+.dock-drawer:not([open]) .dock-toggle-grip,
+.dock-drawer:not([open]) .dock-toggle-chevron {
+  display: none;
+}
+
+.dock-drawer:not([open]) .dock-toggle-plus {
+  display: grid;
+}
+
+.dock-drawer:not([open]) .dock-toggle .icon {
+  width: 28px;
+  height: 28px;
+}
+
+/* Keep the last history card and any toast clear of the floating button. */
+.app:has(.dock-drawer:not([open])) .app-main {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.app:has(.dock-drawer:not([open])) .toast-region {
+  bottom: calc(84px + env(safe-area-inset-bottom));
+}
+
+.dock-panel {
+  display: flex;
+  flex-direction: column;
 }
 
 .dock-stack {
@@ -1933,10 +2034,18 @@ textarea {
 
 @media (max-width: 359px) {
   .app-header,
-  .app-main,
-  .dock {
+  .app-main {
     padding-right: 12px;
     padding-left: 12px;
+  }
+
+  .dock-drawer[open] {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .dock-drawer:not([open]) .dock-toggle {
+    right: calc(12px + env(safe-area-inset-right));
   }
 
   .baby-name {
@@ -2013,10 +2122,18 @@ textarea {
    feed row's controls move to their own line. */
 @media (max-width: 280px) {
   .app-header,
-  .app-main,
-  .dock {
+  .app-main {
     padding-right: 10px;
     padding-left: 10px;
+  }
+
+  .dock-drawer[open] {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .dock-drawer:not([open]) .dock-toggle {
+    right: calc(10px + env(safe-area-inset-right));
   }
 
   .pip-header {

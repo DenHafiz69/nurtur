@@ -16,6 +16,8 @@
 </div>
 {{end}}
 
+{{define "toast-primary"}}{{if .Toast}}{{template "toast" .Toast}}{{end}}{{end}}
+
 {{define "toast-oob"}}
 <div id="toast-region" class="toast-region" hx-swap-oob="innerHTML" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
 {{end}}

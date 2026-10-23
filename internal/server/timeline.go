@@ -113,6 +113,9 @@ func (s *Server) buildTimeline(ctx context.Context, before time.Time, limit int)
 			for _, entry := range entries {
 				group.Rows = append(group.Rows, s.timelineRow(entry, now))
 			}
+			if group.Key == view.DateKey(now, s.loc) {
+				page.HasToday = true
+			}
 			page.Days = append(page.Days, group)
 			page.Count += len(entries)
 		}
@@ -221,6 +224,7 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 			Timeline:     true,
 			RowID:        fmt.Sprintf("row-feed-%d", f.ID),
 			DeleteKey:    fmt.Sprintf("feed-%d", f.ID),
+			DayKey:       view.DateKey(entry.Anchor, s.loc),
 		}
 
 	case entry.Diaper != nil:
@@ -242,6 +246,7 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 			Timeline:     true,
 			RowID:        fmt.Sprintf("row-diaper-%d", d.ID),
 			DeleteKey:    fmt.Sprintf("diaper-%d", d.ID),
+			DayKey:       view.DateKey(entry.Anchor, s.loc),
 		}
 
 	case entry.Sleep != nil:
@@ -275,6 +280,7 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 			Timeline:     true,
 			RowID:        fmt.Sprintf("row-sleep-%d", session.ID),
 			DeleteKey:    fmt.Sprintf("sleep-%d", session.ID),
+			DayKey:       view.DateKey(entry.Anchor, s.loc),
 		}
 	}
 	return view.EventRow{}

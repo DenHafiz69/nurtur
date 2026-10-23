@@ -171,12 +171,14 @@ type EventRow struct {
 	Timeline  bool
 	RowID     string
 	DeleteKey string
+	DayKey    string
 }
 
 // TimelinePageView is one page of the unified history, grouped by local day.
 type TimelinePageView struct {
 	Days       []TimelineDay
 	HasDays    bool
+	HasToday   bool
 	HasMore    bool
 	NextCursor string
 	Count      int
