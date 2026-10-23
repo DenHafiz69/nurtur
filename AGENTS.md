@@ -5,6 +5,7 @@
 - Never `git push` commits or tags unless the user explicitly asks you to push.
 - Do not assume a commit should be published just because it was requested.
 - Before tagging or pushing to `main`, run every check in `.github/workflows/ci.yml` locally (gofmt, `go vet ./...`, `go test -p 1 ./...`).
+- Versioning: a minor change bumps the last digit (`0.3.4` → `0.3.5`). A major change bumps the second digit and resets the last digit to zero (`0.3.5` → `0.4.0`).
 
 ## graphify
 
