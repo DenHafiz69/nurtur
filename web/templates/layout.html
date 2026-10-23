@@ -48,11 +48,7 @@
             <span class="pip-day">{{pip "awake"}}</span>
             <span class="pip-night">{{pip "sleeping"}}</span>
           </span>
-          <div class="brand-copy">
-            <p class="greeting">{{.Greeting}}</p>
-            <h1 class="baby-name">{{if .BabyName}}{{.BabyName}}{{else}}Little one{{end}}</h1>
-            {{if .BabyAge}}<p class="baby-age">{{.BabyAge}}{{if .BabyGenderLabel}} · {{.BabyGenderLabel}}{{end}}</p>{{end}}
-          </div>
+          {{template "baby-heading" .}}
         </div>
         <div class="header-actions">
           {{template "sync-chip" .}}

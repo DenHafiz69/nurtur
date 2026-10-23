@@ -22,6 +22,10 @@ func TestSaveBabyNameUpdatesDashboardAndSettings(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "Baby name saved.") {
 		t.Fatalf("save response missing toast:\n%s", rec.Body.String())
 	}
+	if !strings.Contains(rec.Body.String(), `<div id="baby-heading" class="brand-copy" hx-swap-oob="outerHTML">`) ||
+		!strings.Contains(rec.Body.String(), `<h1 class="baby-name">Aisyah</h1>`) {
+		t.Fatalf("save response does not refresh the header name:\n%s", rec.Body.String())
+	}
 
 	stored, ok, err := env.store.Setting(ctx, settingBabyName)
 	if err != nil || !ok || stored != "Aisyah" {

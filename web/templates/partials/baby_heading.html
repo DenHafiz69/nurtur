@@ -1,0 +1,13 @@
+{{define "baby-heading-inner"}}
+  <p class="greeting">{{.Greeting}}</p>
+  <h1 class="baby-name">{{if .BabyName}}{{.BabyName}}{{else}}Little one{{end}}</h1>
+  {{if .BabyAge}}<p class="baby-age">{{.BabyAge}}{{if .BabyGenderLabel}} · {{.BabyGenderLabel}}{{end}}</p>{{end}}
+{{end}}
+
+{{define "baby-heading"}}
+<div id="baby-heading" class="brand-copy">{{template "baby-heading-inner" .}}</div>
+{{end}}
+
+{{define "baby-heading-oob"}}
+<div id="baby-heading" class="brand-copy" hx-swap-oob="outerHTML">{{template "baby-heading-inner" .}}</div>
+{{end}}

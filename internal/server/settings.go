@@ -337,6 +337,9 @@ func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status 
 		Retarget: "#settings-panel",
 		Reswap:   "outerHTML",
 		Redirect: "/settings",
+		// The header's name and age live outside #settings-panel, so refresh
+		// them out-of-band instead of waiting for the next full page load.
+		ExtraOOB: []string{"baby-heading-oob"},
 		Apply:    func(data *view.PageData) { data.View = "settings"; data.Settings = settings },
 	})
 }

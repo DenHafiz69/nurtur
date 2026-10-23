@@ -68,6 +68,12 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await page.getByRole("button", { name: "Save night window" }).click();
     await expect(page.getByText("Night window saved.")).toBeVisible();
     await expect(page.locator('input[name="night_start"]')).toHaveValue("20:00");
+
+    // Saving the name must refresh the header in place, without a navigation.
+    await page.locator('input[name="baby_name"]').fill("Aisyah");
+    await page.getByRole("button", { name: "Save name" }).click();
+    await expect(page.getByText("Baby name saved.")).toBeVisible();
+    await expect(page.locator(".baby-name")).toHaveText("Aisyah");
   });
 
   test("history collapses quick logging into an expandable drawer", async ({ page }) => {
