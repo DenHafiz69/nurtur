@@ -99,6 +99,28 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(drawer).not.toHaveAttribute("open", "");
   });
 
+  test("hiding quick logging sticks on the main screen and reloads", async ({ page }) => {
+    await page.goto("/");
+    const drawer = page.locator("details.dock-drawer");
+    const toggle = page.locator(".dock-toggle");
+    await expect(drawer).toHaveAttribute("open", "");
+
+    await toggle.click();
+    await expect(drawer).not.toHaveAttribute("open", "");
+
+    // Leaving History must not hand the old open-by-default rendering back.
+    await page.getByRole("link", { name: /History/ }).click();
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(drawer).not.toHaveAttribute("open", "");
+
+    await page.getByRole("link", { name: /Today/ }).click();
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(drawer).not.toHaveAttribute("open", "");
+
+    await page.reload();
+    await expect(drawer).not.toHaveAttribute("open", "");
+  });
+
   test("theme toggle flips on a single click in both directions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => localStorage.setItem("nurtur.theme", "day"));
