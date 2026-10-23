@@ -27,7 +27,7 @@
         root.dataset.theme = theme;
         root.dataset.themeMode = mode;
         var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute("content", theme === "night" ? "#08080c" : "#fff8f0");
+        if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
       } catch (e) {
         var fallbackHour = new Date().getHours();
         document.documentElement.dataset.theme = (fallbackHour >= 21 || fallbackHour < 7) ? "night" : "day";

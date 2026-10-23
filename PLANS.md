@@ -239,7 +239,7 @@ UI controls:
 **Concept:** a soft little nursery companion — playful in daylight, calm at 3 a.m.
 **Not:** a clinical form, a generic dashboard, or a baby-themed toy.
 
-The interface should feel like a warm sticker-covered notebook: rounded, tactile, and friendly. Cuteness comes from shape, color, tiny illustrations, and motion — never from clutter or slow interactions. At night, the same app tucks itself in: Pip sleeps, the palette drops to deep charcoal and amber, and every playful detail becomes quiet.
+The interface should feel like a warm sticker-covered notebook: rounded, tactile, and friendly. Cuteness comes from shape, color, tiny illustrations, and motion — never from clutter or slow interactions. At night, the same app tucks itself in: Pip sleeps, the palette drops to warm plum twilight and amber, and every playful detail becomes quiet.
 
 **Mascot:** **Pip**, a sleepy little sprout. Pip appears in the header and empty states, never on top of a control. Poses:
 
@@ -282,33 +282,33 @@ Pip is decoration with personality, not a status mechanism. The text must always
   --lilac: #e0d2f4;
   --line: #eadccf;
   --danger: #a83d35;
-  --shadow: 0 4px 0 #e7d6c6;
+  --shadow: #e7d6c6;
 }
 
 :root[data-theme="night"] {
-  /* Night — near-black, charcoal, muted amber */
-  --bg: #08080c;
-  --bg-dots: #111118;
-  --surface: #121219;
-  --surface-soft: #1a1a22;
-  --ink: #f1eadc;
-  --ink-soft: #a9a2b2;
-  --coral: #f0a184;
-  --coral-soft: #5a342d;
-  --on-coral: #1c100e;
-  --peach: #3a2a25;
-  --butter: #3b3524;
-  --sage: #223629;
-  --sky: #22353d;
-  --lilac: #2d273b;
-  --line: #272732;
-  --danger: #ff9e8f;
-  --shadow: 0 4px 0 #050508;
+  /* Night — warm plum twilight, lifted surfaces, muted amber */
+  --bg: #1a1621;
+  --bg-dots: #26202e;
+  --surface: #2a2334;
+  --surface-soft: #342c40;
+  --ink: #f5eee9;
+  --ink-soft: #c0b5cb;
+  --coral: #ff9f87;
+  --coral-soft: #74453c;
+  --on-coral: #2b1411;
+  --peach: #4a2f39;
+  --butter: #57431f;
+  --sage: #294633;
+  --sky: #244252;
+  --lilac: #3b3156;
+  --line: #4b405c;
+  --danger: #ff9d90;
+  --shadow: #0d0a11;
 }
 ```
 
 - Day cards use pastel fills with dark ink. Never white text on a pastel.
-- Night uses deep tinted surfaces, amber for the active timer and primary emphasis, and no pure white.
+- Night cards stay neutral and raised; the peach/butter/sage/lilac tints move into icon chips and action pills. Amber marks the active timer and primary emphasis. No pure white.
 - Color is never the only signal: active side, success, and danger also use text, icon, or fill weight.
 - Verify every text/background pair with a contrast checker; body ≥ 4.5:1, large timer ≥ 3:1.
 
@@ -420,7 +420,7 @@ When the feed is active, the timer is the dock's headline and the diaper row rem
 - Default is **auto**: night from 21:00 to 07:00 local. Manual override is remembered per device (`nurtur.theme`).
 - Inline `<head>` script sets `data-theme` before first paint; there is no white flash.
 - Night mode keeps the same layout and copy, but:
-  - Background is near-black; cards are deep charcoal with muted tints.
+  - Background is warm plum-charcoal; cards are lifted neutral surfaces with tinted icon chips.
   - Primary actions use muted amber; coral becomes a soft ember, never neon.
   - Pip sleeps, stars dim, the dotted background becomes almost invisible.
   - Success star is suppressed; only a low-opacity glow and the toast remain.

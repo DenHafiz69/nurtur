@@ -15,6 +15,8 @@
         var auto = (hour >= 21 || hour < 7) ? "night" : "day";
         var theme = (mode === "day" || mode === "night") ? mode : auto;
         document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
       } catch (e) {}
     })();
   </script>

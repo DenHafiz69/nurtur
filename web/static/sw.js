@@ -4,7 +4,7 @@
  * a bundled shell would show stale data and could outlive a passcode gate.
  * Mutation responses are never cached because only GET requests are handled.
  */
-const VERSION = "nurtur-v6";
+const VERSION = "nurtur-v7";
 const SHELL = [
   "/offline",
   "/static/app.css",
