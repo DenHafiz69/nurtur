@@ -96,6 +96,22 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(drawer).not.toHaveAttribute("open", "");
   });
 
+  test("theme toggle flips on a single click in both directions", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("nurtur.theme", "day"));
+    await page.reload();
+
+    const html = page.locator("html");
+    const toggle = page.locator("[data-theme-toggle]").first();
+    await expect(html).toHaveAttribute("data-theme", "day");
+
+    await toggle.click();
+    await expect(html).toHaveAttribute("data-theme", "night");
+
+    await toggle.click();
+    await expect(html).toHaveAttribute("data-theme", "day");
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);

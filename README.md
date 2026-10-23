@@ -183,7 +183,8 @@ service.
 
 - The inline head script applies `data-theme` before first paint. **Auto** is
   night from 21:00–07:00 local (and follows `prefers-color-scheme` on a first
-  visit); the header toggle cycles auto → day → night and stores `nurtur.theme`.
+  visit); the header toggle flips between light and dark, skipping any auto
+  step that would look the same, and stores `nurtur.theme`.
 - The Settings page can change the night window; sleep totals and the auto theme
   both use it.
 - `GET /sw.js` is served from the domain root so it controls the whole app. Static
@@ -236,8 +237,9 @@ Every mutation is a real `<form>` with a `method` and `action`:
 ## Design notes
 
 - Day/night tokens live at the top of `web/static/app.css`. Night starts at
-  21:00 and ends at 07:00 by default; the header toggle cycles auto → day →
-  night and stores `nurtur.theme`.
+  21:00 and ends at 07:00 by default; the header toggle flips between light
+  and dark, skipping an auto step that would look the same, and stores
+  `nurtur.theme`.
 - The first-paint theme bootstrap is a nonce-protected inline script in
   `layout.html`; CSP allows no other inline script or style.
 - Fonts are self-hosted, subsetted OFL WOFF2: Fredoka (display) and Nunito Sans

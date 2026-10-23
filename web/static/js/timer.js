@@ -46,6 +46,19 @@
     return "day";
   }
 
+  // nextThemeMode skips modes that would render the same theme. Without this,
+  // clicking from night to auto at night appears to do nothing, so going back
+  // to day needs a second click.
+  function nextThemeMode(mode) {
+    var theme = resolveTheme(mode);
+    var index = THEME_MODES.indexOf(mode);
+    for (var step = 1; step <= THEME_MODES.length; step++) {
+      var candidate = THEME_MODES[(index + step) % THEME_MODES.length];
+      if (resolveTheme(candidate) !== theme) return candidate;
+    }
+    return THEME_MODES[(index + 1) % THEME_MODES.length];
+  }
+
   function applyTheme(mode, persist) {
     var theme = resolveTheme(mode);
     var root = document.documentElement;
@@ -55,8 +68,7 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
 
-    var index = THEME_MODES.indexOf(mode);
-    var next = THEME_MODES[(index + 1) % THEME_MODES.length];
+    var next = nextThemeMode(mode);
     document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
       button.setAttribute("aria-label", "Theme: " + mode + ". Activate for " + next + ".");
       button.setAttribute("title", "Theme: " + mode);
@@ -74,8 +86,7 @@
 
   document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
     button.addEventListener("click", function () {
-      var index = THEME_MODES.indexOf(currentThemeMode());
-      applyTheme(THEME_MODES[(index + 1) % THEME_MODES.length], true);
+      applyTheme(nextThemeMode(currentThemeMode()), true);
     });
   });
   applyTheme(currentThemeMode(), false);
