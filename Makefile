@@ -12,8 +12,10 @@ dev:
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o $(BIN) ./cmd/nurtur
 
+# Keep test packages serialized: each binary's first tursogo call extracts the
+# embedded native library into a shared cache, and concurrent extraction races.
 test:
-	go test ./...
+	go test -p 1 ./...
 
 race:
 	go test -race ./...

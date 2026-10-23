@@ -44,8 +44,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # Test binaries run in parallel by default. The first use of the tursogo
+      # driver in each binary extracts the embedded native library into the
+      # shared ~/.cache/turso-go path, and concurrent extraction corrupts that
+      # file, so serialize packages with -p 1.
       - name: Test
-        run: go test ./...
+        run: go test -p 1 ./...
 
       - uses: docker/setup-buildx-action@v4
 

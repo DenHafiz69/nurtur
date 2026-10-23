@@ -4,6 +4,7 @@
 - Never create a git tag unless the user explicitly asks for one.
 - Never `git push` commits or tags unless the user explicitly asks you to push.
 - Do not assume a commit should be published just because it was requested.
+- Before tagging or pushing to `main`, run every check in `.github/workflows/ci.yml` locally (gofmt, `go vet ./...`, `go test -p 1 ./...`).
 
 ## graphify
 
