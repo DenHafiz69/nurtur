@@ -98,7 +98,7 @@ func (s *Server) handleCreateSleep(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startSleep(w http.ResponseWriter, r *http.Request, now time.Time) {
-	_, err := s.store.StartSleep(r.Context(), now)
+	started, err := s.store.StartSleep(r.Context(), now)
 	name := s.currentBabyName(r.Context())
 	asleep := "Sleep started. Sleep well."
 	already := "Sleep is already running."
@@ -118,7 +118,19 @@ func (s *Server) startSleep(w http.ResponseWriter, r *http.Request, now time.Tim
 		s.serverError(w, r, err)
 		return
 	}
-	s.renderMutation(w, r, "sleep-pill", toast)
+	opts := mutateResponse{
+		Primary:          "sleep-pill",
+		Toast:            toast,
+		Trigger:          "sheet-saved",
+		TriggerAfterSwap: true,
+	}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Sleep, started.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "insert"
+		}
+	}
+	s.respond(w, r, opts)
 }
 
 func (s *Server) handleStopSleep(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +158,19 @@ func (s *Server) handleStopSleep(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.renderMutation(w, r, "sleep-pill", toast)
+	opts := mutateResponse{
+		Primary:          "sleep-pill",
+		Toast:            toast,
+		Trigger:          "sheet-saved",
+		TriggerAfterSwap: true,
+	}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Sleep, stopped.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "update"
+		}
+	}
+	s.respond(w, r, opts)
 }
 
 func (s *Server) handleSleepEditPage(w http.ResponseWriter, r *http.Request) {

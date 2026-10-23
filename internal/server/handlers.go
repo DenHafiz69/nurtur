@@ -28,7 +28,11 @@ func (s *Server) handleTimerFragment(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.writeFragments(w, r, http.StatusOK, "timer", data, false, reconcileOOB, "", false, "", "")
+	oob := reconcileOOB
+	if onTimeline(r) {
+		oob = timelineOOB(oob, "timer")
+	}
+	s.writeFragments(w, r, http.StatusOK, "timer", data, false, oob, "", false, "", "")
 }
 
 func (s *Server) handleStartFeed(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +46,7 @@ func (s *Server) handleStartFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = s.store.CreateFeed(r.Context(), side, s.clock.Now())
+	created, err := s.store.CreateFeed(r.Context(), side, s.clock.Now())
 	toast := &view.Toast{Message: "Nursing " + strings.ToLower(side.Title()) + ".", Kind: "success"}
 	switch {
 	case err == nil:
@@ -55,7 +59,14 @@ func (s *Server) handleStartFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
+	opts := mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Feed, created.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "insert"
+		}
+	}
+	s.respond(w, r, opts)
 }
 
 func (s *Server) handleSwitchFeed(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +84,7 @@ func (s *Server) handleSwitchFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = s.store.SwitchFeed(r.Context(), id, side, s.clock.Now())
+	updated, err := s.store.SwitchFeed(r.Context(), id, side, s.clock.Now())
 	toast := &view.Toast{Message: "Switched to " + strings.ToLower(side.Title()) + ".", Kind: "success"}
 	switch {
 	case err == nil:
@@ -90,7 +101,14 @@ func (s *Server) handleSwitchFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
+	opts := mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Feed, updated.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "update"
+		}
+	}
+	s.respond(w, r, opts)
 }
 
 func (s *Server) handleStopFeed(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +133,14 @@ func (s *Server) handleStopFeed(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.respond(w, r, mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true})
+	opts := mutateResponse{Toast: toast, Trigger: "sheet-saved", TriggerAfterSwap: true}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Feed, stopped.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "update"
+		}
+	}
+	s.respond(w, r, opts)
 }
 
 func (s *Server) handleDeleteFeed(w http.ResponseWriter, r *http.Request) {

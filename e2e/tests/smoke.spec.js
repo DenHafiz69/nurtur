@@ -70,6 +70,26 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.locator('input[name="night_start"]')).toHaveValue("20:00");
   });
 
+  test("history collapses quick logging into an expandable drawer", async ({ page }) => {
+    await page.goto("/timeline");
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+
+    const drawer = page.locator("details.dock-drawer");
+    const toggle = page.locator(".dock-toggle");
+    await expect(drawer).not.toHaveAttribute("open", "");
+    await expect(toggle).toBeVisible();
+
+    await toggle.click();
+    await expect(drawer).toHaveAttribute("open", "");
+    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Wet", exact: true }).click();
+    await expect(page.getByText(/Wet diaper( was just)? logged\./)).toBeVisible();
+
+    await toggle.click();
+    await expect(drawer).not.toHaveAttribute("open", "");
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);

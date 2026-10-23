@@ -92,6 +92,81 @@ func TestHistoryDaySummaryRefreshesAfterTimerMutation(t *testing.T) {
 	}
 }
 
+func TestDiaperQuickLogFromHistoryInsertsTodayRow(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+
+	// The history page already has a today group, so the new row can be
+	// prepended to it instead of replacing the whole list.
+	if _, _, err := env.store.CreateDiaper(ctx, diaper.Wet, testNow.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	form := url.Values{"type": {"dirty"}, "timeline_today": {"1"}}
+	req := httptest.NewRequest(http.MethodPost, "/diapers", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Current-URL", "http://example.test/timeline")
+	rec := httptest.NewRecorder()
+	env.handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("HX-Retarget"); got != "#timeline-events-2026-10-20" {
+		t.Errorf("HX-Retarget = %q", got)
+	}
+	if got := rec.Header().Get("HX-Reswap"); got != "afterbegin" {
+		t.Errorf("HX-Reswap = %q", got)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`id="row-diaper-2"`,
+		`id="day-head-2026-10-20"`,
+		`id="toast-region"`,
+		"Dirty diaper logged.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("history quick log missing %q\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, `id="status-strip"`) {
+		t.Errorf("history quick log should not target the dashboard status strip:\n%s", body)
+	}
+}
+
+func TestDiaperQuickLogFromEmptyHistoryRefreshesList(t *testing.T) {
+	env := newTestEnv(t)
+
+	form := url.Values{"type": {"wet"}}
+	req := httptest.NewRequest(http.MethodPost, "/diapers", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Current-URL", "http://example.test/timeline")
+	rec := httptest.NewRecorder()
+	env.handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("HX-Retarget"); got != "#timeline-list" {
+		t.Errorf("HX-Retarget = %q", got)
+	}
+	if got := rec.Header().Get("HX-Reswap"); got != "innerHTML" {
+		t.Errorf("HX-Reswap = %q", got)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`id="timeline-events-2026-10-20"`,
+		`id="toast-region"`,
+		"Wet diaper logged.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("empty-history quick log missing %q\n%s", want, body)
+		}
+	}
+}
+
 func TestTimelineDeleteAndUndoRestoresInPlace(t *testing.T) {
 	env := newTestEnv(t)
 	ctx := context.Background()

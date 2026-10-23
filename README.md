@@ -175,6 +175,9 @@ service.
   refused with a plain-language message, and restoring an open feed while
   another feed is running is refused.
 - Undo is also available on the dashboard's today list for all three event types.
+- On `/timeline` the quick-log dock starts collapsed as a floating `+` button so
+  the day cards get the whole screen. Opening it logs in place: the new row is
+  inserted into today's group and the header totals refresh without a reload.
 
 ### Night mode, install, and offline
 
@@ -243,6 +246,8 @@ Every mutation is a real `<form>` with a `method` and `action`:
 - The three status cards fit at 360 px; below 360 px they become three slim
   rows. The dock stays in the bottom third with the feed, diaper, and sleep
   tiers in a fixed order.
+- The dock is a native `<details>` drawer, so it works without JavaScript. Home
+  opens it by default; History and the FAB share the same markup.
 - All touch targets are at least 48×48 px; primary buttons are 56–64 px.
 - `prefers-reduced-motion` removes the glow, blink, and transitions.
 

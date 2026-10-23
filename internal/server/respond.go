@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"time"
 
 	"nurtur/internal/feed"
 	"nurtur/internal/view"
@@ -52,6 +53,7 @@ type mutateResponse struct {
 	Reswap           string
 	Edit             *view.EditView
 	Row              *view.EventRow
+	RowMode          string // insert or update a history row after a quick log
 	Redirect         string
 	ExtraOOB         []string
 	Apply            func(*view.PageData)
@@ -104,21 +106,103 @@ func (s *Server) respond(w http.ResponseWriter, r *http.Request, opts mutateResp
 		opts.Apply(data)
 	}
 
-	oob := mutationOOB(opts.Primary)
+	// Diaper forms target the always-present toast region so the request can
+	// be sent from either page. Point dashboard responses back at the status
+	// strip; the history page rewrites the response below.
+	onHistory := onTimeline(r)
+	if opts.Primary == "status-strip" && !onHistory {
+		opts.Retarget = "#status-strip"
+		opts.Reswap = "outerHTML"
+	}
+
+	// A quick log on the history page swaps the new or changed row directly
+	// into today's list. The dock's original primary fragment becomes an OOB
+	// companion so the timer and sleep pill still refresh in place.
+	primary := opts.Primary
+	oob := mutationOOB(primary)
 	if opts.Status >= 400 {
 		oob = nil
 	} else {
+		timelineHandled := false
+		if onHistory && opts.Row != nil && opts.RowMode != "" {
+			row := *opts.Row
+			if day, err := s.timelineDayView(r.Context(), row.Anchor); err == nil {
+				data.TimelineDay = day
+				data.Row = &row
+				switch opts.RowMode {
+				case "insert":
+					if r.PostFormValue("timeline_today") == "1" {
+						opts.Primary = "timeline-row-fragment"
+						opts.Retarget = "#timeline-events-" + row.DayKey
+						opts.Reswap = "afterbegin"
+						oob = append(oob, "timeline-day-oob")
+						timelineHandled = true
+					} else if page, err := s.buildTimeline(r.Context(), time.Time{}, defaultTimelineLimit); err == nil {
+						// This page had no today group (empty history or a
+						// paginated older day), so refresh the first page.
+						opts.Primary = "timeline-days"
+						opts.Retarget = "#timeline-list"
+						opts.Reswap = "innerHTML"
+						data.Timeline = page
+						data.TimelineDay = nil
+						timelineHandled = true
+					}
+				case "update":
+					opts.Primary = "timeline-row-fragment"
+					opts.Retarget = "#" + row.RowID
+					opts.Reswap = "outerHTML"
+					oob = append(oob, "timeline-day-oob")
+					timelineHandled = true
+				}
+				if timelineHandled {
+					switch primary {
+					case "timer":
+						opts.TimerOOB = true
+					case "sleep-pill":
+						oob = append(oob, "sleep-pill-oob")
+					}
+				}
+			}
+		}
 		// Timer and sheet mutations can happen from the history page too. Keep
 		// today's day header in sync with whatever just changed.
-		if data.TimelineDay == nil && onTimeline(r) {
+		if !timelineHandled && data.TimelineDay == nil && onHistory {
 			if day, err := s.timelineDayView(r.Context(), s.clock.Now().UTC()); err == nil {
 				data.TimelineDay = day
 				opts.ExtraOOB = append(opts.ExtraOOB, "timeline-day-oob")
 			}
 		}
 		oob = append(oob, opts.ExtraOOB...)
+		if onHistory {
+			if opts.Primary == "status-strip" {
+				opts.Primary = "toast-primary"
+				opts.Retarget = "#toast-region"
+				opts.Reswap = "innerHTML"
+			}
+			oob = timelineOOB(oob, opts.Primary)
+		}
 	}
 	s.writeFragments(w, r, opts.Status, opts.Primary, data, opts.TimerOOB, oob, opts.Trigger, opts.TriggerAfterSwap, opts.Retarget, opts.Reswap)
+}
+
+// timelineOOB drops companions that only exist on the dashboard.
+func timelineOOB(oob []string, primary string) []string {
+	if len(oob) == 0 {
+		return oob
+	}
+	out := make([]string, 0, len(oob))
+	for _, name := range oob {
+		switch name {
+		case "status-strip-oob", "timeline-today-oob":
+			continue
+		case "toast-oob":
+			if primary == "toast" || primary == "toast-primary" {
+				continue
+			}
+		}
+		out = append(out, name)
+	}
+	return out
 }
 
 // renderMutation is the standard successful mutation response: a primary
