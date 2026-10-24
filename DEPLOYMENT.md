@@ -4,9 +4,11 @@ How to run Nurtur on a VPS using the image built by CI, alongside an existing
 Docker Compose stack and Caddy reverse proxy.
 
 CI publishes `ghcr.io/denhafiz69/nurtur` on every push to `main` and every `v*`
-tag. Runtime configuration stays on the VPS — nothing in `.env-example` belongs
-in GitHub secrets. The workflow only uses the automatic `GITHUB_TOKEN` to push
-the image.
+tag. `latest` follows `main`; `stable` advances only when a `v*` tag is pushed,
+which makes it the right moving channel for a server that updates itself.
+Runtime configuration stays on the VPS — nothing in `.env-example` belongs in
+GitHub secrets. The workflow only uses the automatic `GITHUB_TOKEN` to push the
+image.
 
 ## What you need
 
@@ -78,7 +80,7 @@ other services. Merge the `volumes` section if you already have one.
 ```yaml
 services:
   nurtur:
-    image: ghcr.io/denhafiz69/nurtur:latest
+    image: ghcr.io/denhafiz69/nurtur:stable
     restart: unless-stopped
     env_file:
       - /etc/nurtur/nurtur.env
@@ -178,10 +180,11 @@ the runtime will not collect aggressively enough to avoid it.
 The image already defines a `HEALTHCHECK`, so Compose reports `(healthy)`
 without any extra configuration.
 
-### Private image
+### Private image (optional)
 
-The GHCR package is private until you change it in the package settings. If it
-stays private, log in on the VPS with a token that has `read:packages`:
+This guide assumes the GHCR package is public, so the VPS needs no registry
+login. If the package is private, log in on the VPS with a token that has
+`read:packages`:
 
 ```sh
 echo "$GHCR_TOKEN" | docker login ghcr.io -u DenHafiz69 --password-stdin
@@ -247,22 +250,114 @@ testing over plain HTTP.
 
 ## 5. Updates
 
+The VPS can follow the `stable` channel on its own. CI only moves `stable` when
+a `v*` tag is pushed, so a normal push to `main` never deploys automatically.
+
+### Automatic updates with a systemd timer
+
+First switch the Nurtur service to the moving channel and remove any local
+build block:
+
+```yaml
+    image: ghcr.io/denhafiz69/nurtur:stable
+    # no build: block
+```
+
+Then run the new image once by hand:
+
 ```sh
 cd /path/to/your/compose
 sudo docker compose pull nurtur
 sudo docker compose up -d nurtur
 ```
 
-`latest` moves with every green `main` build. For predictable upgrades, pin a
-release tag in the service definition:
+The repository ships the timer, service, and updater script in `deploy/`.
+Run these from a checkout of the repository (on the VPS or copied over):
 
-```yaml
-    image: ghcr.io/denhafiz69/nurtur:1.2.3
+```sh
+git clone --depth 1 https://github.com/DenHafiz69/nurtur.git /tmp/nurtur-deploy
+cd /tmp/nurtur-deploy
+
+sudo install -m 755 deploy/nurtur-update.sh /usr/local/bin/nurtur-update
+sudo install -d -m 755 /etc/nurtur
+sudo install -m 644 deploy/nurtur-update.env.example /etc/nurtur/update.env
+sudo editor /etc/nurtur/update.env
+sudo install -m 644 deploy/nurtur-update.service /etc/systemd/system/
+sudo install -m 644 deploy/nurtur-update.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nurtur-update.timer
+rm -rf /tmp/nurtur-deploy
 ```
 
-Take a snapshot before upgrading. Migrations run at startup and a new schema is
-not guaranteed to work with an older binary, so rolling the image tag back is
-not always a complete rollback.
+Set these two values in `/etc/nurtur/update.env`:
+
+```sh
+NURTUR_COMPOSE_FILE=/srv/nurtur/docker-compose.yml
+NURTUR_COMPOSE_SERVICE=nurtur
+```
+
+`NURTUR_COMPOSE_FILE` is the standalone Compose file that contains the Nurtur
+service. `NURTUR_COMPOSE_SERVICE` is the Compose service name, not the
+`container_name`.
+
+The timer runs three minutes after boot and then every fifteen minutes. It:
+
+1. pulls the current `stable` image;
+2. recreates only the Nurtur service with `up -d --no-deps`;
+3. waits for the container health check;
+4. removes dangling layers from old releases.
+
+Run a check immediately instead of waiting:
+
+```sh
+sudo systemctl start nurtur-update.service
+sudo journalctl -u nurtur-update.service -n 50 --no-pager
+```
+
+Check the timer itself with:
+
+```sh
+systemctl list-timers nurtur-update.timer
+```
+
+Pause automatic updates while doing maintenance or restoring a backup:
+
+```sh
+sudo systemctl disable --now nurtur-update.timer
+```
+
+Re-enable with `sudo systemctl enable --now nurtur-update.timer`.
+
+### Releasing
+
+```sh
+git tag v0.3.8
+git push origin v0.3.8
+```
+
+CI publishes the semver tag and moves `stable`; the VPS picks it up on the next
+timer tick. If the new container fails its health check, the unit exits with an
+error and the failure is visible in `journalctl`. Migrations are forward-only,
+so keep the backup schedule from §6 running; rolling the image back does not
+undo a schema change.
+
+### Manual update
+
+If the timer is disabled, the old command still works:
+
+```sh
+cd /path/to/your/compose
+sudo docker compose pull nurtur
+sudo docker compose up -d nurtur
+```
+
+`stable` moves only on release tags. If you need a specific build, pin it:
+
+```yaml
+    image: ghcr.io/denhafiz69/nurtur:0.3.8
+```
+
+Remember to return the service to `stable` before relying on the timer again.
 
 ## 6. Backups and restore
 
@@ -322,6 +417,15 @@ Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
 - **`read-only file system` in the logs**: with `read_only: true`, only `/data`
   and the `/tmp` tmpfs are writable. Keep both mounts; the Turso cache lives at
   `/tmp/turso-go`.
+- **Automatic updates do nothing**: confirm the service uses the `stable` tag,
+  that `/etc/nurtur/update.env` points at the right Compose file, and that the
+  timer is active with `systemctl list-timers nurtur-update.timer`. Run
+  `sudo systemctl start nurtur-update.service` and read
+  `journalctl -u nurtur-update.service`.
+- **Automatic update fails its health check**: inspect
+  `sudo docker compose -f /path/to/compose logs nurtur`. The updater exits
+  non-zero so the failure is visible in the journal. Restore the previous
+  semver tag and the matching backup if the schema changed.
 - **Exit code 137 / container killed while idle**: the memory limit is too
   tight. Raise `memory` and `GOMEMLIMIT` together, then check
   `docker stats nurtur` again.
@@ -336,16 +440,16 @@ Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
       `no-new-privileges`
 - [ ] A memory limit is set and `GOMEMLIMIT` sits below it
 - [ ] Backups run on a schedule and a restore has been tested
+- [ ] `nurtur-update.timer` is enabled and `/etc/nurtur/update.env` points at the
+      standalone Compose file
 - [ ] The GHCR token or package visibility is intentional
 - [ ] Runtime secrets were **not** added to GitHub; CI needs none
 
 ## CI/CD boundary
 
-The GitHub Actions workflow stops at publishing the image. This deployment is
-pull-based: the VPS pulls the tag you choose. If you later want automatic
-deploys, add a separate workflow with SSH credentials stored as GitHub
-environment secrets, and keep runtime `.env` values on the VPS rather than
-passing them as Docker build arguments.
+The GitHub Actions workflow stops at publishing the image. Deployment is
+pull-based: the VPS systemd timer pulls the `stable` tag, so GitHub never needs
+SSH access to the server and no runtime `.env` values leave the VPS.
 
 The systemd alternative remains in `deploy/nurtur.service` and
 `deploy/nurtur.env.example` for running the bare binary; do not use both.

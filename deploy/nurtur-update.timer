@@ -1,0 +1,12 @@
+[Unit]
+Description=Check for a new Nurtur release every 15 minutes
+Documentation=https://github.com/DenHafiz69/nurtur/blob/main/DEPLOYMENT.md
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+RandomizedDelaySec=45
+Unit=nurtur-update.service
+
+[Install]
+WantedBy=timers.target

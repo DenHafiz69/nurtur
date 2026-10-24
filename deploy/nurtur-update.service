@@ -1,0 +1,14 @@
+[Unit]
+Description=Pull and deploy the latest Nurtur release
+Documentation=https://github.com/DenHafiz69/nurtur/blob/main/DEPLOYMENT.md
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/nurtur/update.env
+ExecStart=/usr/bin/flock -n /run/lock/nurtur-update.lock /usr/local/bin/nurtur-update
+TimeoutStartSec=180
+Nice=10
+IOSchedulingClass=idle
