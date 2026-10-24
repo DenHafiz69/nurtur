@@ -65,6 +65,7 @@ func (s *Server) welcomePageData(r *http.Request, next string) (*view.PageData, 
 		BabyName:      profile.Name,
 		BabyBirthDate: birthDate,
 		BabyGender:    profile.Gender,
+		MascotName:    profile.Mascot,
 		MaxBirthDate:  s.todayISO(),
 		Next:          next,
 	}, nil
@@ -116,6 +117,7 @@ func (s *Server) handleSaveWelcome(w http.ResponseWriter, r *http.Request) {
 	rawGender := strings.TrimSpace(r.FormValue("baby_gender"))
 	birthDate, birthErr := parseBirthDate(rawBirthDate, s.clock.Now(), s.loc)
 	gender, genderErr := parseBabyGender(rawGender)
+	mascot, mascotErr := parseMascot(r.FormValue("mascot"))
 
 	data, err := s.welcomePageData(r, next)
 	if err != nil {
@@ -124,6 +126,10 @@ func (s *Server) handleSaveWelcome(w http.ResponseWriter, r *http.Request) {
 	}
 	data.BabyBirthDate = rawBirthDate
 	data.BabyGender = rawGender
+	data.MascotName = mascot
+	if mascotErr != nil {
+		data.MascotName = ""
+	}
 	switch {
 	case birthErr != nil:
 		data.ProfileError = birthDateMessage(birthErr)
@@ -133,11 +139,16 @@ func (s *Server) handleSaveWelcome(w http.ResponseWriter, r *http.Request) {
 		data.ProfileError = genderMessage(genderErr)
 		s.renderNamed(w, r, http.StatusUnprocessableEntity, "welcome", data)
 		return
+	case mascotErr != nil:
+		data.ProfileError = mascotMessage(mascotErr)
+		s.renderNamed(w, r, http.StatusUnprocessableEntity, "welcome", data)
+		return
 	}
 
 	if err := s.store.SetSettingsOnce(r.Context(), map[string]string{
 		settingBabyBirthDate: birthDate.Format("2006-01-02"),
 		settingBabyGender:    gender,
+		settingMascot:        mascot,
 	}); err != nil {
 		s.serverError(w, r, err)
 		return

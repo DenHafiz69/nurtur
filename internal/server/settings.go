@@ -21,6 +21,7 @@ const (
 	settingBabyName         = "baby_name"
 	settingBabyBirthDate    = "baby_birth_date"
 	settingBabyGender       = "baby_gender"
+	settingMascot           = "mascot"
 	settingFeedAlertMinutes = "feed_alert_minutes"
 
 	babyGenderGirl = "girl"
@@ -45,6 +46,7 @@ var (
 	errBirthDateTooOld   = errors.New("baby birth date must be within the last 5 years")
 	errGenderRequired    = errors.New("baby gender is required")
 	errGenderInvalid     = errors.New("baby gender must be girl or boy")
+	errMascotInvalid     = errors.New("mascot must be pip or cat")
 	errFeedAlertInvalid  = errors.New("feed alert minutes must be a whole number from 0 to 120")
 )
 
@@ -54,6 +56,7 @@ type babyProfile struct {
 	Name      string
 	BirthDate time.Time
 	Gender    string
+	Mascot    string
 	Complete  bool
 }
 
@@ -91,6 +94,11 @@ func (s *Server) currentBabyProfile(ctx context.Context) (babyProfile, error) {
 	switch values[settingBabyGender] {
 	case babyGenderGirl, babyGenderBoy:
 		profile.Gender = values[settingBabyGender]
+	}
+	if mascot, err := parseMascot(values[settingMascot]); err == nil {
+		profile.Mascot = mascot
+	} else {
+		profile.Mascot = view.MascotPip
 	}
 	profile.Complete = !profile.BirthDate.IsZero() && profile.Gender != ""
 	return profile, nil
@@ -172,6 +180,41 @@ func genderMessage(err error) string {
 	default:
 		return "Choose Girl or Boy."
 	}
+}
+
+// parseMascot normalizes the mascot choice. An empty value keeps the original
+// Pip default so older installs and forms without a picker still work.
+func parseMascot(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", view.MascotPip:
+		return view.MascotPip, nil
+	case view.MascotCat:
+		return view.MascotCat, nil
+	default:
+		return "", errMascotInvalid
+	}
+}
+
+// mascotMessage renders a parseMascot error as copy for the forms.
+func mascotMessage(err error) string {
+	if errors.Is(err, errMascotInvalid) {
+		return "Choose " + view.MascotLabel(view.MascotPip) + " or " + view.MascotLabel(view.MascotCat) + "."
+	}
+	return "That mascot doesn't look right. Try again?"
+}
+
+// currentMascot returns the account's mascot, falling back to Pip when the
+// stored value is missing or unreadable.
+func (s *Server) currentMascot(ctx context.Context) string {
+	raw, ok, err := s.store.Setting(ctx, settingMascot)
+	if err != nil || !ok {
+		return view.MascotPip
+	}
+	mascot, err := parseMascot(raw)
+	if err != nil {
+		return view.MascotPip
+	}
+	return mascot
 }
 
 // parseBabyName trims and collapses whitespace so a name typed with stray
@@ -402,7 +445,39 @@ func (s *Server) handleSaveFeedAlert(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status int, settings *view.SettingsView, toast *view.Toast) {
+func (s *Server) handleSaveMascot(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+	mascot, parseErr := parseMascot(r.FormValue("mascot"))
+	settings, err := s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if parseErr != nil {
+		settings.MascotErr = mascotMessage(parseErr)
+		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
+		return
+	}
+	if err := s.store.SetSettings(r.Context(), map[string]string{settingMascot: mascot}); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	settings, err = s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.respondSettings(w, r, http.StatusOK, settings, &view.Toast{
+		Message: "Mascot saved.",
+		Kind:    "success",
+	}, "header-mascot-oob")
+}
+
+func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status int, settings *view.SettingsView, toast *view.Toast, extraOOB ...string) {
+	oob := append([]string{"baby-heading-oob"}, extraOOB...)
 	s.respond(w, r, mutateResponse{
 		Status:   status,
 		Primary:  "settings-panel",
@@ -410,10 +485,14 @@ func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status 
 		Retarget: "#settings-panel",
 		Reswap:   "outerHTML",
 		Redirect: "/settings",
-		// The header's name and age live outside #settings-panel, so refresh
-		// them out-of-band instead of waiting for the next full page load.
-		ExtraOOB: []string{"baby-heading-oob"},
-		Apply:    func(data *view.PageData) { data.View = "settings"; data.Settings = settings },
+		// The header's mascot and name/age live outside #settings-panel, so
+		// refresh them out-of-band instead of waiting for the next full page.
+		ExtraOOB: oob,
+		Apply: func(data *view.PageData) {
+			data.View = "settings"
+			data.Settings = settings
+			data.MascotName = settings.Mascot
+		},
 	})
 }
 
@@ -427,6 +506,7 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 		AuthEnabled: s.auth.enabled(),
 		NightStart:  formatClockValue(nightStart),
 		NightEnd:    formatClockValue(nightEnd),
+		Mascot:      s.currentMascot(ctx),
 
 		FeedAlertMinutes: s.feedAlertMinutes(ctx),
 

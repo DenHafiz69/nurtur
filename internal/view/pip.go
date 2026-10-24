@@ -21,7 +21,7 @@ const pipCheeks = `
 
 // pipOpen holds the trusted opening tag for each pose. Keeping them typed and
 // precomposed means no user-supplied string ever reaches the SVG wrapper.
-const pipViewBox = `" viewBox="0 0 120 120" aria-hidden="true" focusable="false">`
+const pipViewBox = `" data-mascot="pip" viewBox="0 0 120 120" aria-hidden="true" focusable="false">`
 
 var pipOpen = map[string]template.HTML{
 	"awake":    `<svg class="pip-svg pip-awake` + pipViewBox,

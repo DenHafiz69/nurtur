@@ -1,0 +1,36 @@
+{{define "header-mascot"}}
+<span id="header-mascot" class="pip pip-header">
+  <span class="pip-day">{{.Mascot "awake"}}</span>
+  <span class="pip-night">{{.Mascot "sleeping"}}</span>
+</span>
+{{end}}
+
+{{define "header-mascot-oob"}}
+<span id="header-mascot" class="pip pip-header" hx-swap-oob="outerHTML">
+  <span class="pip-day">{{.Mascot "awake"}}</span>
+  <span class="pip-night">{{.Mascot "sleeping"}}</span>
+</span>
+{{end}}
+
+{{define "mascot-field"}}
+<div class="field">
+  <span class="field-label">Mascot</span>
+  {{template "mascot-picker" .}}
+</div>
+{{end}}
+
+{{define "mascot-picker"}}
+<fieldset class="mascot-picker">
+  <legend class="sr-only">Mascot</legend>
+  <label class="mascot-choice">
+    <input class="sr-only" type="radio" name="mascot" value="pip"{{if ne .MascotName "cat"}} checked{{end}}>
+    <span class="mascot-choice-art" aria-hidden="true">{{mascot "pip" "awake"}}</span>
+    <span class="mascot-choice-copy"><strong>{{mascotLabel "pip"}}</strong><small>Little sprout</small></span>
+  </label>
+  <label class="mascot-choice">
+    <input class="sr-only" type="radio" name="mascot" value="cat"{{if eq .MascotName "cat"}} checked{{end}}>
+    <span class="mascot-choice-art" aria-hidden="true">{{mascot "cat" "awake"}}</span>
+    <span class="mascot-choice-copy"><strong>{{mascotLabel "cat"}}</strong><small>Cosy cat</small></span>
+  </label>
+</fieldset>
+{{end}}

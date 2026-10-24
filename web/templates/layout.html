@@ -44,10 +44,7 @@
     <header class="app-header">
       <div class="header-row">
         <div class="brand">
-          <span class="pip pip-header">
-            <span class="pip-day">{{pip "awake"}}</span>
-            <span class="pip-night">{{pip "sleeping"}}</span>
-          </span>
+          {{template "header-mascot" .}}
           {{template "baby-heading" .}}
         </div>
         <div class="header-actions">

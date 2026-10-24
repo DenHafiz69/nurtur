@@ -14,10 +14,13 @@ type PageData struct {
 	BabyName        string
 	BabyAge         string
 	BabyGenderLabel string
-	Greeting        string
-	TodayLabel      string
-	Now             time.Time
-	Location        *time.Location
+	// MascotName is the character shown in the header and empty states. Empty
+	// falls back to Pip when rendered.
+	MascotName string
+	Greeting   string
+	TodayLabel string
+	Now        time.Time
+	Location   *time.Location
 
 	// View selects the page body inside layout.html: "" or "dashboard",
 	// "timeline", "settings".
@@ -216,6 +219,9 @@ type SettingsView struct {
 	NightStart  string
 	NightEnd    string
 	NightErr    string
+
+	Mascot    string
+	MascotErr string
 
 	FeedAlertMinutes int
 	FeedAlertErr     string

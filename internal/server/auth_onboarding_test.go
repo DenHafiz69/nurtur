@@ -45,7 +45,7 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		t.Fatalf("signup page = %d", rec.Code)
 	}
 	body = rec.Body.String()
-	for _, want := range []string{"Secret key", "Username", "Baby's name", "date of birth", "Gender", "Confirm password", "Create account"} {
+	for _, want := range []string{"Secret key", "Username", "Baby's name", "date of birth", "Gender", "Mascot", "Mochi", "Confirm password", "Create account"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("signup page missing %q\n%s", want, body)
 		}
@@ -76,6 +76,7 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		"baby_name":        {"  Aisyah  "},
 		"baby_birth_date":  {"2026-06-20"},
 		"baby_gender":      {"girl"},
+		"mascot":           {"cat"},
 		"password":         {"correct horse"},
 		"confirm_password": {"correct horse"},
 		"next":             {"/settings"},
@@ -105,6 +106,10 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 	storedGender, ok, err := env.store.Setting(acctCtx, settingBabyGender)
 	if err != nil || !ok || storedGender != "girl" {
 		t.Fatalf("stored baby_gender = %q, ok=%v, err=%v", storedGender, ok, err)
+	}
+	storedMascot, ok, err := env.store.Setting(acctCtx, settingMascot)
+	if err != nil || !ok || storedMascot != "cat" {
+		t.Fatalf("stored mascot = %q, ok=%v, err=%v", storedMascot, ok, err)
 	}
 
 	// Signup stays open for anyone with the secret key. Each account gets its

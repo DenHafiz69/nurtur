@@ -34,6 +34,7 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 		BabyName:        profile.Name,
 		BabyAge:         view.FormatBabyAge(profile.BirthDate, now, s.loc),
 		BabyGenderLabel: babyGenderLabel(profile.Gender),
+		MascotName:      profile.Mascot,
 		Now:             now,
 		Location:        s.loc,
 		Toast:           toast,

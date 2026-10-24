@@ -30,6 +30,18 @@
     </dl>
   </section>
 
+  <section class="settings-card" aria-labelledby="settings-mascot">
+    <h3 id="settings-mascot" class="settings-title">Mascot</h3>
+    <p class="settings-note">Choose the little character who keeps you company.</p>
+    <form class="settings-form" method="post" action="/settings/mascot" hx-post="/settings/mascot" hx-target="#settings-panel" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      {{template "mascot-picker" .}}
+      {{if .Settings.MascotErr}}<p class="field-error" role="alert">{{.Settings.MascotErr}}</p>{{end}}
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">Save mascot</button>
+      </div>
+    </form>
+  </section>
+
   <section class="settings-card" aria-labelledby="settings-night">
     <h3 id="settings-night" class="settings-title">Night window</h3>
     <p class="settings-note">Sleep is split into day and night using these hours. Night mode also follows them.</p>

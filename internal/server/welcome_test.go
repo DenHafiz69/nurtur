@@ -55,7 +55,7 @@ func TestExistingAccountCompletesBabyProfileOnce(t *testing.T) {
 		t.Fatalf("welcome = %d\n%s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"One more thing", "Aisyah", "date of birth", "Girl", "Boy", "can't be changed"} {
+	for _, want := range []string{"One more thing", "Aisyah", "date of birth", "Girl", "Boy", "Mascot", "Mochi", "can't be changed"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("welcome missing %q\n%s", want, body)
 		}
@@ -74,6 +74,7 @@ func TestExistingAccountCompletesBabyProfileOnce(t *testing.T) {
 	rec = doWith(t, env, http.MethodPost, "/welcome", url.Values{
 		"baby_birth_date": {"2026-06-20"},
 		"baby_gender":     {"girl"},
+		"mascot":          {"cat"},
 		"next":            {"/"},
 	}, session)
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
@@ -92,6 +93,10 @@ func TestExistingAccountCompletesBabyProfileOnce(t *testing.T) {
 	gender, ok, err := env.store.Setting(acctCtx, settingBabyGender)
 	if err != nil || !ok || gender != "girl" {
 		t.Fatalf("stored gender = %q ok=%v err=%v", gender, ok, err)
+	}
+	mascot, ok, err := env.store.Setting(acctCtx, settingMascot)
+	if err != nil || !ok || mascot != "cat" {
+		t.Fatalf("stored mascot = %q ok=%v err=%v", mascot, ok, err)
 	}
 
 	rec = doWith(t, env, http.MethodGet, "/", nil, session)
@@ -116,8 +121,9 @@ func TestExistingAccountCompletesBabyProfileOnce(t *testing.T) {
 	}
 	born, _, _ = env.store.Setting(acctCtx, settingBabyBirthDate)
 	gender, _, _ = env.store.Setting(acctCtx, settingBabyGender)
-	if born != "2026-06-20" || gender != "girl" {
-		t.Fatalf("profile changed on replay: born=%q gender=%q", born, gender)
+	mascot, _, _ = env.store.Setting(acctCtx, settingMascot)
+	if born != "2026-06-20" || gender != "girl" || mascot != "cat" {
+		t.Fatalf("profile changed on replay: born=%q gender=%q mascot=%q", born, gender, mascot)
 	}
 }
 
@@ -149,6 +155,9 @@ func TestWelcomePromptWithoutAuth(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "Boy") {
 		t.Errorf("dashboard missing gender label:\n%s", rec.Body.String())
+	}
+	if mascot, ok, err := env.store.Setting(context.Background(), settingMascot); err != nil || !ok || mascot != "pip" {
+		t.Fatalf("default mascot = %q ok=%v err=%v", mascot, ok, err)
 	}
 }
 

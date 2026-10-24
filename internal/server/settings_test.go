@@ -245,3 +245,91 @@ func TestSettingsPageCarriesActiveFeedForAlert(t *testing.T) {
 		t.Fatalf("settings panel does not carry the alert threshold:\n%s", body)
 	}
 }
+
+func TestSaveMascotUpdatesHeaderAndSettings(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+
+	rec := env.do(t, http.MethodGet, "/settings", nil, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `value="pip" checked`) {
+		t.Fatalf("settings does not start on Pip:\n%s", rec.Body.String())
+	}
+
+	rec = env.do(t, http.MethodPost, "/settings/mascot", url.Values{
+		"mascot": {"cat"},
+	}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save mascot = %d\n%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Mascot saved.",
+		`id="header-mascot" class="pip pip-header" hx-swap-oob="outerHTML"`,
+		`data-mascot="cat"`,
+		`value="cat" checked`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("save response missing %q\n%s", want, body)
+		}
+	}
+
+	stored, ok, err := env.store.Setting(ctx, settingMascot)
+	if err != nil || !ok || stored != "cat" {
+		t.Fatalf("stored mascot = %q, ok=%v, err=%v", stored, ok, err)
+	}
+
+	rec = env.do(t, http.MethodGet, "/", nil, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `data-mascot="cat"`) {
+		t.Fatalf("dashboard does not use the saved mascot:\n%s", rec.Body.String())
+	}
+}
+
+func TestMascotDefaultsToPip(t *testing.T) {
+	env := newTestEnv(t)
+
+	rec := env.do(t, http.MethodGet, "/", nil, false)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `data-mascot="pip"`) {
+		t.Fatalf("dashboard does not default to Pip:\n%s", rec.Body.String())
+	}
+	if stored, ok, err := env.store.Setting(context.Background(), settingMascot); err != nil || ok {
+		t.Fatalf("default mascot was stored: %q ok=%v err=%v", stored, ok, err)
+	}
+}
+
+func TestMascotValidationRejectsUnknown(t *testing.T) {
+	env := newTestEnv(t)
+
+	rec := env.do(t, http.MethodPost, "/settings/mascot", url.Values{
+		"mascot": {"dog"},
+	}, true)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown mascot = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Choose Pip or Mochi.") {
+		t.Fatalf("unknown mascot response missing error:\n%s", rec.Body.String())
+	}
+	if stored, ok, err := env.store.Setting(context.Background(), settingMascot); err != nil || ok {
+		t.Fatalf("invalid mascot was stored: %q ok=%v err=%v", stored, ok, err)
+	}
+}
+
+func TestParseMascot(t *testing.T) {
+	cases := map[string]string{
+		"":        "pip",
+		"  PIP  ": "pip",
+		"cat":     "cat",
+		" Cat ":   "cat",
+	}
+	for raw, want := range cases {
+		got, err := parseMascot(raw)
+		if err != nil || got != want {
+			t.Errorf("parseMascot(%q) = %q, %v, want %q", raw, got, err, want)
+		}
+	}
+	if _, err := parseMascot("dog"); err != errMascotInvalid {
+		t.Fatalf("parseMascot(dog) = %v, want %v", err, errMascotInvalid)
+	}
+	if got := mascotMessage(errMascotInvalid); got != "Choose Pip or Mochi." {
+		t.Errorf("mascotMessage = %q", got)
+	}
+}

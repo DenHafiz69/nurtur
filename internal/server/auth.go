@@ -485,6 +485,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	rawBabyName := r.FormValue("baby_name")
 	rawBirthDate := r.FormValue("baby_birth_date")
 	rawGender := r.FormValue("baby_gender")
+	rawMascot := r.FormValue("mascot")
 	password := r.FormValue("password")
 	confirm := r.FormValue("confirm_password")
 	reject := func(status int, message string) {
@@ -493,6 +494,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		data.BabyName = rawBabyName
 		data.BabyBirthDate = rawBirthDate
 		data.BabyGender = rawGender
+		data.MascotName = rawMascot
 		data.SignupError = message
 		s.renderNamed(w, r, status, "login", data)
 	}
@@ -531,6 +533,11 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusBadRequest, genderMessage(err))
 		return
 	}
+	mascot, err := parseMascot(rawMascot)
+	if err != nil {
+		reject(http.StatusBadRequest, mascotMessage(err))
+		return
+	}
 
 	hash, err := account.HashPassword(password)
 	if err != nil {
@@ -543,6 +550,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 			settingBabyName:      babyName,
 			settingBabyBirthDate: birthDate.Format("2006-01-02"),
 			settingBabyGender:    gender,
+			settingMascot:        mascot,
 		},
 		s.clock.Now(),
 	)

@@ -1907,6 +1907,40 @@ textarea {
   opacity: 0.7;
 }
 
+.cat-ear {
+  fill: var(--pip-body);
+  stroke: var(--pip-line);
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+}
+
+.cat-ear-inner {
+  fill: var(--pip-cheek);
+  opacity: 0.75;
+}
+
+.cat-nose {
+  fill: var(--pip-cheek);
+  stroke: var(--pip-line);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.cat-whisker {
+  fill: none;
+  stroke: var(--pip-line);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+.cat-tail {
+  fill: none;
+  stroke: var(--pip-line);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
 .pip-awake .pip-eye {
   transform-box: fill-box;
   transform-origin: center;
@@ -2583,6 +2617,61 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.mascot-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mascot-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+
+.mascot-choice:has(input:checked) {
+  border-color: var(--coral);
+  background: var(--surface);
+  box-shadow: 0 3px 0 var(--shadow);
+}
+
+.mascot-choice:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.mascot-choice-art {
+  flex: none;
+  width: 42px;
+}
+
+.mascot-choice-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.mascot-choice-copy strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mascot-choice-copy small {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .settings-wide {

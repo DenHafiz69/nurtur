@@ -20,7 +20,8 @@ type Renderer struct {
 func NewRenderer(fsys fs.FS, assetVersion string) (*Renderer, error) {
 	funcs := template.FuncMap{
 		"icon":        Icon,
-		"pip":         Pip,
+		"mascot":      Figure,
+		"mascotLabel": MascotLabel,
 		"duration":    FormatDuration,
 		"timer":       FormatTimer,
 		"iso":         ISO,

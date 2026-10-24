@@ -26,7 +26,7 @@
 </head>
 <body class="auth-body">
   <main class="auth-card">
-    <span class="pip auth-pip">{{pip "awake"}}</span>
+    <span class="pip auth-pip">{{.Mascot "awake"}}</span>
     <h1 class="auth-title">One more thing</h1>
     <p class="auth-copy">Tell us when {{if .BabyName}}{{.BabyName}}{{else}}your baby{{end}} was born so we can show how old they are on the homepage.</p>
 
@@ -44,11 +44,12 @@
           <option value="boy"{{if eq .BabyGender "boy"}} selected{{end}}>Boy</option>
         </select>
       </label>
+      {{template "mascot-field" .}}
       {{if .ProfileError}}<p class="field-error" role="alert">{{.ProfileError}}</p>{{end}}
       <button type="submit" class="btn btn-primary auth-submit">{{icon "check"}}<span>Save and continue</span></button>
     </form>
 
-    <p class="auth-note">These details can't be changed later. The baby's name can still be edited on Settings.</p>
+    <p class="auth-note">Date of birth and gender can't be changed later. The baby's name and mascot can still be edited on Settings.</p>
   </main>
 </body>
 </html>{{end}}

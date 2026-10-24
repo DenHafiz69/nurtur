@@ -2,7 +2,7 @@
 <div id="timer-card" class="timer-card {{if .Active}}is-nursing{{else}}is-idle{{end}}"{{if .TimerOOB}} hx-swap-oob="outerHTML"{{end}} data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-feed-id="{{.ID}}" data-side="{{.Side}}" data-started-at="{{iso .StartedAt}}" data-server-now="{{iso .ServerNow}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{end}}>
   {{if .Active}}
     <div class="timer-display">
-      <span class="timer-pip">{{pip "nursing"}}</span>
+      <span class="timer-pip">{{.Mascot "nursing"}}</span>
       <div class="timer-copy">
         <p class="timer-label">Nursing <strong>{{.Active.SideTitle}}</strong></p>
         <p class="timer-digits" data-timer-digits>{{timer .Active.Elapsed}}</p>
