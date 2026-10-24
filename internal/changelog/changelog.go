@@ -30,7 +30,7 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
-		Version: "v0.3.9",
+		Version: "v0.4.0",
 		Date:    "Oct 24, 2026",
 		Title:   "Invite the people you trust",
 		Summary: "A small admin screen generates one-use magic links, so nobody has to type the shared signup key.",
