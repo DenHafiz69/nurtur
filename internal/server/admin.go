@@ -257,6 +257,8 @@ func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	// #nosec G710 -- next has passed through safeAdminNext, which allows only
+	// same-origin paths under /admin.
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
