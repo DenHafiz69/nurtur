@@ -63,6 +63,13 @@ type PageData struct {
 	ProfileError  string
 	Next          string
 
+	// Invite state for the signup form. A valid invite replaces the shared
+	// secret key for one account creation.
+	InviteToken string
+	InviteValid bool
+	InviteLabel string
+	InviteError string
+
 	Toast     *Toast
 	Edit      *EditView
 	EditOpen  bool
@@ -373,4 +380,41 @@ type NursingSheetView struct {
 	HasLast   bool
 	LastSide  string
 	LastAgo   string
+}
+
+// AdminPageData backs the standalone admin screen. The admin is not a
+// household account, so this deliberately does not reuse PageData.
+type AdminPageData struct {
+	Nonce   string
+	Version string
+	CSRF    string
+
+	Notice string
+	Error  string
+	Next   string
+
+	// NewInviteURL is set only on the render immediately after generating a
+	// link. It is the only time the full token exists outside the invitee's URL.
+	NewInviteURL string
+
+	Invites  []AdminInviteRow
+	Accounts []AdminAccountRow
+}
+
+// AdminInviteRow is one invite in the admin table. Labels are preformatted in
+// the server timezone so the template stays logic-free.
+type AdminInviteRow struct {
+	ID           int64
+	Label        string
+	CreatedLabel string
+	ExpiresLabel string
+	Status       string
+	StatusTone   string
+	Active       bool
+}
+
+// AdminAccountRow is one household account in the read-only admin list.
+type AdminAccountRow struct {
+	Username     string
+	CreatedLabel string
 }

@@ -38,17 +38,35 @@
     {{if .SignupOpen}}<p class="auth-note">New here? You'll need the secret key from the person who set up this server.</p>{{end}}
 
     {{else if eq .AuthMode "signup"}}
+    {{if .InviteValid}}
+    <p class="auth-copy">You're invited to Nurtur. Set up your account and tell us who you're caring for.</p>
+    {{if .InviteLabel}}<p class="auth-note">Invitation for {{.InviteLabel}}</p>{{end}}
+    {{else if .InviteError}}
+    <p class="auth-copy">This invitation can't be used.</p>
+    <p class="field-error" role="alert">{{.InviteError}}</p>
+    <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Sign in</span></a>
+    {{else if .SignupOpen}}
     <p class="auth-copy">Set up your account and tell us who you're caring for.</p>
-    {{if .SignupOpen}}
+    {{else}}
+    <p class="auth-copy">Sign-ups are closed on this server.</p>
+    {{if .SignupError}}<p class="field-error" role="alert">{{.SignupError}}</p>{{end}}
+    <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Sign in</span></a>
+    {{end}}
+
+    {{if or .InviteValid .SignupOpen}}
     <form class="auth-form" method="post" action="/signup">
       <input type="hidden" name="next" value="{{.Next}}">
+      {{if .InviteValid}}
+      <input type="hidden" name="invite" value="{{.InviteToken}}">
+      {{else}}
       <label class="field">
-        <span class="field-label">Step 1 · Secret key</span>
+        <span class="field-label">Secret key</span>
         <input type="password" name="secret_key" autocomplete="off" required autofocus>
       </label>
+      {{end}}
       <label class="field">
-        <span class="field-label">Step 2 · Username</span>
-        <input type="text" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" required>
+        <span class="field-label">Username</span>
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="32" required{{if .InviteValid}} autofocus{{end}}>
       </label>
       <label class="field">
         <span class="field-label">Baby's name</span>
@@ -79,10 +97,6 @@
       <button type="submit" class="btn btn-primary auth-submit">{{icon "lock"}}<span>Create account</span></button>
     </form>
     <a class="auth-alt" href="/login?mode=signin&amp;next={{urlquery .Next}}">I already have an account</a>
-    {{else}}
-    <p class="auth-copy">Sign-ups are closed on this server.</p>
-    {{if .SignupError}}<p class="field-error" role="alert">{{.SignupError}}</p>{{end}}
-    <a class="btn btn-primary auth-submit" href="/login?mode=signin&amp;next={{urlquery .Next}}">{{icon "lock"}}<span>Sign in</span></a>
     {{end}}
 
     {{else}}

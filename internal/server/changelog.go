@@ -78,6 +78,8 @@ func (s *Server) handleDismissChangelog(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 	}
+	// #nosec G710 -- target is produced by safeNext, which allows only
+	// same-origin paths and rejects absolute or backslash-normalised targets.
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 

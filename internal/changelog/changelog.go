@@ -30,6 +30,30 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.3.9",
+		Date:    "Oct 24, 2026",
+		Title:   "Invite the people you trust",
+		Summary: "A small admin screen generates one-use magic links, so nobody has to type the shared signup key.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"Admin screen at /admin, signed in as admin with the password from NURTUR_ADMIN_PASSWORD.",
+					"Generate a magic link with an optional name and a 1, 7, or 30 day expiry.",
+					"Magic links open signup directly, skip the shared secret key, and stop working after one account is created.",
+					"See pending, used, expired, and revoked invitations, and revoke an active link.",
+					"A read-only account list shows who has joined.",
+				},
+			},
+			{
+				Title: "Changed",
+				Items: []string{
+					"The signup form hides the secret-key field when it is opened from an invitation.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.3.8",
 		Date:    "Oct 24, 2026",
 		Title:   "Update notes, in the app",

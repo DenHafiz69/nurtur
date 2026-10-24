@@ -1,0 +1,48 @@
+{{define "admin-login"}}<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nurtur — admin</title>
+  <meta name="theme-color" content="#fff8f0">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
+  <script nonce="{{.Nonce}}">
+    (function () {
+      try {
+        var mode = localStorage.getItem("nurtur.theme") || "auto";
+        var hour = new Date().getHours();
+        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var theme = (mode === "day" || mode === "night") ? mode : auto;
+        document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="auth-body">
+  <main class="auth-card">
+    <span class="pip auth-pip">{{mascot "pip" "awake"}}</span>
+    <h1 class="auth-title">Nurtur admin</h1>
+    <p class="auth-copy">Sign in to invite people to Nurtur.</p>
+    <form class="auth-form" method="post" action="/admin/login">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input type="text" name="username" value="admin" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      {{if .Error}}<p class="field-error" role="alert">{{.Error}}</p>{{end}}
+      <button type="submit" class="btn btn-primary auth-submit">{{icon "lock"}}<span>Sign in</span></button>
+    </form>
+    <p class="auth-note">The password comes from <code>NURTUR_ADMIN_PASSWORD</code> on the server.</p>
+  </main>
+</body>
+</html>{{end}}

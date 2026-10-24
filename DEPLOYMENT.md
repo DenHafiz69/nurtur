@@ -50,6 +50,11 @@ NURTUR_LOCAL_ONLY=true
 NURTUR_SIGNUP_KEY=replace-with-a-long-random-value
 NURTUR_SESSION_SECRET=replace-with-a-long-random-value
 
+# Optional admin screen at /admin. Sign in as "admin" with this password.
+# NURTUR_ADMIN_PASSWORD=replace-with-an-8-plus-character-password
+# Public origin used in generated invite links (important behind a proxy).
+# NURTUR_PUBLIC_URL=https://nurtur.example.com
+
 # true because Caddy serves HTTPS. Use false only for plain-HTTP testing.
 NURTUR_COOKIE_SECURE=true
 
@@ -71,6 +76,12 @@ Keep `NURTUR_SESSION_SECRET` stable. Changing it invalidates existing sessions.
 Anyone who knows `NURTUR_SIGNUP_KEY` can create an account; each account gets
 its own private baby profile and care log. Remove the key to close new signups
 without affecting existing accounts.
+
+To invite people without sharing the signup key, set `NURTUR_ADMIN_PASSWORD`
+and open `/admin`. Sign in as `admin`, generate a magic link, and send it to the
+person. The link opens signup directly, works once, and expires after the
+period you choose (7 days by default). Set `NURTUR_PUBLIC_URL` to the exact
+public origin so generated links work behind Caddy.
 
 ## 2. Add Nurtur to your Compose stack
 
@@ -240,9 +251,10 @@ sudo docker compose exec nurtur curl -fsS 'http://127.0.0.1:8080/healthz?verbose
 
 Then open `https://nurtur.example.com`, enter `NURTUR_SIGNUP_KEY`, choose a
 username/password, and set the baby's name. Repeat with the same key for each
-person who needs their own account. Onboarding writes the account and baby name
-into the database; later logins use that username/password and only see that
-account's data.
+person who needs their own account. Or set `NURTUR_ADMIN_PASSWORD`, open
+`/admin`, and send each person a one-use magic link instead. Onboarding writes
+the account and baby name into the database; later logins use that
+username/password and only see that account's data.
 
 If login appears to succeed but you are bounced back to the sign-in page, check
 `NURTUR_COOKIE_SECURE`: it must be `true` over HTTPS and `false` only when
@@ -620,6 +632,9 @@ not survive a lost VPS.
 
 - [ ] `/etc/nurtur/nurtur.env` is `600 root:root` and not in the repository
 - [ ] `NURTUR_SIGNUP_KEY` and `NURTUR_SESSION_SECRET` are random and unique
+- [ ] `NURTUR_ADMIN_PASSWORD` is set to a long, unique password (or left empty
+      to keep the admin screen disabled)
+- [ ] `NURTUR_PUBLIC_URL` points at the public HTTPS origin when invites are used
 - [ ] `NURTUR_COOKIE_SECURE=true` behind HTTPS
 - [ ] Only 80/443 are exposed; Nurtur has no public port
 - [ ] The container runs `read_only` with a `/tmp` tmpfs and

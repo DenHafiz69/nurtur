@@ -140,6 +140,9 @@ func requiresAuth(r *http.Request) bool {
 		path == "/sw.js",
 		path == "/favicon.ico":
 		return false
+	case path == "/admin" || strings.HasPrefix(path, "/admin/"):
+		// The admin gate is separate from household accounts.
+		return false
 	case strings.HasPrefix(path, "/static/"):
 		return false
 	default:
@@ -160,15 +163,8 @@ func isUnsafeMethod(method string) bool {
 // Origin/Sec-Fetch-Site signal for classic form posts, which cannot attach a
 // header. Both paths also reject cross-site origins outright.
 func (a *auth) checkCSRF(r *http.Request, csrf string) error {
-	if origin := r.Header.Get("Origin"); origin != "" {
-		parsed, err := url.Parse(origin)
-		if err != nil || !strings.EqualFold(parsed.Host, r.Host) {
-			return errors.New("cross-origin request")
-		}
-	} else if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
-		if site != "same-origin" && site != "none" {
-			return errors.New("cross-site request")
-		}
+	if err := sameOrigin(r); err != nil {
+		return err
 	}
 
 	if isHTMX(r) {
@@ -178,6 +174,23 @@ func (a *auth) checkCSRF(r *http.Request, csrf string) error {
 		}
 		if subtle.ConstantTimeCompare([]byte(token), []byte(csrf)) != 1 {
 			return errors.New("bad csrf token")
+		}
+	}
+	return nil
+}
+
+// sameOrigin rejects a request whose Origin or Sec-Fetch-Site says it came from
+// another site. Classic form posts cannot attach a custom header, so this is the
+// shared baseline for login and admin forms.
+func sameOrigin(r *http.Request) error {
+	if origin := r.Header.Get("Origin"); origin != "" {
+		parsed, err := url.Parse(origin)
+		if err != nil || !strings.EqualFold(parsed.Host, r.Host) {
+			return errors.New("cross-origin request")
+		}
+	} else if site := r.Header.Get("Sec-Fetch-Site"); site != "" {
+		if site != "same-origin" && site != "none" {
+			return errors.New("cross-site request")
 		}
 	}
 	return nil
@@ -386,12 +399,59 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSignupPage(w http.ResponseWriter, r *http.Request) {
-	if !s.auth.enabled() {
+	// A configured admin can invite people even when the shared signup key is
+	// not set, so the admin password also keeps this page reachable.
+	if !s.auth.enabled() && !s.admin.enabled() {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	next := safeNext(r.URL.Query().Get("next"))
-	s.renderNamed(w, r, http.StatusOK, "login", s.authPageData(r, "signup", next))
+	data := s.authPageData(r, "signup", next)
+	if err := s.applyInviteToken(r.Context(), data, r.URL.Query().Get("invite")); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.renderNamed(w, r, http.StatusOK, "login", data)
+}
+
+// applyInviteToken fills the signup page state from an invite link. A missing
+// token is a normal signup page; an unusable token gets a calm explanation
+// instead of the shared-secret form.
+func (s *Server) applyInviteToken(ctx context.Context, data *view.PageData, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil
+	}
+	invite, err := s.store.InviteByTokenHash(ctx, hashInviteToken(token))
+	switch {
+	case errors.Is(err, store.ErrInviteNotFound):
+		data.InviteError = "This invitation link isn't valid. Ask the person who invited you for a new one."
+		return nil
+	case err != nil:
+		return err
+	}
+	now := s.clock.Now().UTC()
+	if !invite.Active(now) {
+		data.InviteError = inviteUnavailableMessage(invite, now)
+		return nil
+	}
+	data.InviteToken = token
+	data.InviteValid = true
+	data.InviteLabel = invite.Label
+	return nil
+}
+
+func inviteUnavailableMessage(invite store.Invite, now time.Time) string {
+	switch {
+	case invite.UsedAt != nil:
+		return "This invitation has already been used. Sign in instead, or ask for a new link."
+	case invite.RevokedAt != nil:
+		return "This invitation was revoked. Ask the person who invited you for a new link."
+	case !now.Before(invite.ExpiresAt):
+		return "This invitation link has expired. Ask for a new one."
+	default:
+		return "This invitation link isn't valid. Ask for a new one."
+	}
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -456,7 +516,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
-	if !s.auth.enabled() {
+	// A configured admin can invite people even when the shared signup key is
+	// not set, so the admin password also keeps signup reachable.
+	if !s.auth.enabled() && !s.admin.enabled() {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -465,7 +527,31 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	next := safeNext(r.FormValue("next"))
-	if !s.auth.signupOpen() {
+
+	inviteToken := strings.TrimSpace(r.FormValue("invite"))
+	var invite store.Invite
+	hasInvite := false
+	if inviteToken != "" {
+		found, err := s.store.InviteByTokenHash(r.Context(), hashInviteToken(inviteToken))
+		switch {
+		case errors.Is(err, store.ErrInviteNotFound):
+			s.renderSignupInviteError(w, r, next,
+				"This invitation link isn't valid. Ask the person who invited you for a new one.")
+			return
+		case err != nil:
+			s.serverError(w, r, err)
+			return
+		}
+		now := s.clock.Now().UTC()
+		if !found.Active(now) {
+			s.renderSignupInviteError(w, r, next, inviteUnavailableMessage(found, now))
+			return
+		}
+		invite = found
+		hasInvite = true
+	}
+
+	if !hasInvite && !s.auth.signupOpen() {
 		data := s.authPageData(r, "signup", next)
 		data.SignupError = "Sign-ups are closed on this server. Ask the person who set it up for the secret key."
 		s.renderNamed(w, r, http.StatusForbidden, "login", data)
@@ -477,6 +563,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	if !s.auth.limiter.allowed(limiterKey) {
 		data := s.authPageData(r, "signup", next)
 		data.SignupError = "Too many tries. Wait a few minutes and try again."
+		setInviteData(data, hasInvite, inviteToken, invite.Label)
 		s.renderNamed(w, r, http.StatusTooManyRequests, "login", data)
 		return
 	}
@@ -496,10 +583,12 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		data.BabyGender = rawGender
 		data.MascotName = rawMascot
 		data.SignupError = message
+		setInviteData(data, hasInvite, inviteToken, invite.Label)
 		s.renderNamed(w, r, status, "login", data)
 	}
 
-	if !s.auth.matchesSignupKey(r.FormValue("secret_key")) {
+	// An invite replaces the shared secret key for exactly this signup.
+	if !hasInvite && !s.auth.matchesSignupKey(r.FormValue("secret_key")) {
 		s.auth.limiter.fail(limiterKey)
 		s.log.Warn("signup rejected: wrong secret key", "ip", ip)
 		reject(http.StatusUnauthorized, "That secret key isn't right.")
@@ -555,23 +644,53 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 	if seen, ok := s.changelogSeenSetting(); ok {
 		settings[settingChangelogSeen] = seen
 	}
-	acct, err := s.store.CreateAccountWithSettings(
-		r.Context(), username, hash, settings, s.clock.Now(),
-	)
+	now := s.clock.Now()
+	var acct store.Account
+	if hasInvite {
+		acct, err = s.store.CreateAccountWithInvite(
+			r.Context(), username, hash, settings, invite.ID, now,
+		)
+	} else {
+		acct, err = s.store.CreateAccountWithSettings(
+			r.Context(), username, hash, settings, now,
+		)
+	}
 	if err != nil {
-		if errors.Is(err, store.ErrAccountExists) {
+		switch {
+		case errors.Is(err, store.ErrInviteUnavailable):
+			// Another signup used the link between the page load and submit.
+			s.renderSignupInviteError(w, r, next,
+				"This invitation has just been used. Ask the person who invited you for a new link.")
+			return
+		case errors.Is(err, store.ErrAccountExists):
 			s.auth.setHasAccounts(true)
 			reject(http.StatusConflict, "That username is already taken. Try another.")
 			return
+		default:
+			s.serverError(w, r, err)
+			return
 		}
-		s.serverError(w, r, err)
-		return
 	}
 
 	s.auth.setHasAccounts(true)
 	s.auth.limiter.reset(limiterKey)
-	s.log.Info("account created", "username", username, "id", acct.ID, "ip", ip)
+	s.log.Info("account created", "username", username, "id", acct.ID, "ip", ip, "invite", hasInvite)
 	s.startSession(w, r, acct.ID, next)
+}
+
+func setInviteData(data *view.PageData, hasInvite bool, token, label string) {
+	if !hasInvite {
+		return
+	}
+	data.InviteToken = token
+	data.InviteValid = true
+	data.InviteLabel = label
+}
+
+func (s *Server) renderSignupInviteError(w http.ResponseWriter, r *http.Request, next, message string) {
+	data := s.authPageData(r, "signup", next)
+	data.InviteError = message
+	s.renderNamed(w, r, http.StatusForbidden, "login", data)
 }
 
 // startSession issues the signed session cookie and returns to the page the
@@ -596,8 +715,8 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderNamed renders a top-level template without the dashboard shell. The
-// login and offline pages own their whole document.
-func (s *Server) renderNamed(w http.ResponseWriter, r *http.Request, status int, name string, data *view.PageData) {
+// login, admin, and offline pages own their whole document.
+func (s *Server) renderNamed(w http.ResponseWriter, r *http.Request, status int, name string, data any) {
 	var buf bytes.Buffer
 	if err := s.renderer.Execute(&buf, name, data); err != nil {
 		s.serverError(w, r, err)
