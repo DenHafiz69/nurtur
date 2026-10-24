@@ -18,6 +18,9 @@ services:
       NURTUR_NIGHT_END: "${NURTUR_NIGHT_END:-07:00}"
       TURSO_DATABASE_URL: "${TURSO_DATABASE_URL:-}"
       TURSO_AUTH_TOKEN: "${TURSO_AUTH_TOKEN:-}"
+      # Local writes push within a few seconds; the pull only reconciles
+      # out-of-band cloud changes, so five minutes is plenty for one server.
+      NURTUR_SYNC_INTERVAL: "${NURTUR_SYNC_INTERVAL:-5m}"
       NURTUR_PASSCODE: "${NURTUR_PASSCODE:-}"
       NURTUR_SIGNUP_KEY: "${NURTUR_SIGNUP_KEY:-}"
       NURTUR_SESSION_SECRET: "${NURTUR_SESSION_SECRET:-}"
