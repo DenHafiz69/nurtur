@@ -39,6 +39,8 @@ TZ=Asia/Kuala_Lumpur
 NURTUR_LOCAL_ONLY=true
 # TURSO_DATABASE_URL=libsql://your-db.turso.io
 # TURSO_AUTH_TOKEN=
+# Optional pull cadence. Local writes still push within a few seconds.
+# NURTUR_SYNC_INTERVAL=5m
 
 # Required to create local accounts. Generate fresh values:
 #   openssl rand -hex 16   (signup key)
@@ -290,8 +292,15 @@ an offsite copy instead, enable Turso Cloud:
 NURTUR_LOCAL_ONLY=false
 TURSO_DATABASE_URL=libsql://your-db.turso.io
 TURSO_AUTH_TOKEN=...
-NURTUR_SYNC_INTERVAL=60s
+NURTUR_SYNC_INTERVAL=5m
 ```
+
+Local writes push within a few seconds regardless of this value; the interval
+only controls how often the server pulls changes made outside the app (for
+example, in the Turso dashboard). Five minutes is the recommendation for this
+single-server topology. The built-in default is `60s`; going below roughly
+`30s` adds cloud requests and exposes the sync engine to more network failures
+without making anything fresher.
 
 Startup fails loudly if sync is enabled with only one of the two Turso values.
 Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
