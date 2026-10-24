@@ -25,6 +25,8 @@ func clearEnv(t *testing.T) {
 		"NURTUR_SIGNUP_KEY",
 		"NURTUR_SESSION_SECRET",
 		"NURTUR_COOKIE_SECURE",
+		"NURTUR_ADMIN_PASSWORD",
+		"NURTUR_PUBLIC_URL",
 	} {
 		t.Setenv(key, "")
 	}
@@ -171,5 +173,48 @@ func TestLoadSignupKeyConfiguration(t *testing.T) {
 	}
 	if cfg.SignupKey != "only-for-my-wife" || cfg.SessionSecret != "a-long-random-secret" {
 		t.Fatalf("signup config = %+v", cfg)
+	}
+}
+
+func TestLoadAdminConfiguration(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("NURTUR_LOCAL_ONLY", "true")
+	t.Setenv("NURTUR_ADMIN_PASSWORD", "admin-password")
+	t.Setenv("NURTUR_SESSION_SECRET", "a-long-random-secret")
+	t.Setenv("NURTUR_PUBLIC_URL", "https://nurtur.example.com/")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AdminPassword != "admin-password" {
+		t.Fatalf("admin password = %q", cfg.AdminPassword)
+	}
+	if cfg.PublicURL != "https://nurtur.example.com" {
+		t.Fatalf("public URL = %q", cfg.PublicURL)
+	}
+}
+
+func TestLoadRejectsInvalidAdminValues(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		val  string
+	}{
+		{"short password", "NURTUR_ADMIN_PASSWORD", "short"},
+		{"relative public URL", "NURTUR_PUBLIC_URL", "/nurtur"},
+		{"public URL without host", "NURTUR_PUBLIC_URL", "https://"},
+		{"public URL with query", "NURTUR_PUBLIC_URL", "https://nurtur.example.com?x=1"},
+		{"public URL with path", "NURTUR_PUBLIC_URL", "https://nurtur.example.com/app"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("NURTUR_LOCAL_ONLY", "true")
+			t.Setenv(tt.key, tt.val)
+			if _, err := Load(); err == nil {
+				t.Fatalf("Load accepted %s=%q", tt.key, tt.val)
+			}
+		})
 	}
 }

@@ -178,6 +178,14 @@ make dev
 Then open <http://localhost:8080>. For Docker, Turso Cloud, backups, systemd,
 and the full configuration reference, see [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
+### Inviting people
+
+Set `NURTUR_ADMIN_PASSWORD` (8+ characters) and restart. Open `/admin`, sign in
+as `admin`, and generate a magic link. The link takes one person straight to
+signup, without the household signup key, and stops working after it is used or
+expires. Set `NURTUR_PUBLIC_URL` to the public origin when Nurtur is behind a
+reverse proxy.
+
 ---
 
 ## Documentation

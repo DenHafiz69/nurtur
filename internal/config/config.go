@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -27,6 +28,8 @@ type Config struct {
 	SignupKey     string
 	SessionSecret string
 	SecureCookie  bool
+	AdminPassword string
+	PublicURL     string
 }
 
 // Load reads configuration from the environment and applies defaults. An
@@ -69,8 +72,20 @@ func Load() (Config, error) {
 	cfg.Passcode = strings.TrimSpace(os.Getenv("NURTUR_PASSCODE"))
 	cfg.SignupKey = strings.TrimSpace(os.Getenv("NURTUR_SIGNUP_KEY"))
 	cfg.SessionSecret = strings.TrimSpace(os.Getenv("NURTUR_SESSION_SECRET"))
-	if cfg.Passcode == "" && cfg.SignupKey == "" && cfg.SessionSecret != "" {
-		return Config{}, fmt.Errorf("NURTUR_SESSION_SECRET is set but neither NURTUR_PASSCODE nor NURTUR_SIGNUP_KEY is set")
+	cfg.AdminPassword = strings.TrimSpace(os.Getenv("NURTUR_ADMIN_PASSWORD"))
+	if cfg.Passcode == "" && cfg.SignupKey == "" && cfg.AdminPassword == "" && cfg.SessionSecret != "" {
+		return Config{}, fmt.Errorf("NURTUR_SESSION_SECRET is set but neither NURTUR_PASSCODE, NURTUR_SIGNUP_KEY, nor NURTUR_ADMIN_PASSWORD is set")
+	}
+	if cfg.AdminPassword != "" && len(cfg.AdminPassword) < 8 {
+		return Config{}, fmt.Errorf("NURTUR_ADMIN_PASSWORD must be at least 8 characters")
+	}
+
+	if raw := strings.TrimSpace(os.Getenv("NURTUR_PUBLIC_URL")); raw != "" {
+		base, err := parsePublicURL(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("NURTUR_PUBLIC_URL: %w", err)
+		}
+		cfg.PublicURL = base
 	}
 
 	if raw := strings.TrimSpace(os.Getenv("NURTUR_SYNC_INTERVAL")); raw != "" {
@@ -134,6 +149,32 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// parsePublicURL validates the base used in generated invite links. It must be
+// absolute so a link is copyable before the first request reaches the app.
+func parsePublicURL(raw string) (string, error) {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("must be an absolute http or https URL")
+	}
+	if !strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https") {
+		return "", fmt.Errorf("must start with http:// or https://")
+	}
+	if parsed.Host == "" {
+		return "", fmt.Errorf("must include a host")
+	}
+	if parsed.User != nil {
+		return "", fmt.Errorf("must not include a username or password")
+	}
+	if parsed.Path != "" && parsed.Path != "/" {
+		return "", fmt.Errorf("must be an origin without a path")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("must not include a query or fragment")
+	}
+	return raw, nil
 }
 
 func parseBool(raw string) (bool, error) {

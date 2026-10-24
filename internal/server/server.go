@@ -41,6 +41,8 @@ type Config struct {
 	SignupKey     string
 	SessionSecret string
 	SecureCookie  bool
+	AdminPassword string
+	PublicURL     string
 }
 
 // Server holds the router and shared dependencies.
@@ -59,6 +61,8 @@ type Server struct {
 	migrations fs.FS
 	assets     fs.FS
 	auth       *auth
+	admin      *adminAuth
+	publicURL  string
 
 	defaultBabyName string
 }
@@ -128,6 +132,8 @@ func New(cfg Config) (*Server, error) {
 		migrations:      cfg.Migrations,
 		assets:          cfg.Assets,
 		auth:            newAuth(cfg.Passcode, cfg.SignupKey, cfg.SessionSecret, cfg.SecureCookie, accountCount > 0),
+		admin:           newAdminAuth(cfg.AdminPassword, cfg.SessionSecret, cfg.SecureCookie),
+		publicURL:       strings.TrimRight(cfg.PublicURL, "/"),
 	}, nil
 }
 
@@ -194,6 +200,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /welcome", s.handleSaveWelcome)
 	mux.HandleFunc("POST /logout", s.handleLogout)
 	mux.HandleFunc("GET /offline", s.handleOffline)
+
+	// Admin screens sit outside the household gate and use their own session.
+	// They are disabled unless NURTUR_ADMIN_PASSWORD is configured.
+	mux.HandleFunc("GET /admin/login", s.handleAdminLoginPage)
+	mux.HandleFunc("POST /admin/login", s.handleAdminLogin)
+	mux.Handle("GET /admin", s.adminOnly(http.HandlerFunc(s.handleAdminPage)))
+	mux.Handle("GET /admin/", s.adminOnly(http.HandlerFunc(s.handleAdminPage)))
+	mux.Handle("POST /admin/logout", s.adminOnly(http.HandlerFunc(s.handleAdminLogout)))
+	mux.Handle("POST /admin/invites", s.adminOnly(http.HandlerFunc(s.handleAdminCreateInvite)))
+	mux.Handle("POST /admin/invites/{id}/revoke", s.adminOnly(http.HandlerFunc(s.handleAdminRevokeInvite)))
+
 	mux.HandleFunc("GET /sw.js", s.handleServiceWorker)
 	mux.HandleFunc("GET /partials/sync", s.handleSyncChip)
 

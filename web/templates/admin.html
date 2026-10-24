@@ -1,0 +1,157 @@
+{{define "admin"}}<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nurtur — admin</title>
+  <meta name="theme-color" content="#fff8f0">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
+  <script nonce="{{.Nonce}}">
+    (function () {
+      try {
+        var mode = localStorage.getItem("nurtur.theme") || "auto";
+        var hour = new Date().getHours();
+        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var theme = (mode === "day" || mode === "night") ? mode : auto;
+        document.documentElement.dataset.theme = theme;
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="admin-body">
+<main class="admin-shell">
+  <header class="admin-bar">
+    <div>
+      <h1 class="admin-title">Nurtur admin</h1>
+      <p class="admin-sub">Invite people to set up their own account.</p>
+    </div>
+    <form method="post" action="/admin/logout">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <button type="submit" class="btn btn-ghost">{{icon "logout"}}<span>Sign out</span></button>
+    </form>
+  </header>
+
+  {{if .Notice}}<p class="admin-notice" role="status">{{.Notice}}</p>{{end}}
+  {{if .Error}}<p class="field-error" role="alert">{{.Error}}</p>{{end}}
+
+  <section class="admin-card" aria-labelledby="admin-invite-title">
+    <h2 id="admin-invite-title" class="admin-card-title">Magic link</h2>
+    <p class="admin-note">A link takes one person straight to signup, without the shared secret key. It works once and then expires.</p>
+    <form class="admin-form" method="post" action="/admin/invites">
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <div class="field-pair">
+        <label class="field">
+          <span class="field-label">Who is this for? (optional)</span>
+          <input type="text" name="label" maxlength="80" autocomplete="off" placeholder="Aunty Sarah">
+        </label>
+        <label class="field">
+          <span class="field-label">Expires</span>
+          <select name="days">
+            <option value="1">1 day</option>
+            <option value="7" selected>7 days</option>
+            <option value="30">30 days</option>
+          </select>
+        </label>
+      </div>
+      <div class="sheet-actions">
+        <button type="submit" class="btn btn-primary">{{icon "link"}}<span>Generate link</span></button>
+      </div>
+    </form>
+
+    {{if .NewInviteURL}}
+    <div class="admin-link-panel">
+      <p class="admin-note">Copy this now — the full link is not shown again.</p>
+      <div class="admin-invite-link">
+        <input id="invite-link" type="text" value="{{.NewInviteURL}}" readonly autocomplete="off" spellcheck="false" aria-label="New invitation link">
+        <button type="button" class="btn btn-ghost" data-copy-invite>{{icon "copy"}}<span>Copy</span></button>
+      </div>
+    </div>
+    {{end}}
+  </section>
+
+  <section class="admin-card" aria-labelledby="admin-invites-title">
+    <h2 id="admin-invites-title" class="admin-card-title">Invitations</h2>
+    {{if .Invites}}
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th scope="col">For</th><th scope="col">Created</th><th scope="col">Expires</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
+        </thead>
+        <tbody>
+          {{range .Invites}}
+          <tr>
+            <td data-label="For">{{if .Label}}{{.Label}}{{else}}<span class="admin-muted">—</span>{{end}}</td>
+            <td data-label="Created">{{.CreatedLabel}}</td>
+            <td data-label="Expires">{{.ExpiresLabel}}</td>
+            <td data-label="Status"><span class="admin-pill admin-pill-{{.StatusTone}}">{{.Status}}</span></td>
+            <td class="admin-table-action">
+              {{if .Active}}
+              <form method="post" action="/admin/invites/{{.ID}}/revoke">
+                <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                <button type="submit" class="btn btn-ghost admin-revoke">Revoke</button>
+              </form>
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <p class="admin-note">No invitations yet. Generate one above.</p>
+    {{end}}
+  </section>
+
+  <section class="admin-card" aria-labelledby="admin-accounts-title">
+    <h2 id="admin-accounts-title" class="admin-card-title">Accounts</h2>
+    {{if .Accounts}}
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th scope="col">Username</th><th scope="col">Joined</th></tr></thead>
+        <tbody>
+          {{range .Accounts}}
+          <tr><td data-label="Username">{{.Username}}</td><td data-label="Joined">{{.CreatedLabel}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <p class="admin-note">No accounts yet.</p>
+    {{end}}
+  </section>
+
+  <footer class="admin-footer">
+    <a class="auth-alt" href="/">Open Nurtur</a>
+  </footer>
+</main>
+<script nonce="{{.Nonce}}">
+  (function () {
+    var button = document.querySelector("[data-copy-invite]");
+    var field = document.getElementById("invite-link");
+    if (!button || !field) return;
+    button.addEventListener("click", function () {
+      field.select();
+      var label = button.querySelector("span");
+      var done = function () {
+        if (!label) return;
+        label.textContent = "Copied";
+        setTimeout(function () { label.textContent = "Copy"; }, 1600);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(field.value).then(done, function () {
+          try { document.execCommand("copy"); done(); } catch (e) {}
+        });
+        return;
+      }
+      try { document.execCommand("copy"); done(); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>{{end}}

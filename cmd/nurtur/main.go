@@ -99,6 +99,8 @@ func run() error {
 		SignupKey:     cfg.SignupKey,
 		SessionSecret: cfg.SessionSecret,
 		SecureCookie:  cfg.SecureCookie,
+		AdminPassword: cfg.AdminPassword,
+		PublicURL:     cfg.PublicURL,
 	})
 	if err != nil {
 		return err
