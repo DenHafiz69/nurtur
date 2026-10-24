@@ -2976,11 +2976,20 @@ textarea {
 }
 
 .admin-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 14px;
+}
+
+.admin-bar form {
+  display: flex;
+}
+
+.admin-bar .btn {
+  width: auto;
+  min-height: 48px;
+  padding: 0 18px;
 }
 
 .admin-title {
@@ -3042,13 +3051,21 @@ textarea {
   background: var(--surface-soft);
 }
 
+.admin-actions {
+  margin-top: 2px;
+}
+
+.admin-actions .btn {
+  width: 100%;
+}
+
 .admin-invite-link {
   display: flex;
   gap: 8px;
   margin-top: 10px;
 }
 
-.admin-invite-link input {
+.admin-invite-link textarea {
   flex: 1;
   min-width: 0;
   padding: 10px 12px;
@@ -3057,7 +3074,11 @@ textarea {
   background: var(--surface);
   color: var(--ink);
   font: inherit;
-  font-size: 13px;
+  /* 16px keeps iOS Safari from zooming the page when the field is focused. */
+  font-size: 16px;
+  line-height: 1.35;
+  resize: none;
+  overflow-wrap: anywhere;
 }
 
 .admin-table-wrap {
@@ -3095,7 +3116,9 @@ textarea {
 }
 
 .admin-revoke {
-  padding: 6px 12px;
+  width: auto;
+  min-height: 40px;
+  padding: 6px 14px;
   font-size: 13px;
 }
 
@@ -3140,6 +3163,34 @@ textarea {
 }
 
 @media (max-width: 560px) {
+  .admin-body {
+    padding: 18px 14px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .admin-bar {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .admin-bar .btn {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 15px;
+  }
+
+  .admin-title {
+    font-size: 24px;
+  }
+
+  .admin-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .admin-form .field-pair {
+    grid-template-columns: 1fr;
+  }
+
   .admin-table thead {
     display: none;
   }
@@ -3184,5 +3235,9 @@ textarea {
 
   .admin-invite-link {
     flex-direction: column;
+  }
+
+  .admin-invite-link .btn {
+    width: 100%;
   }
 }

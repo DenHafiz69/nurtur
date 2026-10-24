@@ -22,7 +22,7 @@
   </script>
   <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="{{asset "/static/app.css"}}">
 </head>
 <body class="admin-body">
 <main class="admin-shell">
@@ -59,7 +59,7 @@
           </select>
         </label>
       </div>
-      <div class="sheet-actions">
+      <div class="admin-actions">
         <button type="submit" class="btn btn-primary">{{icon "link"}}<span>Generate link</span></button>
       </div>
     </form>
@@ -68,7 +68,7 @@
     <div class="admin-link-panel">
       <p class="admin-note">Copy this now — the full link is not shown again.</p>
       <div class="admin-invite-link">
-        <input id="invite-link" type="text" value="{{.NewInviteURL}}" readonly autocomplete="off" spellcheck="false" aria-label="New invitation link">
+        <textarea id="invite-link" rows="3" readonly autocomplete="off" spellcheck="false" aria-label="New invitation link">{{.NewInviteURL}}</textarea>
         <button type="button" class="btn btn-ghost" data-copy-invite>{{icon "copy"}}<span>Copy</span></button>
       </div>
     </div>
