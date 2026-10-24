@@ -133,6 +133,13 @@ Enough context to decide what to do next without reading a log.
   each account gets its own private baby profile and care log. No email, OAuth,
   or external identity provider.
 
+### Updates you can read
+
+- After a version change, Nurtur opens a short **What's new** sheet. Dismiss it
+  with one tap and it stays dismissed for that account.
+- The whole changelog, from **v0.1.0** onward, is kept in the app at
+  **Settings → What's new**, so release notes work offline and never disappear.
+
 ---
 
 ## Under the hood

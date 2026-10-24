@@ -174,6 +174,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /timeline/{kind}/{id}/delete", s.handleTimelineDelete)   // no-JS fallback
 	mux.HandleFunc("POST /timeline/{kind}/{id}/restore", s.handleTimelineRestore) // undo
 
+	mux.HandleFunc("GET /changelog", s.handleChangelogPage)
+	mux.HandleFunc("POST /changelog/dismiss", s.handleDismissChangelog)
+
 	mux.HandleFunc("GET /settings", s.handleSettingsPage)
 	mux.HandleFunc("POST /settings", s.handleSaveSettings)
 	mux.HandleFunc("POST /settings/baby", s.handleSaveBabyName)

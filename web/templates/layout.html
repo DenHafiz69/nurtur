@@ -63,10 +63,11 @@
     <main id="main" class="app-main" tabindex="-1">
       {{if eq .View "timeline"}}{{template "timeline-page" .}}
       {{else if eq .View "settings"}}{{template "settings-page" .}}
+      {{else if eq .View "changelog"}}{{template "changelog-page" .}}
       {{else}}{{template "dashboard" .}}{{end}}
     </main>
 
-    {{if ne .View "settings"}}
+    {{if and (ne .View "settings") (ne .View "changelog")}}
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
       <details class="dock-drawer"{{if ne .View "timeline"}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
@@ -98,6 +99,12 @@
       {{if eq .Sheet "sleep-sheet"}}{{template "sleep-sheet" .}}{{end}}
       {{if eq .Sheet "sleep-edit"}}{{template "sleep-edit" .}}{{end}}
     </dialog>
+
+    {{if .ChangelogOpen}}
+    <dialog id="changelog-dialog" class="sheet" aria-labelledby="changelog-title" open>
+      {{template "changelog-sheet" .}}
+    </dialog>
+    {{end}}
   </div>
 
   <script src="{{asset "/static/htmx.min.js"}}"></script>

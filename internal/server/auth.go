@@ -544,15 +544,19 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	settings := map[string]string{
+		settingBabyName:      babyName,
+		settingBabyBirthDate: birthDate.Format("2006-01-02"),
+		settingBabyGender:    gender,
+		settingMascot:        mascot,
+	}
+	// A brand-new account starts caught up so onboarding does not open the
+	// update sheet for a release it never knew about.
+	if seen, ok := s.changelogSeenSetting(); ok {
+		settings[settingChangelogSeen] = seen
+	}
 	acct, err := s.store.CreateAccountWithSettings(
-		r.Context(), username, hash,
-		map[string]string{
-			settingBabyName:      babyName,
-			settingBabyBirthDate: birthDate.Format("2006-01-02"),
-			settingBabyGender:    gender,
-			settingMascot:        mascot,
-		},
-		s.clock.Now(),
+		r.Context(), username, hash, settings, s.clock.Now(),
 	)
 	if err != nil {
 		if errors.Is(err, store.ErrAccountExists) {

@@ -304,6 +304,8 @@ func (s *Server) writeFragments(
 }
 
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, data *view.PageData) {
+	data.Path = r.URL.RequestURI()
+	s.attachChangelog(r.Context(), data)
 	var buf bytes.Buffer
 	if err := s.renderer.Execute(&buf, "layout", data); err != nil {
 		s.serverError(w, r, err)

@@ -3,6 +3,7 @@ package view
 import (
 	"time"
 
+	"nurtur/internal/changelog"
 	"nurtur/internal/feed"
 )
 
@@ -77,6 +78,16 @@ type PageData struct {
 	// TimerOOB adds hx-swap-oob when the timer is a companion fragment rather
 	// than the primary response target.
 	TimerOOB bool
+
+	// Path is the current request URI, used by forms that return to the page
+	// they were submitted from.
+	Path string
+
+	// Releases holds the notes rendered by the changelog page or update sheet.
+	// ChangelogOpen is set when the running version is newer than the version
+	// this account last read.
+	Releases      []changelog.Release
+	ChangelogOpen bool
 }
 
 // ActiveView is the running feed shown in the dock and header badge.

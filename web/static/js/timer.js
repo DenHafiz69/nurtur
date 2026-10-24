@@ -764,6 +764,38 @@
     updateOfflineHint();
   });
 
+  /* ---------- Changelog ---------- */
+
+  // The sheet renders open when the server sees an unread version. "Got it"
+  // posts through htmx; closing by backdrop, Escape, or the X posts the same
+  // dismissal in the background so the sheet does not return on the next page.
+  var changelogDialog = document.getElementById("changelog-dialog");
+  if (changelogDialog) {
+    var changelogDismissed = false;
+    var changelogForm = changelogDialog.querySelector("form[action='/changelog/dismiss']");
+
+    function dismissChangelog() {
+      if (changelogDismissed) return;
+      changelogDismissed = true;
+      if (!window.fetch) return;
+      var action = changelogForm ? changelogForm.action : "/changelog/dismiss";
+      fetch(action, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: ""
+      }).catch(function () {
+        // Keep quiet; the next load will offer the notes again if this failed.
+      });
+    }
+
+    changelogDialog.addEventListener("close", dismissChangelog);
+    document.body.addEventListener("changelog-dismissed", function () {
+      changelogDismissed = true;
+      closeDialog(changelogDialog);
+    });
+  }
+
   /* ---------- Toasts ---------- */
 
   var toastTimer = null;

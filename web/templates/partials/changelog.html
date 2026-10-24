@@ -1,0 +1,55 @@
+{{define "changelog-sheet"}}
+<div class="sheet-inner changelog-sheet">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="changelog-title">What's new</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <p class="sheet-copy">Here's what changed in the latest Nurtur update.</p>
+  {{template "changelog-releases" .}}
+  <div class="sheet-actions changelog-actions">
+    <a class="btn btn-ghost" href="/changelog">All updates</a>
+    <form method="post" action="/changelog/dismiss" hx-post="/changelog/dismiss" hx-swap="none" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="return_to" value="{{.Path}}">
+      <button type="submit" class="btn btn-primary">Got it</button>
+    </form>
+  </div>
+</div>
+{{end}}
+
+{{define "changelog-releases"}}
+<div class="changelog-list">
+  {{range .Releases}}
+  <article class="changelog-release">
+    <header class="changelog-release-head">
+      <h3 class="changelog-version">{{.Version}}</h3>
+      <span class="changelog-date">{{.Date}}</span>
+    </header>
+    {{if .Title}}<p class="changelog-title">{{.Title}}</p>{{end}}
+    {{if .Summary}}<p class="changelog-summary">{{.Summary}}</p>{{end}}
+    {{range .Sections}}
+    <section class="changelog-section">
+      <h4>{{.Title}}</h4>
+      <ul>
+        {{range .Items}}<li>{{.}}</li>{{end}}
+      </ul>
+    </section>
+    {{end}}
+  </article>
+  {{end}}
+</div>
+{{end}}
+
+{{define "changelog-page"}}
+<section class="page-head">
+  <div class="page-head-row">
+    <a class="back-link" href="/">{{icon "arrow-left"}}<span>Today</span></a>
+    <h2 class="page-title">What's new</h2>
+  </div>
+  <p class="page-sub">Every Nurtur update, kept in one place.</p>
+</section>
+{{template "changelog-releases" .}}
+<div class="changelog-foot">
+  <a class="text-link" href="/settings">{{icon "settings"}}<span>Settings</span></a>
+</div>
+{{end}}

@@ -30,7 +30,10 @@ stop_server() {
 }
 
 start_server() {
-  if ! go build -o "$BIN" ./cmd/nurtur; then
+  # Match the Makefile so local runs report a real version and can show
+  # release notes instead of the untagged "dev" placeholder.
+  VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+  if ! go build -ldflags "-X main.version=${VERSION}" -o "$BIN" ./cmd/nurtur; then
     echo "build failed — watching for changes"
     return
   fi
