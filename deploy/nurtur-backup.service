@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up the Nurtur database
+Documentation=https://github.com/DenHafiz69/nurtur/blob/main/DEPLOYMENT.md
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/nurtur/update.env
+EnvironmentFile=-/etc/nurtur/backup.env
+ExecStart=/usr/bin/flock -n /run/lock/nurtur-maintenance.lock /usr/local/bin/nurtur-backup
+TimeoutStartSec=180
+Nice=10
+IOSchedulingClass=idle

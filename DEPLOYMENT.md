@@ -361,6 +361,79 @@ Remember to return the service to `stable` before relying on the timer again.
 
 ## 6. Backups and restore
 
+### Do I already have backups?
+
+The repository does not install a backup schedule by itself. Unless the VPS
+already has a cron job, systemd timer, restic/borg job, or provider snapshot,
+you only have the manual commands below.
+
+Check the VPS:
+
+```sh
+systemctl list-timers --all | grep -Ei 'backup|restic|borg|nurtur'
+sudo ls -lah /var/backups/nurtur 2>/dev/null
+sudo crontab -l
+command -v restic borg rclone duplicity
+```
+
+A VPS provider snapshot is useful for disaster recovery, but it is not a
+database backup: restoring the whole VPS is slower and loses everything written
+after the snapshot. Keep at least one copy off the VPS.
+
+### Automatic local snapshots
+
+The repository ships an optional backup script, service, and timer in
+`deploy/`. Install them from a checkout of the repository:
+
+```sh
+git clone --depth 1 https://github.com/DenHafiz69/nurtur.git /tmp/nurtur-deploy
+cd /tmp/nurtur-deploy
+
+sudo install -m 755 deploy/nurtur-backup.sh /usr/local/bin/nurtur-backup
+sudo install -d -m 755 /etc/nurtur
+sudo install -m 644 deploy/nurtur-backup.env.example /etc/nurtur/backup.env
+sudo editor /etc/nurtur/backup.env
+sudo install -m 644 deploy/nurtur-backup.service /etc/systemd/system/
+sudo install -m 644 deploy/nurtur-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nurtur-backup.timer
+rm -rf /tmp/nurtur-deploy
+```
+
+`/etc/nurtur/backup.env` controls the destination and retention:
+
+```sh
+NURTUR_BACKUP_DIR=/var/backups/nurtur
+NURTUR_BACKUP_KEEP_DAYS=14
+```
+
+The backup unit reads `NURTUR_COMPOSE_FILE` and `NURTUR_COMPOSE_SERVICE` from
+`/etc/nurtur/update.env`. If you are not installing the update timer, set those
+two values in `backup.env` instead.
+
+Every day at 04:15 (with up to ten minutes of random delay, and once after boot
+if the machine was off), the timer:
+
+1. finds the host directory mounted at `/data`;
+2. stops Nurtur cleanly so the WAL is checkpointed;
+3. writes a gzip tar snapshot of the whole data directory;
+4. starts Nurtur again and waits for its health check;
+5. deletes snapshots older than `NURTUR_BACKUP_KEEP_DAYS`.
+
+The stop/start is usually one or two seconds. The backup and update units share
+the same lock, so they never run at the same time.
+
+Run a snapshot immediately and inspect it:
+
+```sh
+sudo systemctl start nurtur-backup.service
+sudo journalctl -u nurtur-backup.service -n 50 --no-pager
+sudo ls -lah /var/backups/nurtur
+sudo tar tzf /var/backups/nurtur/$(ls -1t /var/backups/nurtur | head -1) | head
+```
+
+### Manual snapshot
+
 With local-only mode, `/srv/nurtur/data` is the only copy. Stop the service
 cleanly so the WAL is checkpointed and pending sync work is flushed:
 
@@ -370,6 +443,8 @@ sudo tar czf /var/backups/nurtur-$(date +%F).tgz -C /srv/nurtur/data .
 sudo docker compose start nurtur
 ```
 
+### Restore
+
 Restore into an empty data directory, preserving ownership:
 
 ```sh
@@ -377,6 +452,15 @@ sudo docker compose stop nurtur
 sudo tar xzf /var/backups/nurtur-YYYY-MM-DD.tgz -C /srv/nurtur/data
 sudo chown -R 10001:10001 /srv/nurtur/data
 sudo docker compose start nurtur
+```
+
+The backup archive is not encrypted and contains your baby's care history. If
+you copy it off the VPS, use encrypted storage such as restic, borg, or an
+rclone crypt remote:
+
+```sh
+# After configuring an rclone crypt remote:
+sudo rclone sync /var/backups/nurtur encrypted-remote:nurtur-backups
 ```
 
 The app also exports JSON/CSV/SQL from Settings. The SQL export is a logical
@@ -399,6 +483,100 @@ without making anything fresher.
 
 Startup fails loudly if sync is enabled with only one of the two Turso values.
 Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
+
+## What the VPS agent needs to do
+
+This is the one-time setup for a standalone Compose stack. It assumes Nurtur is
+already running and that the GHCR package is public. Replace
+`/path/to/your/compose` and `/srv/nurtur/docker-compose.yml` with the real path.
+
+### 1. Switch Nurtur to the stable image
+
+In the standalone Compose file:
+
+```yaml
+  nurtur:
+    image: ghcr.io/denhafiz69/nurtur:stable
+    # remove any build: block or pinned version
+```
+
+Then pull it once. This must happen after the first `v*` release tag has been
+pushed, otherwise `stable` does not exist yet.
+
+```sh
+cd /path/to/your/compose
+sudo docker compose pull nurtur
+sudo docker compose up -d nurtur
+```
+
+### 2. Install the update timer
+
+```sh
+git clone --depth 1 https://github.com/DenHafiz69/nurtur.git /tmp/nurtur-deploy
+cd /tmp/nurtur-deploy
+
+sudo install -m 755 deploy/nurtur-update.sh /usr/local/bin/nurtur-update
+sudo install -d -m 755 /etc/nurtur
+sudo install -m 644 deploy/nurtur-update.env.example /etc/nurtur/update.env
+sudo editor /etc/nurtur/update.env
+sudo install -m 644 deploy/nurtur-update.service /etc/systemd/system/
+sudo install -m 644 deploy/nurtur-update.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nurtur-update.timer
+rm -rf /tmp/nurtur-deploy
+```
+
+`/etc/nurtur/update.env` must contain:
+
+```sh
+NURTUR_COMPOSE_FILE=/srv/nurtur/docker-compose.yml
+NURTUR_COMPOSE_SERVICE=nurtur
+```
+
+`NURTUR_COMPOSE_SERVICE` is the Compose service name, not `container_name`.
+
+### 3. Install the backup timer
+
+```sh
+git clone --depth 1 https://github.com/DenHafiz69/nurtur.git /tmp/nurtur-deploy
+cd /tmp/nurtur-deploy
+
+sudo install -m 755 deploy/nurtur-backup.sh /usr/local/bin/nurtur-backup
+sudo install -d -m 755 /etc/nurtur
+sudo install -m 644 deploy/nurtur-backup.env.example /etc/nurtur/backup.env
+sudo editor /etc/nurtur/backup.env
+sudo install -m 644 deploy/nurtur-backup.service /etc/systemd/system/
+sudo install -m 644 deploy/nurtur-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nurtur-backup.timer
+rm -rf /tmp/nurtur-deploy
+```
+
+`/etc/nurtur/backup.env` controls the destination and retention:
+
+```sh
+NURTUR_BACKUP_DIR=/var/backups/nurtur
+NURTUR_BACKUP_KEEP_DAYS=14
+```
+
+### 4. Verify both timers
+
+```sh
+sudo systemctl start nurtur-update.service
+sudo journalctl -u nurtur-update.service -n 50 --no-pager
+
+sudo systemctl start nurtur-backup.service
+sudo journalctl -u nurtur-backup.service -n 50 --no-pager
+sudo ls -lah /var/backups/nurtur
+
+systemctl list-timers nurtur-update.timer nurtur-backup.timer
+sudo docker compose -f /srv/nurtur/docker-compose.yml ps nurtur
+```
+
+Do not leave the VPS until the update check reports the service healthy, the
+backup archive exists, and both timers have a next-elapse time. Also arrange an
+offsite copy of `/var/backups/nurtur` or provider snapshots; local snapshots do
+not survive a lost VPS.
 
 ## Troubleshooting
 
@@ -426,6 +604,14 @@ Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
   `sudo docker compose -f /path/to/compose logs nurtur`. The updater exits
   non-zero so the failure is visible in the journal. Restore the previous
   semver tag and the matching backup if the schema changed.
+- **Backup timer runs but no archive appears**: check
+  `journalctl -u nurtur-backup.service`, confirm `NURTUR_BACKUP_DIR` is writable,
+  and verify `/etc/nurtur/update.env` or `backup.env` points at the right
+  Compose file. The script needs to be able to find the `/data` mount.
+- **Nurtur stays stopped after a backup**: run
+  `sudo docker compose -f /path/to/compose start nurtur` and inspect
+  `journalctl -u nurtur-backup.service`. The script restarts Nurtur on both
+  success and failure, but a broken image or config can still prevent startup.
 - **Exit code 137 / container killed while idle**: the memory limit is too
   tight. Raise `memory` and `GOMEMLIMIT` together, then check
   `docker stats nurtur` again.
@@ -439,9 +625,11 @@ Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
 - [ ] The container runs `read_only` with a `/tmp` tmpfs and
       `no-new-privileges`
 - [ ] A memory limit is set and `GOMEMLIMIT` sits below it
-- [ ] Backups run on a schedule and a restore has been tested
 - [ ] `nurtur-update.timer` is enabled and `/etc/nurtur/update.env` points at the
       standalone Compose file
+- [ ] `nurtur-backup.timer` is enabled, `/var/backups/nurtur` has recent
+      archives, and an **offsite** copy exists
+- [ ] A restore has been tested, not just the backup command
 - [ ] The GHCR token or package visibility is intentional
 - [ ] Runtime secrets were **not** added to GitHub; CI needs none
 

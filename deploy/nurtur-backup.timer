@@ -1,0 +1,12 @@
+[Unit]
+Description=Back up Nurtur every day
+Documentation=https://github.com/DenHafiz69/nurtur/blob/main/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=10min
+Persistent=true
+Unit=nurtur-backup.service
+
+[Install]
+WantedBy=timers.target
