@@ -8,16 +8,22 @@
 
 {{define "sleep-pill-inner"}}
   {{if .Sleep.Active}}
-    <form method="post" action="/sleeps/{{.Sleep.ID}}/stop" hx-post="/sleeps/{{.Sleep.ID}}/stop" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
-      <button type="submit" class="sleep-pill is-asleep" data-live-since="{{iso .Sleep.StartedAt}}" data-live-server-now="{{iso .Sleep.ServerNow}}">
-        <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
-        <span class="sleep-copy">
-          <span class="sleep-title">{{if .BabyName}}{{.BabyName}} is asleep{{else}}Sleeping{{end}}</span>
-          <span class="sleep-sub"><span data-live-digits>{{timer .Sleep.Elapsed}}</span> · tap to wake</span>
-        </span>
-        <span class="sleep-action">Wake up</span>
-      </button>
-    </form>
+    <div class="sleep-pill is-asleep" data-live-since="{{iso .Sleep.StartedAt}}" data-live-server-now="{{iso .Sleep.ServerNow}}">
+      <div class="timer-display">
+        <span class="timer-pip">{{.Mascot "sleeping"}}</span>
+        <div class="timer-copy">
+          <p class="timer-label">Sleeping</p>
+          <p class="timer-digits" data-live-digits>{{timer .Sleep.Elapsed}}</p>
+          <p class="timer-split">{{if .BabyName}}{{.BabyName}} is asleep{{else}}Sleeping soundly{{end}}</p>
+        </div>
+        <a class="icon-btn timer-adjust" href="/sleeps/{{.Sleep.ID}}/sheet" hx-get="/sleeps/{{.Sleep.ID}}/sheet" hx-target="#action-dialog" hx-swap="innerHTML" aria-label="Adjust this sleep">{{icon "pencil"}}</a>
+      </div>
+      <div class="timer-actions timer-actions-sleep">
+        <form method="post" action="/sleeps/{{.Sleep.ID}}/stop" hx-post="/sleeps/{{.Sleep.ID}}/stop" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+          <button type="submit" class="btn btn-done">{{icon "sun"}}<span>Wake up</span></button>
+        </form>
+      </div>
+    </div>
   {{else}}
     <form method="post" action="/sleeps" hx-post="/sleeps" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
       <button type="submit" class="sleep-pill">
