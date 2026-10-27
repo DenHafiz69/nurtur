@@ -95,6 +95,35 @@ func extractInviteURL(t *testing.T, body string) string {
 	return match[0]
 }
 
+func TestAuthPagesUseVersionedStylesheet(t *testing.T) {
+	env := newTestEnvConfig(t, func(cfg *Config) {
+		cfg.AdminPassword = testAdminPassword
+		cfg.SignupKey = "only-for-my-wife"
+		cfg.SessionSecret = "test-session-secret"
+	})
+
+	// Standalone pages once linked /static/app.css directly. The service worker
+	// caches that URL cache-first, so they could render with a stale stylesheet.
+	for _, path := range []string{"/login", "/signup"} {
+		rec := env.do(t, http.MethodGet, path, nil, false)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s = %d", path, rec.Code)
+		}
+		if body := rec.Body.String(); !strings.Contains(body, `/static/app.css?v=`) {
+			t.Errorf("GET %s did not use the versioned stylesheet", path)
+		}
+	}
+
+	client := loginAdmin(t, env)
+	rec := client.do(http.MethodGet, "/admin", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /admin = %d", rec.Code)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, `/static/app.css?v=`) {
+		t.Error("GET /admin did not use the versioned stylesheet")
+	}
+}
+
 func TestAdminDisabledReturnsNotFound(t *testing.T) {
 	env := newTestEnv(t)
 

@@ -25,6 +25,10 @@ services:
       NURTUR_SIGNUP_KEY: "${NURTUR_SIGNUP_KEY:-}"
       NURTUR_SESSION_SECRET: "${NURTUR_SESSION_SECRET:-}"
       NURTUR_COOKIE_SECURE: "${NURTUR_COOKIE_SECURE:-false}"
+      # Admin screen at /admin; disabled (404) when the password is empty.
+      NURTUR_ADMIN_PASSWORD: "${NURTUR_ADMIN_PASSWORD:-}"
+      # Public origin used in generated invite links.
+      NURTUR_PUBLIC_URL: "${NURTUR_PUBLIC_URL:-}"
     volumes:
       - nurtur-data:/data
     restart: unless-stopped
