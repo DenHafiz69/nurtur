@@ -201,10 +201,13 @@ button {
   flex-direction: column;
   width: 100%;
   max-width: 520px;
+  /* Installed iOS web apps report 100dvh without the bottom safe area, which
+     leaves the tab bar floating above the screen edge. Add the inset back to
+     the shell; Android reports 0px and keeps the dynamic viewport height. */
   height: 100vh;
-  height: 100dvh;
+  height: calc(100dvh + env(safe-area-inset-bottom, 0px));
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
   margin: 0 auto;
 }
 
