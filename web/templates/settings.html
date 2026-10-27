@@ -92,18 +92,6 @@
     </button>
   </section>
 
-  <section class="settings-card" aria-labelledby="settings-sync">
-    <h3 id="settings-sync" class="settings-title">Sync</h3>
-    <dl class="settings-list">
-      <div><dt>Mode</dt><dd>{{.Settings.SyncMode}}</dd></div>
-      <div><dt>Status</dt><dd{{if .Settings.Degraded}} class="settings-warn"{{end}}>{{.Settings.SyncStatus}}</dd></div>
-      <div><dt>Last push</dt><dd>{{.Settings.LastPush}}</dd></div>
-      <div><dt>Last pull</dt><dd>{{.Settings.LastPull}}</dd></div>
-      <div><dt>Pending</dt><dd>{{.Settings.Pending}}</dd></div>
-    </dl>
-    <p class="settings-note">Logging always writes to the local database first. A cloud outage never blocks a feed or a diaper.</p>
-  </section>
-
   <section class="settings-card" aria-labelledby="settings-backup">
     <h3 id="settings-backup" class="settings-title">Backup</h3>
     <p class="settings-note">Download a copy before upgrading or moving the server.</p>
