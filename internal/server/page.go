@@ -40,7 +40,6 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 		Toast:           toast,
 		CSRF:            csrfFrom(ctx),
 		AuthEnabled:     s.auth.enabled(),
-		SyncChip:        s.syncChip(),
 	}
 	p.FeedAlertMinutes = s.feedAlertMinutes(ctx)
 	p.Greeting = view.Greeting(now.In(s.loc).Hour())

@@ -9,10 +9,6 @@
     <h2 id="today-heading" class="today-title">Today</h2>
     <p class="today-date">{{.TodayLabel}}</p>
   </div>
-  <nav class="today-nav" aria-label="History and settings">
-    <a class="text-link" href="/timeline">{{icon "history"}}<span>History</span></a>
-    <a class="text-link" href="/settings">{{icon "settings"}}<span>Settings</span></a>
-  </nav>
   {{template "timeline-today" .}}
 </section>
 {{end}}

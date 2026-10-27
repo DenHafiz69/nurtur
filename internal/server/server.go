@@ -214,7 +214,6 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /admin/invites/{id}/revoke", s.adminOnly(http.HandlerFunc(s.handleAdminRevokeInvite)))
 
 	mux.HandleFunc("GET /sw.js", s.handleServiceWorker)
-	mux.HandleFunc("GET /partials/sync", s.handleSyncChip)
 
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 

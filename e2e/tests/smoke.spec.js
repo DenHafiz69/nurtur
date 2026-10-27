@@ -109,12 +109,14 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(drawer).not.toHaveAttribute("open", "");
 
     // Leaving History must not hand the old open-by-default rendering back.
-    await page.getByRole("link", { name: /History/ }).click();
+    await page.getByRole("link", { name: "History", exact: true }).click();
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(drawer).not.toHaveAttribute("open", "");
 
-    await page.getByRole("link", { name: /Today/ }).click();
+    await page.getByRole("link", { name: "Home", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(drawer).not.toHaveAttribute("open", "");
 
     await page.reload();

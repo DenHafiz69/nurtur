@@ -510,11 +510,6 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 
 		FeedAlertMinutes: s.feedAlertMinutes(ctx),
 
-		SyncMode:   "Local only",
-		SyncStatus: "No cloud copy configured",
-		LastPush:   "—",
-		LastPull:   "—",
-		Pending:    "—",
 		ThemeNote: fmt.Sprintf(
 			"Theme follows the time of day (night %s–%s) unless you override it from the header.",
 			formatClockValue(nightStart), formatClockValue(nightEnd)),
@@ -525,66 +520,7 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 		out.DBSize = "—"
 	}
 
-	if s.worker == nil {
-		return out, nil
-	}
-	out.SyncMode = "Turso Cloud sync"
-	status := s.worker.Status()
-	switch {
-	case status.LastPushError != "" || status.LastPullError != "":
-		out.SyncStatus = "Sync issue — changes stay local"
-		out.Degraded = true
-	case status.Pushing || status.Dirty:
-		out.SyncStatus = "Syncing…"
-		out.Degraded = status.PendingAgeSeconds > 300
-	default:
-		out.SyncStatus = "Synced"
-	}
-	if status.LastPush != nil {
-		out.LastPush = status.LastPush.In(s.loc).Format("Jan 2, 3:04 PM")
-	} else {
-		out.LastPush = "Never"
-	}
-	if status.LastPull != nil {
-		out.LastPull = status.LastPull.In(s.loc).Format("Jan 2, 3:04 PM")
-	} else {
-		out.LastPull = "Never"
-	}
-	if status.Dirty && status.PendingAgeSeconds > 0 {
-		out.Pending = (time.Duration(status.PendingAgeSeconds) * time.Second).Round(time.Second).String()
-	} else {
-		out.Pending = "—"
-	}
-	out.SyncDetail = fmt.Sprintf("last push %s · last pull %s", out.LastPush, out.LastPull)
 	return out, nil
-}
-
-// syncChip is the header's short sync state. It is intentionally separate from
-// network connectivity: the phone can be online while Turso is catching up.
-func (s *Server) syncChip() *view.SyncChipView {
-	if s.worker == nil {
-		return &view.SyncChipView{
-			Label: "Local",
-			Tone:  "local",
-			Title: "Saved on this device's server. No cloud copy configured.",
-		}
-	}
-	status := s.worker.Status()
-	switch {
-	case status.LastPushError != "" || status.LastPullError != "":
-		return &view.SyncChipView{Label: "Local copy", Tone: "warn", Title: "Cloud sync is having trouble. Logging still works."}
-	case status.Pushing || status.Dirty:
-		return &view.SyncChipView{Label: "Syncing…", Tone: "pending", Title: "Changes are saved locally and being pushed to Turso Cloud."}
-	case status.LastPush == nil:
-		return &view.SyncChipView{Label: "Not synced yet", Tone: "pending", Title: "Waiting for the first push to Turso Cloud."}
-	default:
-		return &view.SyncChipView{Label: "Synced", Tone: "ok", Title: "Local and cloud copies are caught up."}
-	}
-}
-
-func (s *Server) handleSyncChip(w http.ResponseWriter, r *http.Request) {
-	data := &view.PageData{SyncChip: s.syncChip()}
-	s.writeFragments(w, r, http.StatusOK, "sync-chip", data, false, nil, "", false, "", "")
 }
 
 func (s *Server) handleOffline(w http.ResponseWriter, r *http.Request) {

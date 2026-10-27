@@ -48,7 +48,6 @@
           {{template "baby-heading" .}}
         </div>
         <div class="header-actions">
-          {{template "sync-chip" .}}
           <button type="button" class="theme-toggle" data-theme-toggle aria-label="Theme: automatic. Activate to change.">
             <span class="theme-icon theme-icon-day">{{icon "sun"}}</span>
             <span class="theme-icon theme-icon-night">{{icon "moon"}}</span>
@@ -87,6 +86,8 @@
       </details>
     </footer>
     {{end}}
+
+    {{template "tabbar" .}}
 
     <dialog id="feed-edit-dialog" class="sheet" aria-labelledby="feed-edit-title"{{if .EditOpen}} open{{end}}>
       {{if .Edit}}{{template "feed-edit" .}}{{end}}
