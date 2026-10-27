@@ -133,6 +133,51 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(drawer).not.toHaveAttribute("open", "");
   });
 
+  test("the quick log appears with its page, not while the last one is still up", async ({ page }) => {
+    await page.goto("/");
+    const drawer = page.locator("details.dock-drawer");
+    const toggle = page.locator(".dock-toggle");
+
+    // Remember a collapsed dock so Home and History both use the floating +.
+    await toggle.click();
+    await expect(drawer).not.toHaveAttribute("open", "");
+
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(drawer).toBeHidden();
+
+    // Leave Settings while the next page is still loading. The dock must stay
+    // hidden until that page arrives, or the red + flashes over Settings.
+    await page.route((url) => url.pathname === "/timeline", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.continue();
+    });
+    await page.getByRole("link", { name: "History", exact: true }).click();
+    await page.waitForTimeout(150);
+    await expect(drawer).toBeHidden();
+    await expect(toggle).toBeHidden();
+    await expect(page.getByRole("link", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
+
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(drawer).not.toHaveAttribute("hidden", "");
+    await expect(toggle).toBeVisible();
+    await page.unroute((url) => url.pathname === "/timeline");
+
+    // The reverse: an open drawer stays put until Settings has swapped in.
+    await toggle.click();
+    await expect(drawer).toHaveAttribute("open", "");
+    await page.route((url) => url.pathname === "/settings", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.continue();
+    });
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
+    await page.waitForTimeout(150);
+    await expect(drawer).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(drawer).toHaveAttribute("hidden", "");
+    await page.unroute((url) => url.pathname === "/settings");
+  });
+
   test("theme toggle flips on a single click in both directions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => localStorage.setItem("nurtur.theme", "day"));

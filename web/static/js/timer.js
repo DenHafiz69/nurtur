@@ -186,6 +186,7 @@
   // instead of reloading the whole document on every tap.
   var tabNavigationPending = false;
   var tabNavigationTarget = "";
+  var tabNavigationPath = "";
 
   function pathOf(link) {
     try {
@@ -196,16 +197,28 @@
     }
   }
 
-  function syncTabbar(path) {
+  function currentPath(path) {
     var here = path || location.pathname;
-    if (here.length > 1) here = here.replace(/\/+$/, "");
+    return here.length > 1 ? here.replace(/\/+$/, "") : here;
+  }
+
+  // Paint the selected tab immediately on tap. The dock is deliberately left
+  // alone here: revealing it before the new page arrives flashes the floating
+  // + button over the page being left behind.
+  function syncTabHighlight(path) {
+    var here = currentPath(path);
     document.querySelectorAll(".tabbar-link").forEach(function (link) {
       var active = pathOf(link) === here;
       link.classList.toggle("is-active", active);
       if (active) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
     });
-    syncDockView(here);
+  }
+
+  // After the body has swapped, bring the rest of the shell in step.
+  function syncPageChrome(path) {
+    syncTabHighlight(path);
+    syncDockView(currentPath(path));
   }
 
   document.addEventListener("click", function (event) {
@@ -213,17 +226,18 @@
     if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     tabNavigationPending = true;
     tabNavigationTarget = link.href;
+    tabNavigationPath = pathOf(link);
     // Paint the destination tab immediately and drop a toast from the page
-    // being left behind; the page itself follows a moment later.
+    // being left behind; the page and the dock follow a moment later.
     clearToast();
-    syncTabbar(pathOf(link));
+    syncTabHighlight(tabNavigationPath);
   });
 
   // Back and forward move between tabs without a full reload, so put the tab
-  // bar back in step with the URL.
+  // bar back in step with the URL. The dock waits for the restored body.
   window.addEventListener("popstate", function () {
     window.requestAnimationFrame(function () {
-      syncTabbar();
+      syncTabHighlight();
     });
   });
 
@@ -1022,12 +1036,14 @@
     if (!target) return;
 
     if (target.id === "main") {
-      // A boosted tab swap only replaces the page body; bring the tab bar and
-      // focus along with it.
-      syncTabbar();
+      // A boosted tab swap only replaces the page body; bring the tab bar,
+      // dock, and focus along with it, after the new page is on screen. Use
+      // the tapped path because htmx updates the URL around this callback.
+      syncPageChrome(tabNavigationPending ? tabNavigationPath : "");
       if (tabNavigationPending) {
         tabNavigationPending = false;
         tabNavigationTarget = "";
+        tabNavigationPath = "";
         try { target.focus({ preventScroll: true }); } catch (e) {}
       }
     }
@@ -1065,7 +1081,7 @@
   // Boosted history restores do not run the tab link's request, so update the
   // active tab after htmx puts the cached page back.
   document.body.addEventListener("htmx:historyRestore", function () {
-    syncTabbar();
+    syncPageChrome();
   });
 
   document.body.addEventListener("htmx:responseError", function (event) {
@@ -1073,7 +1089,8 @@
     if (tabNavigationPending) {
       tabNavigationPending = false;
       tabNavigationTarget = "";
-      syncTabbar();
+      tabNavigationPath = "";
+      syncPageChrome();
     }
     if (status === 422) return;
     localToast("Couldn't save that. Check the connection and try again.", "error");
@@ -1086,6 +1103,7 @@
       var fallback = tabNavigationTarget;
       tabNavigationPending = false;
       tabNavigationTarget = "";
+      tabNavigationPath = "";
       window.location.assign(fallback);
       return;
     }
