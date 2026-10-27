@@ -24,11 +24,11 @@ make logging feel heavier.
   Home, History, or Settings. Quick logging keeps working from every other page.
 - **Logging never depends on the album.** If R2 is down or an upload fails, feeding,
   diapers, sleep, and history continue to work normally.
-- **Keep a good copy, not every copy.** By default we keep a high-quality display
-  copy (long edge 2560 px) and a 480 px thumbnail. We do not keep the untouched
-  camera original. That keeps storage and transfer predictable for a phone-first
-  app; a `NURTUR_ALBUM_KEEP_ORIGINAL` option can be added later without changing
-  the data model (store the original key as an extra variant).
+- **Keep a good copy, not every copy.** By default we keep a high-quality WebP
+  display copy (long edge 2560 px) and a 480 px WebP thumbnail. We do not keep the
+  untouched camera original. That keeps storage and transfer predictable for a
+  phone-first app; a `NURTUR_ALBUM_KEEP_ORIGINAL` option can be added later
+  without changing the data model (store the original key as an extra variant).
 
 ---
 
@@ -36,14 +36,14 @@ make logging feel heavier.
 
 ```text
 Phone browser
-  │  compress + resize + read EXIF date
+  │  read EXIF date + resize + encode WebP
   │  multipart POST /album/photos
   ▼
 Nurtur (Go)
   │  validate, upload two objects
   ├──────────────► Cloudflare R2 (private bucket)
-  │                  accounts/<id>/album/<upload-id>/full.jpg
-  │                  accounts/<id>/album/<upload-id>/thumb.jpg
+  │                  accounts/<id>/album/<upload-id>/full.webp
+  │                  accounts/<id>/album/<upload-id>/thumb.webp
   │
   └── Turso/SQLite (metadata only: date, size, keys, caption)
         │  existing debounced sync worker
@@ -67,8 +67,9 @@ changing the database or the page UI.
 | Storage abstraction | `internal/album.Storage` with `local` and `r2` drivers | Tests and local dev need no network; R2 is production-only |
 | S3 client | `github.com/minio/minio-go/v7` | Small S3-compatible client; avoids hand-rolling SigV4. Only Put/Get/Remove/Stat are used |
 | Upload path | Browser → Nurtur → R2 | Keeps bucket private, avoids R2 CORS, keeps CSP simple |
-| Compression | Browser, via canvas | Works on iOS and Android without server-side HEIC decoding; strips GPS and other metadata |
-| Variants | `full` (≤2560 px long edge) + `thumb` (≤480 px) | Grid loads small files; viewer loads a sharp enough copy |
+| Compression | Browser, via canvas → WebP | Works on iOS and Android without server-side HEIC decoding; WebP is substantially smaller than JPEG at the same visual quality; strips GPS and other metadata |
+| Fallback format | JPEG when canvas cannot encode WebP | Keeps older browsers and the no-JS path usable; the actual MIME type is stored so reads stay correct |
+| Variants | `full` (≤2560 px long edge) + `thumb` (≤480 px) | Grid loads small WebP files; viewer loads a sharp enough copy |
 | Date source | EXIF `DateTimeOriginal` → file timestamp → upload time | Most phone photos have EXIF; fallback keeps uploads usable |
 | Timezone | Store UTC RFC3339; display in `NURTUR_TZ` | Matches every other timestamp in Nurtur |
 | Pagination | Whole local days, newest first, cursor on the day boundary | A date heading never splits across pages, same rule as History |
@@ -76,7 +77,7 @@ changing the database or the page UI.
 | Auth | Existing account middleware; every query and key scoped by `account_id` | A photo URL from another account must return 404 |
 | Read cache | `Cache-Control: private, max-age=31536000, immutable` + ETag | Object keys never change; repeat scrolls are instant |
 | Local fallback | `./data/album` directory | `make dev`, tests, and e2e stay hermetic |
-| Dependency budget | One new module (`minio-go`) | Correctness of S3 signing beats a hand-rolled implementation |
+| Dependency budget | `minio-go` for R2; `golang.org/x/image` for WebP header/dimension checks | Correctness of S3 signing and WebP `DecodeConfig` beats hand-rolled parsers |
 
 ---
 
@@ -98,7 +99,7 @@ CREATE TABLE album_photos (
     height          INTEGER NOT NULL,
     bytes           INTEGER NOT NULL,           -- full object
     thumb_bytes     INTEGER NOT NULL,
-    content_type    TEXT NOT NULL,              -- image/jpeg or image/png
+    content_type    TEXT NOT NULL,              -- image/webp (or image/jpeg/png fallback)
     full_key        TEXT NOT NULL,
     thumb_key       TEXT NOT NULL,
     created_at      TEXT NOT NULL,
@@ -124,15 +125,23 @@ Rules:
   and reused on every retry.
 - `full_key` and `thumb_key` are opaque; the server never accepts a key from a URL.
   The no-JS degraded upload may set both to the same key.
+- `content_type` is the MIME type actually stored. The normal path writes
+  `image/webp`; the JPEG/PNG fallback writes that type instead. Reads always use
+  the stored value, never a guessed extension.
 - Soft-deleted rows keep their objects until the 30-day sweep in Phase 5.
 - Every read filters `account_id = ? AND deleted_at IS NULL`.
 
 Object keys:
 
 ```text
-accounts/<account_id>/album/<upload_id>/full.jpg
-accounts/<account_id>/album/<upload_id>/thumb.jpg
+accounts/<account_id>/album/<upload_id>/full.webp
+accounts/<account_id>/album/<upload_id>/thumb.webp
 ```
+
+The normal path always uses the `.webp` keys. If a browser cannot encode WebP,
+the same keys are used with the `.jpg` or `.png` suffix and the matching
+`content_type`; the extension is only cosmetic because reads come through the
+database. The no-JS fallback follows the same rule.
 
 The `upload_id` is also the unique retry key, so a crash between "upload full" and
 "insert row" is recoverable by retrying with the same id and overwriting the same
@@ -214,8 +223,9 @@ change later: the schema and the storage adapter.
 - Wire config, `server.Config`, `cmd/nurtur/main.go`, `.env-example`, and
   `docker-compose.yaml`.
 - Add `GET /album` and `GET /album/partial` (empty state for now).
-- Add a temporary storage smoke test (local driver) and an opt-in R2 test that
-  runs only when `NURTUR_R2_TEST=1` and the R2 values are set.
+- Add a temporary storage smoke test (local driver, using a small WebP fixture)
+  and an opt-in R2 test that runs only when `NURTUR_R2_TEST=1` and the R2 values
+  are set.
 - Add store tests for insert/list/paging/soft delete/account isolation.
 - Run `graphify update .` after the code change.
 
@@ -225,8 +235,8 @@ change later: the schema and the storage adapter.
 - The page renders inside the normal layout, header, and tabbar on a 320 px-wide
   viewport and in night mode.
 - `NURTUR_ALBUM_STORAGE=local` survives a restart and writes under `data/album`.
-- A manual R2 smoke test can put, stat, get, and remove one object from the private
-  bucket using the configured token.
+- A manual R2 smoke test can put, stat, get, and remove one `.webp` object from
+  the private bucket using the configured token.
 - `gofmt`, `go vet ./...`, and `go test -p 1 ./...` pass.
 
 ---
@@ -248,23 +258,29 @@ album without a page reload.
     external library and no network request.
   - Decode with `createImageBitmap(file, { imageOrientation: "from-image" })`,
     falling back to an `<img>` + object URL when `createImageBitmap` is missing.
-  - Draw to a canvas and export two JPEGs:
-    - full: long edge ≤2560 px, quality 0.85
-    - thumb: long edge ≤480 px, quality 0.8
+  - Draw to a canvas and export two **WebP** images:
+    - full: long edge ≤2560 px, quality 0.82
+    - thumb: long edge ≤480 px, quality 0.78
+  - Check the returned blob's `type`. If it is null or not `image/webp`, retry
+    the same canvas once as JPEG and send the actual MIME type; never claim WebP
+    for bytes that are not WebP.
   - Do not upscale small sources. Re-encoding strips GPS and other metadata.
   - Generate `upload_id` with `crypto.randomUUID()`, reused for retries.
   - Upload one photo per request with a queue of two, per-photo progress, cancel,
-    and retry. Show blob previews immediately; replace them with server tiles on
-    success.
-  - Fall back cleanly when canvas or JPEG encoding is unavailable: explain that
-    the photo could not be prepared, rather than uploading a 12 MB HEIC that the
+    and retry. Retries reuse the prepared blobs and the same `upload_id`, so the
+    format and keys do not change mid-retry. Show blob previews immediately;
+    replace them with server tiles on success.
+  - Fall back cleanly when neither WebP nor JPEG encoding works: explain that the
+    photo could not be prepared, rather than uploading a 12 MB HEIC that the
     server cannot thumbnail.
 - Add `POST /album/photos`:
   - One photo per request; max 12 MiB total, full ≤8 MiB, thumb ≤1 MiB.
   - Raise the body limit only for this route; the global 1 MiB limit stays for
     every other mutation.
   - Verify magic bytes (`http.DetectContentType`), `image.DecodeConfig` for
-    dimensions (JPEG/PNG), and reject >12000 px on either edge.
+    dimensions (WebP via `golang.org/x/image/webp`, plus JPEG/PNG), and reject
+    >12000 px on either edge. `image/webp` is the expected type; JPEG/PNG are
+    accepted only as the documented fallback.
   - Validate `upload_id` is exactly 32 lowercase hex characters (or a UUID),
     `taken_at` is RFC3339 and not in the future by more than a day, caption
     length, and content type.
@@ -277,6 +293,10 @@ album without a page reload.
 - No-JS fallback: a plain multipart form posts one file; the server stores the
   original as both `full` and `thumb`, uses upload time, and redirects to `/album`
   with a toast. This is deliberately degraded (larger downloads, no EXIF date).
+  Because the server does not transcode, it accepts only JPEG/PNG/WebP here and
+  rejects HEIC with a clear "turn on JavaScript to convert this photo" message.
+  The stored key extension and `content_type` follow the uploaded format; the
+  normal JS path is the one that always produces `.webp`.
 - Add `blob:` to the CSP `img-src` (local previews) and leave camera permissions
   alone: `capture` uses the native camera picker, not `getUserMedia`.
 - Tune `http.Server` read/write timeouts for uploads (start at 2 minutes) and
@@ -288,8 +308,8 @@ album without a page reload.
   file `lastModified` when plausible (same bounds), else upload time. Store the
   source.
 - Tests: EXIF fixtures with and without offset, orientation, no EXIF, future
-  timestamps, duplicate `upload_id`, oversized payload, wrong content type, and
-  account isolation.
+  timestamps, duplicate `upload_id`, oversized payload, wrong content type,
+  WebP header/dimension validation, the JPEG fallback, and account isolation.
 
 **Exit criteria**
 
@@ -300,7 +320,9 @@ album without a page reload.
   toast when it is outside the loaded range).
 - The same upload retried after a network drop creates exactly one row.
 - Dashboard logging still works while an upload is in flight.
-- The R2 objects have the expected keys and the bucket is still private.
+- The R2 objects use the expected `.webp` keys, report `image/webp`, and the
+  bucket is still private. A forced JPEG fallback reports `image/jpeg` and still
+  renders correctly.
 
 ---
 
@@ -332,7 +354,8 @@ album without a page reload.
   - Stream from the storage adapter with `Content-Type`, `Content-Length`,
     `ETag`, and `Cache-Control: private, max-age=31536000, immutable`.
   - `?download=1` sets `Content-Disposition: attachment` with a safe filename
-    such as `nurtur-2026-10-27-1542.jpg`.
+    whose extension matches the stored type, such as
+    `nurtur-2026-10-27-1542.webp` (or `.jpg`/`.png` for a fallback).
 - Add empty, first-load skeleton, upload-in-progress, and load-error states.
 - Make sure the service worker does not try to cache album HTML or photo URLs:
   it already only handles `/static/` and navigations, so no shell change is
@@ -340,7 +363,8 @@ album without a page reload.
   existing cache-first rule; if its URL or the CSS changes in a way that matters,
   the asset fingerprint in `asset` already busts the HTML reference.
 - Tests: paging across day boundaries, a day with no photos, cache headers,
-  deleted photo 404, foreign account 404, and grid rendering in the server test.
+  `Content-Type: image/webp` on a normal read, the JPEG fallback type, deleted
+  photo 404, foreign account 404, and grid rendering in the server test.
 
 **Exit criteria**
 
@@ -412,7 +436,7 @@ caption, and undo an accidental delete.
   - strip/reject suspicious filenames; never use the uploaded filename as a key
   - ensure `?download=1` cannot reflect a filename into headers
   - add `X-Content-Type-Options: nosniff` (already global) and only serve
-    `image/jpeg`/`image/png`
+    `image/webp`/`image/jpeg`/`image/png`
 - Retention sweep:
   - on startup and once a day, hard-delete rows whose `deleted_at` is older than
     30 days, after removing their R2 objects
@@ -436,7 +460,8 @@ caption, and undo an accidental delete.
   - empty and error copy in the Nurtur voice
 - Performance:
   - measure first grid paint and a 500-photo scroll on a real phone
-  - confirm thumbnails are ≤~80 KB and full copies are ≤~2 MB for typical photos
+  - confirm WebP thumbnails are ≤~40 KB and WebP full copies are ≤~1.2 MB for
+    typical photos; record the JPEG fallback separately
 - Tests and docs:
   - store/server/e2e coverage for the full flow
   - update `README.md`, `DEPLOYMENT.md` (R2 bucket + token + proxy body limit),
@@ -477,9 +502,10 @@ caption, and undo an accidental delete.
 
 | Risk | Why it matters | Mitigation |
 |---|---|---|
-| HEIC photos from iPhones | Browsers differ in decode support; the server should not decode HEIC | Re-encode in the browser with canvas; show a clear error if the browser cannot decode; test on a real iPhone in Phase 2 |
+| HEIC photos from iPhones | Browsers differ in decode support; the server should not decode HEIC | Re-encode in the browser with canvas; show a clear error if the browser cannot decode; test on a real iPhone in Phase 2. If iOS hands us HEIC bytes whose EXIF container we cannot read, fall back to the file timestamp and allow manual correction |
+| Browser cannot encode WebP | Older Safari/iOS versions may not support `canvas.toBlob("image/webp")` | Detect the returned blob type, retry as JPEG once, and store the real `content_type`; the grid and viewer do not care which format arrives |
 | Wrong EXIF timezone | `DateTimeOriginal` has no timezone | Use `OffsetTimeOriginal` when present, otherwise device timezone; store the source and allow manual correction in Phase 4 |
-| Slow mobile uploads through the VPS | 2–3 MB can take a while on a weak connection | Compress to ≤2560 px, show progress/retry, tune timeouts; if needed, add presigned direct upload in Phase 5 |
+| Slow mobile uploads through the VPS | A 2560 px WebP is usually 0.3–1.2 MB, but weak connections still struggle | Compress to ≤2560 px, show progress/retry, tune timeouts; if needed, add presigned direct upload in Phase 5 |
 | Orphaned R2 objects | Failed inserts or crashes can leave bytes with no row | Upload keys derive from `upload_id`; retries overwrite; best-effort delete on failure; document a manual bucket audit |
 | Large albums | Hundreds of full images would hurt scrolling | Thumbnails, lazy loading, whole-day pagination, immutable caching |
 | Private photos in browser cache after logout | Shared-device privacy | `Cache-Control: private`; document the trade-off; do not use a public bucket or public URLs |
@@ -506,14 +532,17 @@ caption, and undo an accidental delete.
 
 Run before calling the album shipped:
 
-- iPhone Safari: camera capture, photo library, multi-select, HEIC source, screen
-  lock during upload, night mode, installed PWA.
+- iPhone Safari: camera capture, photo library, multi-select, HEIC source, WebP
+  output (and JPEG fallback on an older iOS), screen lock during upload, night
+  mode, installed PWA.
 - Android Chrome: camera capture, photo library, multi-select, rotation, weak
   network, back button in the viewer.
-- Desktop Chrome/Firefox: drag-and-drop, file picker, keyboard viewer, no-JS
-  fallback.
+- Desktop Chrome/Firefox: drag-and-drop, file picker, keyboard viewer, WebP file
+  output, no-JS fallback.
 - Two accounts on the same server: each sees only its own photos, including
   guessed photo IDs.
+- R2 object check: full and thumb end in `.webp`, `Content-Type` is `image/webp`,
+  and a forced JPEG fallback keeps the correct MIME type.
 - Date edge cases: photo just before midnight, photo with no EXIF, camera clock
   wrong, photo taken in another timezone, future timestamp.
 - Delete/undo, delete the last photo in a day, delete while another tab is open.
