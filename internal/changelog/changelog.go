@@ -30,6 +30,27 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.6",
+		Date:    "Oct 27, 2026",
+		Title:   "A quieter quick log",
+		Summary: "The quick log now stays focused on whatever is running, and the Theme button keeps working after other settings change.",
+		Sections: []Section{
+			{
+				Title: "Changed",
+				Items: []string{
+					"While nursing or sleeping, the quick log hides the options that don't apply.",
+					"Every option comes back as soon as the feed or sleep is done.",
+				},
+			},
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The Theme button in Settings still works after another setting is saved.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.5",
 		Date:    "Oct 27, 2026",
 		Title:   "The bottom menu sits where it belongs",
