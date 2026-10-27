@@ -608,6 +608,40 @@ func TestDeleteActiveFeedStopsTimer(t *testing.T) {
 	}
 }
 
+func TestBoostedTabNavigationReturnsOnlyMain(t *testing.T) {
+	env := newTestEnv(t)
+	cases := []struct {
+		name    string
+		path    string
+		headers map[string]string
+	}{
+		{name: "tab link", path: "/timeline", headers: map[string]string{"HX-Target": "main"}},
+		{name: "history restore", path: "/settings", headers: map[string]string{"HX-History-Restore-Request": "true"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req.Header.Set("HX-Request", "true")
+			for key, value := range tc.headers {
+				req.Header.Set(key, value)
+			}
+			rec := httptest.NewRecorder()
+			env.handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d\n%s", rec.Code, rec.Body.String())
+			}
+			body := rec.Body.String()
+			trimmed := strings.TrimSpace(body)
+			if !strings.HasPrefix(trimmed, "<main") || !strings.Contains(body, `class="app-main"`) {
+				t.Fatalf("boosted page is not the main fragment:\n%s", body)
+			}
+			if strings.Contains(body, "<!doctype") || strings.Contains(body, `class="tabbar"`) {
+				t.Fatalf("boosted page kept the shell it already has:\n%s", body)
+			}
+		})
+	}
+}
+
 func TestTimerFragment(t *testing.T) {
 	env := newTestEnv(t)
 	env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true)

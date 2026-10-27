@@ -1,5 +1,5 @@
 {{define "tabbar"}}
-<nav class="tabbar" aria-label="Main">
+<nav class="tabbar" aria-label="Main" hx-boost="true" hx-target="#main" hx-select="#main" hx-swap="outerHTML" hx-push-url="true">
   <a class="tabbar-link{{if eq .View ""}} is-active{{end}}" href="/"{{if eq .View ""}} aria-current="page"{{end}}>
     {{icon "home"}}<span>Home</span>
   </a>

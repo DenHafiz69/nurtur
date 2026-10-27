@@ -71,10 +71,11 @@ func TestLandingForSignedOutAndDashboardForSignedIn(t *testing.T) {
 		t.Fatalf("signed-in root served the landing page:\n%s", body)
 	}
 
-	// Fragment requests keep the normal gate, so HTMX never receives a whole
-	// landing document where it expects a fragment.
+	// HTMX requests are told to redirect instead of receiving a whole landing
+	// document where the caller expects a fragment. This lets boosted tab
+	// links fall back to a full sign-in navigation.
 	rec = env.do(t, http.MethodGet, "/", nil, true)
-	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/login") {
-		t.Fatalf("signed-out HTMX root = %d %q", rec.Code, rec.Header().Get("Location"))
+	if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("HX-Redirect"), "/login") {
+		t.Fatalf("signed-out HTMX root = %d %q", rec.Code, rec.Header().Get("HX-Redirect"))
 	}
 }

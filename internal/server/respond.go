@@ -63,6 +63,16 @@ func isHTMX(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true"
 }
 
+// wantsMainFragment reports a boosted tab navigation: htmx asks for #main and
+// the rest of the shell (header, dock, tab bar) stays on the page. A history
+// restore refetches without an HX-Target, but still only needs the page body.
+func wantsMainFragment(r *http.Request) bool {
+	if !isHTMX(r) {
+		return false
+	}
+	return r.Header.Get("HX-Target") == "main" || r.Header.Get("HX-History-Restore-Request") == "true"
+}
+
 func (s *Server) respond(w http.ResponseWriter, r *http.Request, opts mutateResponse) {
 	if opts.Status == 0 {
 		opts.Status = http.StatusOK
@@ -306,8 +316,13 @@ func (s *Server) writeFragments(
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, data *view.PageData) {
 	data.Path = r.URL.RequestURI()
 	s.attachChangelog(r.Context(), data)
+	templateName := "layout"
+	if wantsMainFragment(r) {
+		// A boosted tab only needs the page body; skip the shell it already has.
+		templateName = "page-main"
+	}
 	var buf bytes.Buffer
-	if err := s.renderer.Execute(&buf, "layout", data); err != nil {
+	if err := s.renderer.Execute(&buf, templateName, data); err != nil {
 		s.serverError(w, r, err)
 		return
 	}

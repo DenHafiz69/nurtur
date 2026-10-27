@@ -861,6 +861,12 @@ button {
   box-shadow: 0 -8px 22px var(--dock-shadow);
 }
 
+/* Settings and the changelog keep the shell for tab swaps but hide the quick
+   log itself; the toast region stays available. */
+.dock-drawer[hidden] {
+  display: none;
+}
+
 /* The summary is the drawer's grab handle when open and its floating
    quick-log button when closed. It is native <details>, so it still works
    without JavaScript. */
@@ -945,11 +951,11 @@ button {
 }
 
 /* Keep the last history card and any toast clear of the floating button. */
-.app:has(.dock-drawer:not([open])) .app-main {
+.app:has(.dock-drawer:not([open]):not([hidden])) .app-main {
   padding-bottom: 96px;
 }
 
-.app:has(.dock-drawer:not([open])) .toast-region {
+.app:has(.dock-drawer:not([open]):not([hidden])) .toast-region {
   bottom: 84px;
 }
 
@@ -2931,14 +2937,6 @@ textarea {
   .back-link {
     transition: none;
   }
-}
-
-.settings-toast {
-  position: fixed;
-  right: 16px;
-  bottom: calc(72px + env(safe-area-inset-bottom));
-  left: 16px;
-  z-index: 40;
 }
 
 .timeline-row {

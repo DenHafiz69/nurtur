@@ -59,17 +59,11 @@
 
     <div id="offline-banner" class="offline-banner" hidden role="status">Offline — showing the last saved screen. New logs will wait for the connection.</div>
 
-    <main id="main" class="app-main" tabindex="-1">
-      {{if eq .View "timeline"}}{{template "timeline-page" .}}
-      {{else if eq .View "settings"}}{{template "settings-page" .}}
-      {{else if eq .View "changelog"}}{{template "changelog-page" .}}
-      {{else}}{{template "dashboard" .}}{{end}}
-    </main>
+    {{template "page-main" .}}
 
-    {{if and (ne .View "settings") (ne .View "changelog")}}
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
-      <details id="quick-log" class="dock-drawer"{{if ne .View "timeline"}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
+      <details id="quick-log" class="dock-drawer"{{if or (eq .View "settings") (eq .View "changelog")}} hidden{{else if ne .View "timeline"}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
         <summary class="dock-toggle" title="Show or hide quick logging">
           <span class="dock-toggle-grip" aria-hidden="true"></span>
           <span class="dock-toggle-label sr-only">Quick log</span>
@@ -85,7 +79,6 @@
         </div>
       </details>
     </footer>
-    {{end}}
 
     {{template "tabbar" .}}
 
@@ -112,3 +105,12 @@
   <script src="{{asset "/static/js/timer.js"}}"></script>
 </body>
 </html>{{end}}
+
+{{define "page-main"}}<main id="main" class="app-main" tabindex="-1" hx-history-elt>{{template "main-content" .}}</main>{{end}}
+
+{{define "main-content"}}
+  {{if eq .View "timeline"}}{{template "timeline-page" .}}
+  {{else if eq .View "settings"}}{{template "settings-page" .}}
+  {{else if eq .View "changelog"}}{{template "changelog-page" .}}
+  {{else}}{{template "dashboard" .}}{{end}}
+{{end}}

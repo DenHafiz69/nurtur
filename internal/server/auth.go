@@ -122,7 +122,16 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 				return
 			}
 			next := r.URL.RequestURI()
-			http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusSeeOther)
+			login := "/login?next=" + url.QueryEscape(next)
+			if isHTMX(r) {
+				// A boosted tab keeps the current page on screen until the
+				// response arrives. Send it to the sign-in page instead of
+				// letting it swap a document that has no #main.
+				w.Header().Set("HX-Redirect", login)
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			http.Redirect(w, r, login, http.StatusSeeOther)
 			return
 		}
 
