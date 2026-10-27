@@ -52,7 +52,7 @@ var releases = []Release{
 			{
 				Title: "Removed",
 				Items: []string{
-					"A status chip in the header and a status card in Settings, for a calmer screen.",
+					"The small status chip in the header, for a calmer screen. Sync details are still in Settings.",
 				},
 			},
 		},

@@ -241,7 +241,14 @@ type SettingsView struct {
 	FeedAlertMinutes int
 	FeedAlertErr     string
 
-	ThemeNote string
+	SyncMode   string
+	SyncStatus string
+	SyncDetail string
+	LastPush   string
+	LastPull   string
+	Pending    string
+	Degraded   bool
+	ThemeNote  string
 }
 
 // Toast is a transient mutation result. An action turns it into a quick

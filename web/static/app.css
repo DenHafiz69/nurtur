@@ -2692,6 +2692,10 @@ textarea {
   font-weight: 600 !important;
 }
 
+.settings-warn {
+  color: var(--danger);
+}
+
 .settings-form {
   display: flex;
   flex-direction: column;
