@@ -30,6 +30,20 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.5",
+		Date:    "Oct 27, 2026",
+		Title:   "The bottom menu sits where it belongs",
+		Summary: "On iPhone, the bottom menu now reaches the screen edge instead of floating above it.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The bottom menu fills the home-indicator area on iOS instead of leaving a gap below it.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.4",
 		Date:    "Oct 27, 2026",
 		Title:   "One thumb, three places",
