@@ -399,7 +399,7 @@ When the feed is active, the timer is the dock's headline and the diaper row rem
 | Sticker badge | Slightly rotated pill with dashed border | "Last: Left · 1h 45m ago"; rotates only ±1.5°, never enough to hurt readability. |
 | Bottom sheet | Rounded top corners, cream/night surface, grab handle | Native `<dialog>`; focus trapped; swipe/backdrop/Esc closes. |
 | Toast | Floating pill above dock, icon + text + action | 8 s for Undo, 5 s otherwise; pauses on hover/focus; announced politely. |
-| Timeline row | Icon circle, title, detail, time, delete affordance | Tap to edit; delete is a small but ≥44 px target with an accessible label. |
+| Timeline row | Icon circle, title, detail, time, delete affordance | Tap to edit; delete is a small but ≥44 px target with an accessible label. The running activity's row in Today opens the quick-log dock. |
 | Theme toggle | Sun/moon in a small sticker circle | Three states: auto, day, night; long-press or settings for auto schedule. |
 | Sync chip | Tiny cloud + dot, no spinner unless actively pushing | "Saved locally", "Syncing…", "Synced"; amber when offline, green when caught up. |
 

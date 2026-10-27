@@ -103,6 +103,16 @@
   // server render reopen (or close) it.
   var DOCK_KEY = "nurtur.dock";
   var dockDrawer = document.querySelector(".dock-drawer");
+
+  // The running activity row is a disclosure for the dock, so keep its
+  // aria-expanded in step with the drawer even after an OOB swap replaces it.
+  function syncDockExpanded() {
+    var expanded = !!(dockDrawer && dockDrawer.open);
+    document.querySelectorAll("[data-open-dock]").forEach(function (row) {
+      row.setAttribute("aria-expanded", expanded ? "true" : "false");
+    });
+  }
+
   if (dockDrawer) {
     var dockPreference = null;
     try { dockPreference = localStorage.getItem(DOCK_KEY); } catch (e) {}
@@ -111,8 +121,21 @@
     }
     dockDrawer.addEventListener("toggle", function () {
       try { localStorage.setItem(DOCK_KEY, dockDrawer.open ? "open" : "closed"); } catch (e) {}
+      syncDockExpanded();
     });
+    syncDockExpanded();
   }
+
+  // Tapping the running activity's row opens the same quick-log drawer as the
+  // floating + button, so the actions for that activity stay one tap away.
+  document.addEventListener("click", function (event) {
+    var row = event.target.closest ? event.target.closest("[data-open-dock]") : null;
+    if (!row || !dockDrawer) return;
+    event.preventDefault();
+    dockDrawer.open = true;
+    var toggle = dockDrawer.querySelector(".dock-toggle");
+    if (toggle) toggle.focus({ preventScroll: true });
+  });
 
   /* ---------- Time formatting (mirrors internal/view) ---------- */
 
@@ -893,6 +916,7 @@
     updateRelativeLabels();
     tickLiveClocks();
     refreshNotificationUI();
+    syncDockExpanded();
   }
 
   document.body.addEventListener("htmx:afterSwap", function (event) {

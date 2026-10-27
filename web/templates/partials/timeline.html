@@ -1,3 +1,16 @@
+{{define "event-row-copy"}}
+<span class="event-icon" aria-hidden="true">{{icon .Icon}}</span>
+<div class="feed-main">
+  <p class="feed-line">
+    <span class="feed-time">{{.TimeLabel}}</span>
+    <span class="feed-sep" aria-hidden="true">·</span>
+    <span class="event-title">{{.Title}}</span>
+    {{if .Active}}{{if .Paused}}<span class="chip chip-paused">paused</span>{{else}}<span class="chip chip-live">now</span>{{end}}{{end}}
+  </p>
+  {{if .Detail}}<p class="feed-detail">{{.Detail}}</p>{{end}}
+</div>
+{{end}}
+
 {{define "timeline-today"}}
 <div id="timeline-today" class="timeline-today">{{template "timeline-today-inner" .}}</div>
 {{end}}
@@ -16,17 +29,15 @@
     </p>
     <ul class="feed-list" aria-label="Today's events">
       {{range .Events}}
-        <li class="feed-row {{.KindClass}}{{if .Active}} is-active{{end}}">
-          <span class="event-icon" aria-hidden="true">{{icon .Icon}}</span>
-          <div class="feed-main">
-            <p class="feed-line">
-              <span class="feed-time">{{.TimeLabel}}</span>
-              <span class="feed-sep" aria-hidden="true">·</span>
-              <span class="event-title">{{.Title}}</span>
-              {{if .Active}}{{if .Paused}}<span class="chip chip-paused">paused</span>{{else}}<span class="chip chip-live">now</span>{{end}}{{end}}
-            </p>
-            {{if .Detail}}<p class="feed-detail">{{.Detail}}</p>{{end}}
-          </div>
+        <li class="feed-row {{.KindClass}}{{if .Active}} is-active live-row{{end}}">
+          {{if .Active}}
+            <a class="live-row-main" href="{{.EditURL}}" data-open-dock aria-controls="quick-log" aria-expanded="true">
+              {{template "event-row-copy" .}}
+              <span class="sr-only">Open quick log</span>
+            </a>
+          {{else}}
+            {{template "event-row-copy" .}}
+          {{end}}
           <div class="feed-actions">
             <a class="icon-btn" href="{{.EditURL}}" hx-get="{{.EditURL}}" hx-target="{{.EditTarget}}" hx-swap="innerHTML" aria-label="Edit {{.ActionLabel}}">{{icon "pencil"}}</a>
             <form method="post" action="{{.DeleteURL}}/delete" hx-delete="{{.DeleteURL}}" hx-target="{{.DeleteTarget}}" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">

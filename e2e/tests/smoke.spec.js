@@ -203,6 +203,35 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByText(/Last: Left/)).toBeVisible();
   });
 
+  test("tapping the running activity row opens the quick-log dock", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /Start sleep/ }).click();
+    await expect(page.locator(".sleep-pill.is-asleep")).toBeVisible();
+
+    const drawer = page.locator("details.dock-drawer");
+    const toggle = page.locator(".dock-toggle");
+    await toggle.click();
+    await expect(drawer).not.toHaveAttribute("open", "");
+
+    // The running activity's row in Today is a shortcut for the + menu.
+    const liveRow = page.locator(".feed-row.is-active .live-row-main");
+    await expect(liveRow).toHaveAttribute("aria-expanded", "false");
+    await liveRow.click();
+    await expect(drawer).toHaveAttribute("open", "");
+    await expect(liveRow).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("button", { name: /Wake up/ })).toBeVisible();
+
+    // Status cards keep opening their own detail sheets.
+    await page.locator(".status-card.status-sleep").click();
+    await expect(
+      page.locator("dialog.sheet[open]").getByRole("heading", { name: "Sleep", exact: true })
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: /Wake up/ }).click();
+    await expect(page.getByText(/Awake\. That was/)).toBeVisible();
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);

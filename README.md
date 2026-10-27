@@ -88,6 +88,10 @@ Three compact status cards sit at the top of the home screen:
 The header also shows your baby's current age, derived from their birth date.
 Enough context to decide what to do next without reading a log.
 
+The status cards open their detail sheets. When something is running, its row
+in Today opens the same quick-log dock as the floating `+`, so pause, switch,
+wake, or log a diaper straight from the row.
+
 ### A timeline you can actually fix
 
 - **One history, newest first.** Feeds, diapers, and sleeps share a single
