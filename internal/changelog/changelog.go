@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.9",
+		Date:    "Oct 27, 2026",
+		Title:   "The quick log waits its turn",
+		Summary: "Leaving Settings no longer flashes the quick log's floating button over the old page while the next tab loads.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The quick log appears with the new tab instead of popping in over the page being left behind.",
+					"An open quick log stays in place until Settings has actually loaded.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.8",
 		Date:    "Oct 27, 2026",
 		Title:   "Tabs that keep up",
