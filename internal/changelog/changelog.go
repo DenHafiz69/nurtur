@@ -30,6 +30,22 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.2",
+		Date:    "Oct 27, 2026",
+		Title:   "The nursing clock keeps its time",
+		Summary: "Resuming a paused feed now continues from the time already nursed instead of starting at zero.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"Resuming a paused feed no longer resets the timer to 00:00.",
+					"The timer, header badge, and nursing status card show the total time on the current side.",
+					"Switching back to a side continues that side's running total.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.1",
 		Date:    "Oct 27, 2026",
 		Title:   "Pause the timer, keep the time",
