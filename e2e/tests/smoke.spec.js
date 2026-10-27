@@ -139,6 +139,27 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(html).toHaveAttribute("data-theme", "day");
   });
 
+  test("theme still changes after saving another setting", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.setItem("nurtur.theme", "day"));
+    await page.goto("/settings");
+
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute("data-theme", "day");
+
+    // Saving a setting rebuilds the panel, including the Theme card.
+    await page.locator('input[name="night_start"]').fill("21:00");
+    await page.locator('input[name="night_end"]').fill("07:00");
+    await page.getByRole("button", { name: "Save night window" }).click();
+    await expect(page.getByText("Night window saved.")).toBeVisible();
+
+    const themeButton = page.locator('section[aria-labelledby="settings-theme"] [data-theme-toggle]');
+    await expect(themeButton).toHaveAttribute("aria-label", "Theme: day. Activate for night.");
+    await themeButton.click();
+    await expect(html).toHaveAttribute("data-theme", "night");
+    await expect(themeButton).toHaveAttribute("aria-label", /^Theme: night\./);
+  });
+
   test("nursing alert pings at the threshold and repeats until done", async ({ page }) => {
     // Control Date/timers so the ten-minute threshold can be crossed quickly.
     await page.clock.install();
