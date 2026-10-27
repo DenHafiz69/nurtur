@@ -30,6 +30,23 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.8",
+		Date:    "Oct 27, 2026",
+		Title:   "Tabs that keep up",
+		Summary: "Switching between Home, History, and Settings no longer reloads the whole page, so the timer stays put and the next tab appears right away.",
+		Sections: []Section{
+			{
+				Title: "Changed",
+				Items: []string{
+					"Tab switches replace only the page body; the header and quick log stay in place.",
+					"A running timer keeps going across tabs without a reload or flash.",
+					"The tab you tapped highlights straight away while its page loads.",
+					"Back and forward move between tabs the same way.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.7",
 		Date:    "Oct 27, 2026",
 		Title:   "Sleeping gets the same big card",
