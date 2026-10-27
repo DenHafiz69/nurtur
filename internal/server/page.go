@@ -121,23 +121,24 @@ func (s *Server) statusView(snap status.Snapshot) view.StatusView {
 	}
 	if snap.ActiveFeed != nil {
 		side := snap.ActiveFeed.MostRecentSide()
-		since := snap.ActiveFeed.StartedAt
 		if current, ok := snap.ActiveFeed.CurrentSegment(); ok {
 			side = current.Side
-			since = current.StartedAt
+		}
+		left, right := snap.ActiveFeed.Totals(now)
+		elapsed := left
+		if side == feed.SideRight {
+			elapsed = right
 		}
 		out.Nursing.Active = true
 		out.Nursing.HasData = true
 		out.Nursing.Icon = "drop-" + string(side)
+		out.Nursing.Value = view.FormatDuration(elapsed)
 		if snap.ActiveFeed.Paused() {
 			// Freeze the card: a paused feed keeps the time already nursed
 			// and does not advance while nobody is nursing.
-			left, right := snap.ActiveFeed.Totals(now)
-			out.Nursing.Value = view.FormatDuration(left + right)
 			out.Nursing.Detail = "Paused · " + side.Title() + " side"
 		} else {
-			out.Nursing.Value = view.FormatDuration(now.Sub(since))
-			out.Nursing.ValueSince = since
+			out.Nursing.ValueSince = now.Add(-elapsed)
 			out.Nursing.ValueMode = "duration"
 			out.Nursing.Detail = "Nursing " + strings.ToLower(side.Title())
 		}
@@ -331,30 +332,26 @@ func diaperIcon(kind diaper.Kind) string {
 func (s *Server) activeView(ctx context.Context, f *feed.Feed, now time.Time) *view.ActiveView {
 	paused := f.Paused()
 	side := f.MostRecentSide()
-	started := f.StartedAt
-	elapsed := now.Sub(started)
 	if current, ok := f.CurrentSegment(); ok {
 		side = current.Side
-		started = current.StartedAt
-		elapsed = current.Duration(now)
-	} else if paused && len(f.Segments) > 0 {
-		// Freeze on the stretch that just ended so the digits do not keep
-		// counting through the pause.
-		last := f.Segments[len(f.Segments)-1]
-		side = last.Side
-		started = last.StartedAt
-		elapsed = last.Duration(now)
-	} else if paused {
-		elapsed = 0
-	}
-	if elapsed < 0 {
-		elapsed = 0
 	}
 
 	left, right, err := s.store.TotalsForFeed(ctx, f.ID, now)
 	if err != nil {
 		left, right = f.Totals(now)
 	}
+	elapsed := left
+	if side == feed.SideRight {
+		elapsed = right
+	}
+	if elapsed < 0 {
+		elapsed = 0
+	}
+
+	// The clock shows everything nursed on this side during this feed, not
+	// just the latest stretch. Resuming after a pause therefore continues
+	// from the paused time instead of starting over at zero.
+	started := now.Add(-elapsed)
 	opposite := feed.Opposite(side)
 	return &view.ActiveView{
 		ID:            f.ID,

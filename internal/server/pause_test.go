@@ -48,6 +48,7 @@ func TestPauseResumeKeepsTheTimerHonest(t *testing.T) {
 		"Resume",
 		resumeURL,
 		"so far",
+		"data-timer-digits>05:00<",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("paused dashboard missing %q\n%s", want, body)
@@ -75,7 +76,7 @@ func TestPauseResumeKeepsTheTimerHonest(t *testing.T) {
 		t.Fatalf("resume = %d\n%s", rec.Code, rec.Body.String())
 	}
 	body = rec.Body.String()
-	for _, want := range []string{`data-paused="false"`, "Nursing <strong>Left</strong>", "this feed"} {
+	for _, want := range []string{`data-paused="false"`, "Nursing <strong>Left</strong>", "this feed", "data-timer-digits>05:00<"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("resumed timer missing %q\n%s", want, body)
 		}
@@ -125,5 +126,33 @@ func TestPauseResumeKeepsTheTimerHonest(t *testing.T) {
 	left, right = stopped.Totals(env.clock.Now())
 	if left != 7*time.Minute || right != 0 {
 		t.Fatalf("final totals = %v/%v, want 7m/0m", left, right)
+	}
+}
+
+func TestTimerShowsCumulativeTimeForTheCurrentSide(t *testing.T) {
+	env := newTestEnv(t)
+
+	if rec := env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true); rec.Code != http.StatusOK {
+		t.Fatalf("start feed = %d\n%s", rec.Code, rec.Body.String())
+	}
+	env.clock.Advance(6 * time.Minute)
+	rec := env.do(t, http.MethodPost, "/feeds/1/switch", url.Values{"side": {"right"}}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("switch to right = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "data-timer-digits>00:00<") {
+		t.Fatalf("new right side should start at zero:\n%s", rec.Body.String())
+	}
+
+	env.clock.Advance(4 * time.Minute)
+	rec = env.do(t, http.MethodGet, "/partials/feed/timer", nil, true)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "data-timer-digits>04:00<") {
+		t.Fatalf("right side clock = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	// Returning to a side continues that side's total instead of restarting.
+	rec = env.do(t, http.MethodPost, "/feeds/1/switch", url.Values{"side": {"left"}}, true)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "data-timer-digits>06:00<") {
+		t.Fatalf("left side clock after switching back = %d\n%s", rec.Code, rec.Body.String())
 	}
 }

@@ -104,12 +104,15 @@ type ActiveView struct {
 	SideTitle     string
 	Opposite      feed.Side
 	OppositeTitle string
-	StartedAt     time.Time
-	ServerNow     time.Time
-	Elapsed       time.Duration
-	TotalElapsed  time.Duration
-	SplitLabel    string
-	Paused        bool
+	// StartedAt is the reference the client ticks from. It can predate the
+	// open segment so Elapsed counts every stretch already nursed on this side
+	// during this feed, not only the latest one.
+	StartedAt    time.Time
+	ServerNow    time.Time
+	Elapsed      time.Duration
+	TotalElapsed time.Duration
+	SplitLabel   string
+	Paused       bool
 }
 
 // LastView is the most recent completed feed.
