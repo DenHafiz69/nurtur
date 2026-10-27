@@ -79,6 +79,16 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByText(/add Nurtur to your home screen/)).toBeVisible();
   });
 
+  test("history and settings use the bottom nav instead of a back link", async ({ page }) => {
+    await page.goto("/timeline");
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(page.locator(".back-link")).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.locator(".back-link")).toHaveCount(0);
+  });
+
   test("history collapses quick logging into an expandable drawer", async ({ page }) => {
     await page.goto("/timeline");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
