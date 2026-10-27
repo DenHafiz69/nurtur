@@ -30,6 +30,22 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.7",
+		Date:    "Oct 27, 2026",
+		Title:   "Sleeping gets the same big card",
+		Summary: "The quick log's sleeping card now matches the nursing card, with a large live timer and a clear Wake up button.",
+		Sections: []Section{
+			{
+				Title: "Changed",
+				Items: []string{
+					"The sleeping card stands as tall as the nursing card.",
+					"Sleeping shows the mascot, a live timer, and an edit button while it runs.",
+					"Wake up is now its own button instead of the whole card.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.6",
 		Date:    "Oct 27, 2026",
 		Title:   "A quieter quick log",
