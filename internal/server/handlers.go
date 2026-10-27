@@ -115,6 +115,90 @@ func (s *Server) handleSwitchFeed(w http.ResponseWriter, r *http.Request) {
 	s.respond(w, r, opts)
 }
 
+func (s *Server) handlePauseFeed(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.feedID(w, r)
+	if !ok {
+		return
+	}
+
+	paused, err := s.store.PauseFeed(r.Context(), id, s.clock.Now())
+	var toast *view.Toast
+	switch {
+	case err == nil:
+		toast = &view.Toast{Message: "Timer paused. Take your time.", Kind: "info"}
+	case errors.Is(err, feed.ErrAlreadyPaused):
+		toast = &view.Toast{Message: "That feed is already paused.", Kind: "info"}
+	case errors.Is(err, feed.ErrNoActiveFeed):
+		toast = &view.Toast{Message: "That feed already ended.", Kind: "info"}
+	case errors.Is(err, feed.ErrAlreadyDeleted):
+		toast = &view.Toast{Message: "That feed was deleted.", Kind: "info"}
+	case errors.Is(err, feed.ErrNotFound):
+		s.notFound(w)
+		return
+	default:
+		s.serverError(w, r, err)
+		return
+	}
+
+	opts := mutateResponse{Toast: toast, Trigger: "feed-saved", TriggerAfterSwap: true}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Feed, paused.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "update"
+		}
+	}
+	s.respond(w, r, opts)
+}
+
+func (s *Server) handleResumeFeed(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.feedID(w, r)
+	if !ok {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+
+	var side feed.Side
+	if raw := strings.TrimSpace(r.FormValue("side")); raw != "" {
+		parsed, err := feed.ParseSide(raw)
+		if err != nil {
+			s.badRequest(w, "That side isn't valid.")
+			return
+		}
+		side = parsed
+	}
+
+	resumed, err := s.store.ResumeFeed(r.Context(), id, side, s.clock.Now())
+	var toast *view.Toast
+	switch {
+	case err == nil:
+		toast = &view.Toast{Message: "Nursing " + strings.ToLower(resumed.MostRecentSide().Title()) + " again.", Kind: "success"}
+	case errors.Is(err, feed.ErrNotPaused):
+		toast = &view.Toast{Message: "That feed is already running.", Kind: "info"}
+	case errors.Is(err, feed.ErrNoActiveFeed):
+		toast = &view.Toast{Message: "That feed already ended.", Kind: "info"}
+	case errors.Is(err, feed.ErrAlreadyDeleted):
+		toast = &view.Toast{Message: "That feed was deleted.", Kind: "info"}
+	case errors.Is(err, feed.ErrNotFound):
+		s.notFound(w)
+		return
+	default:
+		s.serverError(w, r, err)
+		return
+	}
+
+	opts := mutateResponse{Toast: toast, Trigger: "feed-saved", TriggerAfterSwap: true}
+	if err == nil && onTimeline(r) {
+		if row, rowErr := s.timelineRowByID(r.Context(), timeline.Feed, resumed.ID); rowErr == nil {
+			opts.Row = &row
+			opts.RowMode = "update"
+		}
+	}
+	s.respond(w, r, opts)
+}
+
 func (s *Server) handleStopFeed(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.feedID(w, r)
 	if !ok {

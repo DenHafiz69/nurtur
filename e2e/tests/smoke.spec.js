@@ -181,6 +181,28 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.locator(".timer-label")).toHaveCount(0);
   });
 
+  test("pause holds the timer until resume", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Left", exact: true }).click();
+    await expect(page.locator(".timer-label")).toContainText("Nursing Left");
+
+    await page.getByRole("button", { name: "Pause nursing" }).click();
+    await expect(page.locator(".timer-label")).toContainText("Paused Left");
+    await expect(page.getByRole("button", { name: "Resume nursing Left" })).toBeVisible();
+
+    // Pausing is server-owned, so it survives a reload and the digits stop.
+    await page.reload();
+    await expect(page.locator(".timer-label")).toContainText("Paused Left");
+    const frozen = await page.locator("[data-timer-digits]").textContent();
+    await page.waitForTimeout(1200);
+    await expect(page.locator("[data-timer-digits]")).toHaveText(frozen);
+
+    await page.getByRole("button", { name: "Resume nursing Left" }).click();
+    await expect(page.locator(".timer-label")).toContainText("Nursing Left");
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.getByText(/Last: Left/)).toBeVisible();
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);

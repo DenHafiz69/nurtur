@@ -47,6 +47,9 @@ Nurtur goes the other way.
 - **A timer that survives real life.** Screen locks, tab switches, refreshes,
   and server restarts don't reset the feed. The server is the source of truth,
   and the browser reconciles against it.
+- **Pause when your baby unlatches.** Pause without losing the time already
+  nursed. Paused minutes stay out of the total, and Resume picks the same side
+  back up where you left it.
 - **"Last nursed" at a glance.** Side and elapsed time, right in the header, so
   you never have to guess which side is next.
 - **Fix it after the fact.** `−5 min` / `+5 min` and manual start/end edits,

@@ -109,6 +109,7 @@ type ActiveView struct {
 	Elapsed       time.Duration
 	TotalElapsed  time.Duration
 	SplitLabel    string
+	Paused        bool
 }
 
 // LastView is the most recent completed feed.
@@ -183,6 +184,7 @@ type EventRow struct {
 	Title        string
 	Detail       string
 	Active       bool
+	Paused       bool
 	Icon         string
 	EditURL      string
 	EditTarget   string
@@ -270,6 +272,7 @@ type Toast struct {
 type EditView struct {
 	ID           int64
 	Active       bool
+	Paused       bool
 	Title        string
 	SideTitle    string
 	StartInput   string
@@ -371,15 +374,17 @@ type SleepEditView struct {
 
 // NursingSheetView backs the nursing action sheet.
 type NursingSheetView struct {
-	Active    bool
-	ID        int64
-	SideTitle string
-	StartedAt time.Time
-	ServerNow time.Time
-	Elapsed   time.Duration
-	HasLast   bool
-	LastSide  string
-	LastAgo   string
+	Active        bool
+	Paused        bool
+	ID            int64
+	SideTitle     string
+	OppositeTitle string
+	StartedAt     time.Time
+	ServerNow     time.Time
+	Elapsed       time.Duration
+	HasLast       bool
+	LastSide      string
+	LastAgo       string
 }
 
 // AdminPageData backs the standalone admin screen. The admin is not a

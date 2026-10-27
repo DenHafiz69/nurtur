@@ -1,12 +1,12 @@
 {{define "timer"}}
-<div id="timer-card" class="timer-card {{if .Active}}is-nursing{{else}}is-idle{{end}}"{{if .TimerOOB}} hx-swap-oob="outerHTML"{{end}} data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-feed-id="{{.ID}}" data-side="{{.Side}}" data-started-at="{{iso .StartedAt}}" data-server-now="{{iso .ServerNow}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{end}}>
+<div id="timer-card" class="timer-card {{if .Active}}{{if .Active.Paused}}is-paused{{else}}is-nursing{{end}}{{else}}is-idle{{end}}"{{if .TimerOOB}} hx-swap-oob="outerHTML"{{end}} data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-feed-id="{{.ID}}" data-side="{{.Side}}" data-started-at="{{iso .StartedAt}}" data-server-now="{{iso .ServerNow}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}" data-paused="{{if .Paused}}true{{else}}false{{end}}"{{end}}>
   {{if .Active}}
     <div class="timer-display">
-      <span class="timer-pip">{{.Mascot "nursing"}}</span>
+      <span class="timer-pip">{{if .Active.Paused}}{{.Mascot "sleeping"}}{{else}}{{.Mascot "nursing"}}{{end}}</span>
       <div class="timer-copy">
-        <p class="timer-label">Nursing <strong>{{.Active.SideTitle}}</strong></p>
+        <p class="timer-label">{{if .Active.Paused}}Paused{{else}}Nursing{{end}} <strong>{{.Active.SideTitle}}</strong></p>
         <p class="timer-digits" data-timer-digits>{{timer .Active.Elapsed}}</p>
-        <p class="timer-split">{{.Active.SplitLabel}} this feed</p>
+        <p class="timer-split">{{.Active.SplitLabel}} {{if .Active.Paused}}so far{{else}}this feed{{end}}</p>
         <span class="sr-only" id="timer-announcer" aria-live="polite"></span>
       </div>
       <a class="icon-btn timer-adjust" href="/feeds/{{.Active.ID}}/edit" hx-get="/feeds/{{.Active.ID}}/edit" hx-target="#feed-edit-dialog" hx-swap="innerHTML" aria-label="Adjust this feed">{{icon "pencil"}}</a>
@@ -20,9 +20,19 @@
 
   {{if .Active}}
     <div class="timer-actions timer-actions-active">
+      {{if .Active.Paused}}
+      <form method="post" action="/feeds/{{.Active.ID}}/resume" hx-post="/feeds/{{.Active.ID}}/resume" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <input type="hidden" name="side" value="{{.Active.Side}}">
+        <button type="submit" class="btn btn-resume" aria-label="Resume nursing {{.Active.SideTitle}}">{{icon "play"}}<span>Resume</span></button>
+      </form>
+      {{else}}
+      <form method="post" action="/feeds/{{.Active.ID}}/pause" hx-post="/feeds/{{.Active.ID}}/pause" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <button type="submit" class="btn btn-pause" aria-label="Pause nursing">{{icon "pause"}}<span>Pause</span></button>
+      </form>
+      {{end}}
       <form method="post" action="/feeds/{{.Active.ID}}/switch" hx-post="/feeds/{{.Active.ID}}/switch" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
         <input type="hidden" name="side" value="{{.Active.Opposite}}">
-        <button type="submit" class="btn btn-switch">{{icon (printf "drop-%s" .Active.Opposite)}}<span>Switch to {{.Active.OppositeTitle}}</span></button>
+        <button type="submit" class="btn btn-switch" aria-label="Switch to {{.Active.OppositeTitle}}">{{icon (printf "drop-%s" .Active.Opposite)}}<span>{{.Active.OppositeTitle}}</span></button>
       </form>
       <form method="post" action="/feeds/{{.Active.ID}}/stop" hx-post="/feeds/{{.Active.ID}}/stop" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
         <button type="submit" class="btn btn-done">{{icon "check"}}<span>Done</span></button>

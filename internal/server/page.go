@@ -128,11 +128,19 @@ func (s *Server) statusView(snap status.Snapshot) view.StatusView {
 		}
 		out.Nursing.Active = true
 		out.Nursing.HasData = true
-		out.Nursing.Value = view.FormatDuration(now.Sub(since))
-		out.Nursing.ValueSince = since
-		out.Nursing.ValueMode = "duration"
-		out.Nursing.Detail = "Nursing " + strings.ToLower(side.Title())
 		out.Nursing.Icon = "drop-" + string(side)
+		if snap.ActiveFeed.Paused() {
+			// Freeze the card: a paused feed keeps the time already nursed
+			// and does not advance while nobody is nursing.
+			left, right := snap.ActiveFeed.Totals(now)
+			out.Nursing.Value = view.FormatDuration(left + right)
+			out.Nursing.Detail = "Paused · " + side.Title() + " side"
+		} else {
+			out.Nursing.Value = view.FormatDuration(now.Sub(since))
+			out.Nursing.ValueSince = since
+			out.Nursing.ValueMode = "duration"
+			out.Nursing.Detail = "Nursing " + strings.ToLower(side.Title())
+		}
 	} else if snap.LastFeed != nil && snap.LastFeed.EndedAt != nil {
 		out.Nursing.HasData = true
 		out.Nursing.Value = view.FormatAgo(now, *snap.LastFeed.EndedAt)
@@ -222,10 +230,14 @@ func (s *Server) eventRows(feeds []feed.Feed, diapers []diaper.Diaper, sleeps []
 	for _, f := range feeds {
 		left, right := f.Totals(now)
 		active := f.EndedAt == nil
+		paused := f.Paused()
 		title := "Nursed"
 		detail := view.SplitLabel(left, right, f.MostRecentSide())
 		if active {
 			title = "Nursing"
+			if paused {
+				title = "Paused"
+			}
 		} else {
 			detail = view.FeedDetail(left, right)
 		}
@@ -237,6 +249,7 @@ func (s *Server) eventRows(feeds []feed.Feed, diapers []diaper.Diaper, sleeps []
 			Title:        title,
 			Detail:       detail,
 			Active:       active,
+			Paused:       paused,
 			Icon:         "drop-" + string(f.MostRecentSide()),
 			EditURL:      fmt.Sprintf("/feeds/%d/edit", f.ID),
 			EditTarget:   "#feed-edit-dialog",
@@ -316,6 +329,7 @@ func diaperIcon(kind diaper.Kind) string {
 }
 
 func (s *Server) activeView(ctx context.Context, f *feed.Feed, now time.Time) *view.ActiveView {
+	paused := f.Paused()
 	side := f.MostRecentSide()
 	started := f.StartedAt
 	elapsed := now.Sub(started)
@@ -323,6 +337,15 @@ func (s *Server) activeView(ctx context.Context, f *feed.Feed, now time.Time) *v
 		side = current.Side
 		started = current.StartedAt
 		elapsed = current.Duration(now)
+	} else if paused && len(f.Segments) > 0 {
+		// Freeze on the stretch that just ended so the digits do not keep
+		// counting through the pause.
+		last := f.Segments[len(f.Segments)-1]
+		side = last.Side
+		started = last.StartedAt
+		elapsed = last.Duration(now)
+	} else if paused {
+		elapsed = 0
 	}
 	if elapsed < 0 {
 		elapsed = 0
@@ -344,6 +367,7 @@ func (s *Server) activeView(ctx context.Context, f *feed.Feed, now time.Time) *v
 		Elapsed:       elapsed,
 		TotalElapsed:  left + right,
 		SplitLabel:    view.SplitLabel(left, right, side),
+		Paused:        paused,
 	}
 }
 
@@ -356,11 +380,14 @@ func (s *Server) buildEditView(f *feed.Feed, now time.Time) *view.EditView {
 
 	if ev.Active {
 		ev.Title = "Adjust this feed"
+		ev.Paused = f.Paused()
 		side := f.MostRecentSide()
 		start := f.StartedAt
 		if current, ok := f.CurrentSegment(); ok {
 			side = current.Side
 			start = current.StartedAt
+		} else if n := len(f.Segments); n > 0 {
+			start = f.Segments[n-1].StartedAt
 		}
 		ev.SideTitle = side.Title()
 		ev.StartInput = p.DateInput(start)

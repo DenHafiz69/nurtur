@@ -70,7 +70,7 @@
         <span class="feed-time">{{.TimeLabel}}</span>
         <span class="feed-sep" aria-hidden="true">·</span>
         <span class="event-title">{{.Title}}</span>
-        {{if .Active}}<span class="chip chip-live">now</span>{{end}}
+        {{if .Active}}{{if .Paused}}<span class="chip chip-paused">paused</span>{{else}}<span class="chip chip-live">now</span>{{end}}{{end}}
       </p>
       {{if .Detail}}<p class="feed-detail">{{.Detail}}</p>{{end}}
     </div>

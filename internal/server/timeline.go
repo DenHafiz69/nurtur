@@ -199,10 +199,14 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 		f := entry.Feed
 		left, right := f.Totals(now)
 		active := f.EndedAt == nil
+		paused := f.Paused()
 		title := "Nursed"
 		detail := view.SplitLabel(left, right, f.MostRecentSide())
 		if active {
 			title = "Nursing"
+			if paused {
+				title = "Paused"
+			}
 		} else {
 			detail = view.FeedDetail(left, right)
 		}
@@ -214,6 +218,7 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 			Title:        title,
 			Detail:       detail,
 			Active:       active,
+			Paused:       paused,
 			Icon:         "drop-" + string(f.MostRecentSide()),
 			EditURL:      fmt.Sprintf("/feeds/%d/edit", f.ID),
 			EditTarget:   "#feed-edit-dialog",

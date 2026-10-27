@@ -147,6 +147,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /feeds", s.handleStartFeed)
 	mux.HandleFunc("GET /feeds/sheet", s.handleNursingSheet)
 	mux.HandleFunc("POST /feeds/{id}/switch", s.handleSwitchFeed)
+	mux.HandleFunc("POST /feeds/{id}/pause", s.handlePauseFeed)
+	mux.HandleFunc("POST /feeds/{id}/resume", s.handleResumeFeed)
 	mux.HandleFunc("POST /feeds/{id}/stop", s.handleStopFeed)
 	mux.HandleFunc("GET /feeds/{id}/edit", s.handleEditPage)
 	mux.HandleFunc("PATCH /feeds/{id}", s.handleEditFeed)

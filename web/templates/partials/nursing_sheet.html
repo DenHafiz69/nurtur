@@ -6,7 +6,29 @@
     <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
   </div>
 
-  {{if .NursingSheet.Active}}
+  {{if .NursingSheet.Paused}}
+    <div class="sleep-now nursing-now">
+      <span class="sleep-now-icon" aria-hidden="true">{{icon "pause"}}</span>
+      <div>
+        <p class="sleep-now-title">Paused on {{.NursingSheet.SideTitle}}</p>
+        <p class="sleep-now-time">{{timer .NursingSheet.Elapsed}}</p>
+      </div>
+    </div>
+    <div class="sheet-action-grid sheet-action-grid-three">
+      <form method="post" action="/feeds/{{.NursingSheet.ID}}/resume" hx-post="/feeds/{{.NursingSheet.ID}}/resume" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <input type="hidden" name="side" value="{{if eq .NursingSheet.SideTitle "Left"}}left{{else}}right{{end}}">
+        <button type="submit" class="btn btn-resume">{{icon "play"}}<span>Resume</span></button>
+      </form>
+      <form method="post" action="/feeds/{{.NursingSheet.ID}}/switch" hx-post="/feeds/{{.NursingSheet.ID}}/switch" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <input type="hidden" name="side" value="{{if eq .NursingSheet.SideTitle "Left"}}right{{else}}left{{end}}">
+        <button type="submit" class="btn btn-switch">{{icon "drop"}}<span>{{.NursingSheet.OppositeTitle}}</span></button>
+      </form>
+      <form method="post" action="/feeds/{{.NursingSheet.ID}}/stop" hx-post="/feeds/{{.NursingSheet.ID}}/stop" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <button type="submit" class="btn btn-done">{{icon "check"}}<span>Done</span></button>
+      </form>
+    </div>
+    <a class="btn btn-ghost sheet-wide" href="/feeds/{{.NursingSheet.ID}}/edit" hx-get="/feeds/{{.NursingSheet.ID}}/edit" hx-target="#feed-edit-dialog" hx-swap="innerHTML">{{icon "pencil"}}<span>Adjust this feed</span></a>
+  {{else if .NursingSheet.Active}}
     <div class="sleep-now nursing-now" data-live-since="{{iso .NursingSheet.StartedAt}}" data-live-server-now="{{iso .NursingSheet.ServerNow}}">
       <span class="sleep-now-icon" aria-hidden="true">{{icon "drop"}}</span>
       <div>

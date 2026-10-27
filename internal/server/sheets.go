@@ -15,8 +15,10 @@ func (s *Server) handleNursingSheet(w http.ResponseWriter, r *http.Request) {
 	sheet := &view.NursingSheetView{}
 	if data.Active != nil {
 		sheet.Active = true
+		sheet.Paused = data.Active.Paused
 		sheet.ID = data.Active.ID
 		sheet.SideTitle = data.Active.SideTitle
+		sheet.OppositeTitle = data.Active.OppositeTitle
 		sheet.StartedAt = data.Active.StartedAt
 		sheet.ServerNow = data.Active.ServerNow
 		sheet.Elapsed = data.Active.Elapsed

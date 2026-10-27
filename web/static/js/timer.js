@@ -212,6 +212,10 @@
     return document.getElementById("timer-card");
   }
 
+  function timerPaused(card) {
+    return !!card && card.dataset.paused === "true";
+  }
+
   function syncFromCard(card) {
     var feedId = card.dataset.feedId;
     if (!feedId) return null;
@@ -280,7 +284,7 @@
     var card = timerCard();
 
     if (card) {
-      if (card.dataset.feedId) {
+      if (card.dataset.feedId && !timerPaused(card)) {
         var state = syncFromCard(card);
         if (state) {
           var digits = card.querySelector("[data-timer-digits]");
@@ -295,6 +299,11 @@
           if (liveSource) feedAlertTick(liveSource);
           else clearFeedAlertIfIdle();
         }
+      } else if (timerPaused(card)) {
+        // Keep the cached timer and the alert marker out of the way while
+        // paused, but do not forget when the last ping happened. Resuming
+        // should not replay milestones that were already announced.
+        hideCachedHint(card);
       } else {
         showCachedHint(card);
         clearFeedAlertIfIdle();
@@ -308,7 +317,7 @@
     var bodySource = feedAlertFromBody();
     if (bodySource) {
       feedAlertTick(bodySource);
-    } else {
+    } else if (!document.body || document.body.dataset.feedPaused !== "true") {
       clearFeedAlertIfIdle();
     }
   }
@@ -335,7 +344,7 @@
     if (!card) return;
     var hint = card.querySelector("[data-offline-hint]");
     if (!hint) return;
-    var show = isOffline && (!!card.dataset.feedId || !!cachedTimer);
+    var show = isOffline && !timerPaused(card) && (!!card.dataset.feedId || !!cachedTimer);
     hint.hidden = !show;
   }
 
@@ -345,6 +354,7 @@
   // keyed by feed ID so a new feeding re-arms the alert, while a reload or a
   // backgrounded tab resumes at the next milestone without a burst.
   function feedAlertFromCard(card) {
+    if (timerPaused(card)) return null;
     var total = parseInt(card.dataset.feedTotalMs || "", 10);
     var serverNow = Date.parse(card.dataset.serverNow || "");
     var minutes = parseAlertMinutes(card.dataset.alertMinutes);
@@ -361,6 +371,7 @@
   function feedAlertFromBody() {
     var body = document.body;
     if (!body || !body.dataset.activeFeedId) return null;
+    if (body.dataset.feedPaused === "true") return null;
     var total = parseInt(body.dataset.feedTotalMs || "", 10);
     var serverNow = Date.parse(body.dataset.serverNow || "");
     // The settings panel is swapped in place, so read its fresh value first.
@@ -648,12 +659,16 @@
   function onTimerSwap() {
     var card = timerCard();
     timerState.key = null;
-    if (card && card.dataset.feedId) {
+    timerState.feedId = null;
+    timerState.side = null;
+    if (card && card.dataset.feedId && !timerPaused(card)) {
       syncFromCard(card);
       hideCachedHint(card);
     } else {
       clearCache();
-      clearFeedAlertIfIdle();
+      // A paused feed keeps its alert marker so resuming does not ping for
+      // milestones that already passed.
+      if (!timerPaused(card)) clearFeedAlertIfIdle();
     }
     updateOfflineHint();
   }
@@ -960,8 +975,10 @@
   /* ---------- Boot ---------- */
 
   var card = timerCard();
-  if (card && card.dataset.feedId) {
+  if (card && card.dataset.feedId && !timerPaused(card)) {
     syncFromCard(card);
+  } else if (timerPaused(card)) {
+    clearCache();
   } else if (cachedTimer) {
     // Paint the cached session immediately, then let the server win.
     reconcile(true);

@@ -6,6 +6,7 @@ For a solo-user, mother-focused baby tracker built on **Go + SQLite + HTMX**, th
 
 * **One-tap Left / Right toggle:** Tapping "Left" starts the timer for the left breast; tapping "Right" automatically pauses/stops the left and starts the right without needing multiple clicks.
 * **Resilient timer state:** Store the timer's `started_at` and `side` in `localStorage` (via lightweight inline JavaScript) and/or sync it to the backend via HTMX so that if the browser refreshes, switches tabs, or her screen locks, the timer doesn't reset or lose counted seconds.
+* **Pause and resume:** Pause when the baby unlatches without losing the time already nursed. Paused minutes are a gap, not nursing time, and Resume continues on the same side.
 * **Quick-fix / Manual edit:** New parents regularly forget to start or stop the timer. A 1-click modal or inline HTMX form to adjust duration (e.g., "+5 min", "-5 min", or edit start/end times manually) is essential.
 * **"Last nursed" indicator:** A high-contrast header badge showing: *"Last side: Left (1 hr 45 min ago)"*. This eliminates the perpetual *"Which side did I feed on last?"* guesswork.
 

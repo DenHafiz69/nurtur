@@ -161,3 +161,31 @@ func TestBuildSegmentsSingleSide(t *testing.T) {
 		t.Fatalf("right-only feed should start at the feed start")
 	}
 }
+
+func TestPausedOnlyWhileActiveWithoutAnOpenSegment(t *testing.T) {
+	now := time.Date(2026, 10, 20, 15, 0, 0, 0, time.UTC)
+	end := now.Add(-2 * time.Minute)
+
+	paused := Feed{Segments: []Segment{
+		{Side: SideLeft, StartedAt: now.Add(-20 * time.Minute), EndedAt: &end},
+	}}
+	if !paused.Paused() {
+		t.Fatal("active feed without an open segment should be paused")
+	}
+	left, right := paused.Totals(now)
+	if left != 18*time.Minute || right != 0 {
+		t.Fatalf("totals = %v/%v, want 18m/0m", left, right)
+	}
+
+	running := Feed{Segments: []Segment{
+		{Side: SideRight, StartedAt: now.Add(-5 * time.Minute)},
+	}}
+	if running.Paused() {
+		t.Fatal("feed with an open segment should not be paused")
+	}
+
+	ended := Feed{EndedAt: &now, Segments: paused.Segments}
+	if ended.Paused() {
+		t.Fatal("completed feed should never report paused")
+	}
+}

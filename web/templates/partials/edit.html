@@ -6,7 +6,15 @@
     <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
   </div>
 
-  {{if .Edit.Active}}
+  {{if .Edit.Paused}}
+    <form class="sheet-form" method="post" action="/feeds/{{.Edit.ID}}/resume" hx-post="/feeds/{{.Edit.ID}}/resume" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+      <p class="sheet-copy">This feed is paused on {{.Edit.SideTitle}}. Resume when you're ready, or tap Done on the timer to finish.</p>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" data-close-dialog>Close</button>
+        <button type="submit" class="btn btn-primary">Resume {{.Edit.SideTitle}}</button>
+      </div>
+    </form>
+  {{else if .Edit.Active}}
     <form class="sheet-form" method="post" action="/feeds/{{.Edit.ID}}" hx-patch="/feeds/{{.Edit.ID}}" hx-target="#feed-edit-dialog" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
       <p class="sheet-copy">Adjust when {{.Edit.SideTitle}} started. It can't be in the future.</p>
       <label class="field">

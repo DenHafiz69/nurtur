@@ -514,3 +514,118 @@ func TestConcurrentStartCreatesOneFeed(t *testing.T) {
 		t.Fatalf("feeds=%d open=%d, want 1/1", feeds, openSegments)
 	}
 }
+
+func TestPauseResumeExcludesPausedGap(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	now := testNow
+
+	f, err := st.CreateFeed(ctx, feed.SideLeft, now)
+	if err != nil {
+		t.Fatalf("CreateFeed: %v", err)
+	}
+
+	now = now.Add(5 * time.Minute)
+	paused, err := st.PauseFeed(ctx, f.ID, now)
+	if err != nil {
+		t.Fatalf("PauseFeed: %v", err)
+	}
+	if !paused.Paused() {
+		t.Fatal("feed should be paused")
+	}
+	if current, open := paused.CurrentSegment(); open {
+		t.Fatalf("paused feed still has an open segment: %+v", current)
+	}
+	left, right := paused.Totals(now)
+	if left != 5*time.Minute || right != 0 {
+		t.Fatalf("paused totals = %v/%v, want 5m/0m", left, right)
+	}
+	if _, err := st.PauseFeed(ctx, f.ID, now.Add(time.Minute)); !errors.Is(err, feed.ErrAlreadyPaused) {
+		t.Fatalf("double pause = %v, want ErrAlreadyPaused", err)
+	}
+	if _, err := st.CreateFeed(ctx, feed.SideRight, now); !errors.Is(err, feed.ErrAlreadyActive) {
+		t.Fatalf("start while paused = %v, want ErrAlreadyActive", err)
+	}
+
+	active, err := st.ActiveFeed(ctx)
+	if err != nil {
+		t.Fatalf("ActiveFeed: %v", err)
+	}
+	if active == nil || !active.Paused() || len(active.Segments) != 1 {
+		t.Fatalf("active feed = %+v, want a paused feed with one closed segment", active)
+	}
+
+	// Paused time is a gap, not nursing time.
+	now = now.Add(15 * time.Minute)
+	if _, err := st.ResumeFeed(ctx, f.ID, "", now); err != nil {
+		t.Fatalf("ResumeFeed: %v", err)
+	}
+	if _, err := st.ResumeFeed(ctx, f.ID, "", now.Add(time.Minute)); !errors.Is(err, feed.ErrNotPaused) {
+		t.Fatalf("double resume = %v, want ErrNotPaused", err)
+	}
+
+	now = now.Add(5 * time.Minute)
+	paused, err = st.PauseFeed(ctx, f.ID, now)
+	if err != nil {
+		t.Fatalf("second pause: %v", err)
+	}
+	left, right = paused.Totals(now.Add(30 * time.Minute))
+	if left != 10*time.Minute || right != 0 {
+		t.Fatalf("totals after pause = %v/%v, want 10m/0m", left, right)
+	}
+
+	// Choosing the other side resumes there without losing the first stretch.
+	now = now.Add(30 * time.Minute)
+	if _, err := st.ResumeFeed(ctx, f.ID, feed.SideRight, now); err != nil {
+		t.Fatalf("resume on right: %v", err)
+	}
+	now = now.Add(5 * time.Minute)
+	stopped, err := st.StopFeed(ctx, f.ID, now)
+	if err != nil {
+		t.Fatalf("StopFeed: %v", err)
+	}
+	left, right = stopped.Totals(now)
+	if left != 10*time.Minute || right != 5*time.Minute {
+		t.Fatalf("final totals = %v/%v, want 10m/5m", left, right)
+	}
+	if stopped.EndedAt == nil || !stopped.EndedAt.Equal(now) {
+		t.Fatalf("ended at = %v, want %v", stopped.EndedAt, now)
+	}
+	if stopped.LastSide != feed.SideRight {
+		t.Fatalf("last side = %q, want right", stopped.LastSide)
+	}
+}
+
+func TestSwitchWhilePausedResumesOnRequestedSide(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	start := testNow
+
+	f, err := st.CreateFeed(ctx, feed.SideLeft, start)
+	if err != nil {
+		t.Fatalf("CreateFeed: %v", err)
+	}
+	if _, err := st.PauseFeed(ctx, f.ID, start.Add(4*time.Minute)); err != nil {
+		t.Fatalf("PauseFeed: %v", err)
+	}
+
+	resumedAt := start.Add(12 * time.Minute)
+	switched, err := st.SwitchFeed(ctx, f.ID, feed.SideRight, resumedAt)
+	if err != nil {
+		t.Fatalf("SwitchFeed while paused: %v", err)
+	}
+	if switched.Paused() {
+		t.Fatal("switching from paused should resume the feed")
+	}
+	current, ok := switched.CurrentSegment()
+	if !ok || current.Side != feed.SideRight || !current.StartedAt.Equal(resumedAt) {
+		t.Fatalf("current segment = %+v, want right starting at %v", current, resumedAt)
+	}
+	if len(switched.Segments) != 2 {
+		t.Fatalf("segments = %d, want 2", len(switched.Segments))
+	}
+	left, right := switched.Totals(resumedAt.Add(3 * time.Minute))
+	if left != 4*time.Minute || right != 3*time.Minute {
+		t.Fatalf("totals = %v/%v, want 4m/3m", left, right)
+	}
+}

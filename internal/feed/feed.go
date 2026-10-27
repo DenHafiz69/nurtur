@@ -37,6 +37,8 @@ var (
 	ErrNoSegments       = errors.New("feed: feed has no segments")
 	ErrFeedActive       = errors.New("feed: feed is still active")
 	ErrFutureStart      = errors.New("feed: start time is in the future")
+	ErrAlreadyPaused    = errors.New("feed: feed is already paused")
+	ErrNotPaused        = errors.New("feed: feed is not paused")
 )
 
 // ValidationError is a user-correctable problem with a form field.
@@ -119,6 +121,16 @@ type Feed struct {
 
 // Active reports whether the feed is still running.
 func (f Feed) Active() bool { return f.EndedAt == nil && f.DeletedAt == nil }
+
+// Paused reports whether the feed is running but no side is currently open.
+// Paused time becomes a gap between segments and is never counted in totals.
+func (f Feed) Paused() bool {
+	if !f.Active() {
+		return false
+	}
+	_, open := f.CurrentSegment()
+	return !open
+}
 
 // CurrentSegment returns the open segment, if any.
 func (f Feed) CurrentSegment() (Segment, bool) {

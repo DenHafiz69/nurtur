@@ -333,6 +333,16 @@ button {
   background: var(--butter);
 }
 
+.sticker-paused {
+  background: var(--surface-soft);
+}
+
+.sticker-paused .sticker-dot {
+  background: var(--surface);
+  border: 2px solid var(--coral-soft);
+  box-shadow: none;
+}
+
 .sticker-muted {
   border-style: solid;
   background: var(--surface-soft);
@@ -577,6 +587,11 @@ button {
   background: var(--butter);
   color: var(--ink);
   font-size: 13px;
+}
+
+.chip.chip-paused {
+  background: var(--surface-soft);
+  color: var(--ink-soft-strong);
 }
 
 .feed-summary-stats {
@@ -935,6 +950,11 @@ button {
   background: var(--surface-soft);
 }
 
+.timer-card.is-paused {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+
 .timer-card.is-idle {
   padding: 0;
   border: 0;
@@ -949,7 +969,8 @@ button {
   font-weight: 700;
 }
 
-.timer-card.is-nursing::before {
+.timer-card.is-nursing::before,
+.timer-card.is-paused::before {
   content: "";
   position: absolute;
   inset: -8px 16% auto;
@@ -959,6 +980,15 @@ button {
   filter: blur(10px);
   animation: breathe 3s ease-in-out infinite alternate;
   pointer-events: none;
+}
+
+.timer-card.is-paused::before {
+  animation: none;
+  opacity: 0.3;
+}
+
+.timer-card.is-paused .timer-digits {
+  color: var(--ink-soft-strong);
 }
 
 .timer-display {
@@ -1046,18 +1076,19 @@ button {
 }
 
 .timer-actions-active {
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .timer-actions-active .btn {
-  padding: 0 10px;
-  font-size: 16px;
+  gap: 6px;
+  padding: 0 6px;
+  font-size: 15px;
 }
 
 .timer-actions-active .btn .icon {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
 }
 
 .timer-actions form {
@@ -1129,6 +1160,14 @@ button {
 }
 
 .btn-done {
+  background: var(--sage);
+}
+
+.btn-pause {
+  background: var(--butter);
+}
+
+.btn-resume {
   background: var(--sage);
 }
 
@@ -1549,6 +1588,16 @@ input[type="number"] {
 .sheet-action-grid form {
   display: flex;
   margin: 0;
+}
+
+.sheet-action-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sheet-action-grid-three .btn {
+  gap: 5px;
+  padding: 0 6px;
+  font-size: 15px;
 }
 
 .sheet-subhead {
@@ -2142,7 +2191,18 @@ textarea {
   }
 
   .timer-actions-active {
-    gap: 12px;
+    gap: 6px;
+  }
+
+  .timer-actions-active .btn {
+    gap: 4px;
+    padding: 0 4px;
+    font-size: 14px;
+  }
+
+  .timer-actions-active .btn .icon {
+    width: 17px;
+    height: 17px;
   }
 
   .btn {

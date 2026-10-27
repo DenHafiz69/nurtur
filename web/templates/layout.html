@@ -38,7 +38,7 @@
   <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{asset "/static/app.css"}}">
 </head>
-<body data-server-now="{{iso .Now}}" data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-active-feed-id="{{.ID}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{end}}{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
+<body data-server-now="{{iso .Now}}" data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-active-feed-id="{{.ID}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{if .Paused}} data-feed-paused="true"{{end}}{{end}}{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="app">
     <header class="app-header">

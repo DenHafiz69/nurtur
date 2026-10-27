@@ -197,7 +197,13 @@ func (s *Store) SwitchFeed(ctx context.Context, id int64, side feed.Side, now ti
 		}
 		current, ok := f.CurrentSegment()
 		if !ok {
-			return feed.ErrNoActiveFeed
+			// A paused feed has no open segment. Choosing a side resumes it on
+			// that side, with the paused gap left out of the totals.
+			if err := s.openSegment(ctx, tx, f, side, resumeStart(f, now)); err != nil {
+				return err
+			}
+			out = *f
+			return nil
 		}
 		if current.Side == side {
 			return feed.ErrSameSide
@@ -221,21 +227,62 @@ func (s *Store) SwitchFeed(ctx context.Context, id int64, side feed.Side, now ti
 			return feed.ErrNoActiveFeed
 		}
 
-		res, err = tx.ExecContext(ctx,
-			`INSERT INTO feed_segments (account_id, feed_id, side, started_at) VALUES (?, ?, ?, ?)`,
-			AccountID(ctx), id, side, encodeTime(end))
-		if err != nil {
-			if isUniqueViolation(err) {
-				return feed.ErrAlreadyActive
+		for i := range f.Segments {
+			if f.Segments[i].ID == current.ID {
+				f.Segments[i].EndedAt = timePtr(end)
 			}
-			return fmt.Errorf("store: open segment: %w", err)
 		}
-		newID, err := res.LastInsertId()
+		if err := s.openSegment(ctx, tx, f, side, end); err != nil {
+			return err
+		}
+		out = *f
+		return nil
+	})
+	return out, err
+}
+
+// PauseFeed closes the open segment and leaves the feed running. The gap until
+// ResumeFeed is excluded from every derived total.
+func (s *Store) PauseFeed(ctx context.Context, id int64, now time.Time) (feed.Feed, error) {
+	now = normalizeTime(now)
+	var out feed.Feed
+
+	err := s.WithTx(ctx, func(tx *sql.Tx) error {
+		f, err := s.loadFeedAt(ctx, tx, id, true, false)
 		if err != nil {
-			return fmt.Errorf("store: segment id: %w", err)
+			return err
+		}
+		if f.DeletedAt != nil {
+			return feed.ErrAlreadyDeleted
+		}
+		if f.EndedAt != nil {
+			return feed.ErrNoActiveFeed
+		}
+		current, ok := f.CurrentSegment()
+		if !ok {
+			return feed.ErrAlreadyPaused
+		}
+
+		end := now
+		if end.Before(current.StartedAt) {
+			end = current.StartedAt
+		}
+		res, err := tx.ExecContext(ctx,
+			`UPDATE feed_segments SET ended_at = ? WHERE id = ? AND account_id = ? AND ended_at IS NULL`,
+			encodeTime(end), current.ID, AccountID(ctx))
+		if err != nil {
+			return fmt.Errorf("store: pause segment: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("store: pause segment rows: %w", err)
+		}
+		if n != 1 {
+			return feed.ErrAlreadyPaused
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE feeds SET last_side = ? WHERE id = ? AND account_id = ?`, side, id, AccountID(ctx)); err != nil {
+			`UPDATE feeds SET last_side = ? WHERE id = ? AND account_id = ?`,
+			current.Side, id, AccountID(ctx)); err != nil {
 			return fmt.Errorf("store: update last side: %w", err)
 		}
 
@@ -244,13 +291,42 @@ func (s *Store) SwitchFeed(ctx context.Context, id int64, side feed.Side, now ti
 				f.Segments[i].EndedAt = timePtr(end)
 			}
 		}
-		f.Segments = append(f.Segments, feed.Segment{
-			ID:        newID,
-			FeedID:    id,
-			Side:      side,
-			StartedAt: end,
-		})
-		f.LastSide = side
+		f.LastSide = current.Side
+		out = *f
+		return nil
+	})
+	return out, err
+}
+
+// ResumeFeed opens a new segment on side, or on the most recent side when side
+// is empty. The feed must be active and paused.
+func (s *Store) ResumeFeed(ctx context.Context, id int64, side feed.Side, now time.Time) (feed.Feed, error) {
+	now = normalizeTime(now)
+	var out feed.Feed
+
+	err := s.WithTx(ctx, func(tx *sql.Tx) error {
+		f, err := s.loadFeedAt(ctx, tx, id, true, false)
+		if err != nil {
+			return err
+		}
+		if f.DeletedAt != nil {
+			return feed.ErrAlreadyDeleted
+		}
+		if f.EndedAt != nil {
+			return feed.ErrNoActiveFeed
+		}
+		if _, open := f.CurrentSegment(); open {
+			return feed.ErrNotPaused
+		}
+		if side == "" {
+			side = f.MostRecentSide()
+		}
+		if !side.Valid() {
+			return feed.ErrInvalidSide
+		}
+		if err := s.openSegment(ctx, tx, f, side, resumeStart(f, now)); err != nil {
+			return err
+		}
 		out = *f
 		return nil
 	})
@@ -275,6 +351,9 @@ func (s *Store) StopFeed(ctx context.Context, id int64, now time.Time) (feed.Fee
 		}
 
 		end := now
+		if end.Before(f.StartedAt) {
+			end = f.StartedAt
+		}
 		current, ok := f.CurrentSegment()
 		if ok {
 			if end.Before(current.StartedAt) {
@@ -697,6 +776,51 @@ func scanSegment(s scanner) (feed.Segment, error) {
 	}
 	seg.Side = feed.Side(side)
 	return seg, nil
+}
+
+// openSegment inserts an open segment and points the feed at its side. The
+// caller must already have closed any previous segment.
+func (s *Store) openSegment(ctx context.Context, tx *sql.Tx, f *feed.Feed, side feed.Side, at time.Time) error {
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO feed_segments (account_id, feed_id, side, started_at) VALUES (?, ?, ?, ?)`,
+		AccountID(ctx), f.ID, side, encodeTime(at))
+	if err != nil {
+		if isUniqueViolation(err) {
+			return feed.ErrAlreadyActive
+		}
+		return fmt.Errorf("store: open segment: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("store: segment id: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE feeds SET last_side = ? WHERE id = ? AND account_id = ?`, side, f.ID, AccountID(ctx)); err != nil {
+		return fmt.Errorf("store: update last side: %w", err)
+	}
+	f.Segments = append(f.Segments, feed.Segment{
+		ID:        id,
+		FeedID:    f.ID,
+		Side:      side,
+		StartedAt: at,
+	})
+	f.LastSide = side
+	return nil
+}
+
+// resumeStart keeps a backwards clock from opening a segment before the feed
+// or the stretch that just ended.
+func resumeStart(f *feed.Feed, now time.Time) time.Time {
+	at := now
+	if at.Before(f.StartedAt) {
+		at = f.StartedAt
+	}
+	if n := len(f.Segments); n > 0 {
+		if end := f.Segments[n-1].EndedAt; end != nil && at.Before(*end) {
+			at = *end
+		}
+	}
+	return at
 }
 
 func segmentIndex(f *feed.Feed, segmentID int64) int {
