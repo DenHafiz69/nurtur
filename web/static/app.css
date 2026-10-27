@@ -1009,6 +1009,14 @@ button {
   color: var(--coral);
 }
 
+/* iOS reserves the home-indicator strip inside the safe area. Lift the row a
+   little so its labels sit just above the indicator instead of hugging it. */
+@supports (-webkit-touch-callout: none) {
+  .tabbar {
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .timer-card {
   position: relative;
   isolation: isolate;
