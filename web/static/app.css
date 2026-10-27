@@ -1199,6 +1199,10 @@ button {
   height: 19px;
 }
 
+.timer-actions-sleep {
+  grid-template-columns: 1fr;
+}
+
 .timer-actions form {
   display: flex;
   min-width: 0;
@@ -1369,7 +1373,23 @@ button {
 }
 
 .sleep-pill.is-asleep {
+  display: block;
+  padding: 8px 12px 10px;
+  border-radius: 26px;
   background: var(--lilac);
+  box-shadow: 0 4px 0 var(--shadow);
+}
+
+.sleep-pill.is-asleep:active {
+  transform: none;
+}
+
+.sleep-pill.is-asleep .timer-digits {
+  color: var(--ink);
+}
+
+.sleep-pill.is-asleep .timer-adjust {
+  background: var(--surface);
 }
 
 .sleep-icon {
