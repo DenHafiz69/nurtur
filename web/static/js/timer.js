@@ -61,6 +61,14 @@
     return THEME_MODES[(index + 1) % THEME_MODES.length];
   }
 
+  function syncThemeToggles(mode) {
+    var next = nextThemeMode(mode);
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
+      button.setAttribute("aria-label", "Theme: " + mode + ". Activate for " + next + ".");
+      button.setAttribute("title", "Theme: " + mode);
+    });
+  }
+
   function applyTheme(mode, persist) {
     var theme = resolveTheme(mode);
     var root = document.documentElement;
@@ -70,11 +78,7 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
 
-    var next = nextThemeMode(mode);
-    document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
-      button.setAttribute("aria-label", "Theme: " + mode + ". Activate for " + next + ".");
-      button.setAttribute("title", "Theme: " + mode);
-    });
+    syncThemeToggles(mode);
 
     if (persist) {
       try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
@@ -86,10 +90,13 @@
     return THEME_MODES.indexOf(mode) >= 0 ? mode : "auto";
   }
 
-  document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      applyTheme(nextThemeMode(currentThemeMode()), true);
-    });
+  // The Theme card lives inside the settings panel, which htmx replaces after
+  // every settings save. Delegating the click keeps the freshly swapped button
+  // working instead of leaving it without a listener.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest ? event.target.closest("[data-theme-toggle]") : null;
+    if (!button) return;
+    applyTheme(nextThemeMode(currentThemeMode()), true);
   });
   applyTheme(currentThemeMode(), false);
   window.setInterval(function () {
@@ -917,6 +924,7 @@
     tickLiveClocks();
     refreshNotificationUI();
     syncDockExpanded();
+    syncThemeToggles(currentThemeMode());
   }
 
   document.body.addEventListener("htmx:afterSwap", function (event) {
