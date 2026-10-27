@@ -30,6 +30,29 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.1",
+		Date:    "Oct 27, 2026",
+		Title:   "Pause the timer, keep the time",
+		Summary: "Nursing can now be paused when your baby unlatches, without losing the time already counted.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"A Pause button on the nursing timer.",
+					"Resume on the same side, or choose the other side to carry on there.",
+					"Paused minutes stay out of the nursing totals.",
+				},
+			},
+			{
+				Title: "Changed",
+				Items: []string{
+					"The header badge, status card, history row, nursing sheet, and edit sheet show when a feed is paused.",
+					"The nursing alert stops pinging while paused and does not replay old milestones after resuming.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.0",
 		Date:    "Oct 24, 2026",
 		Title:   "Invite the people you trust",
