@@ -90,7 +90,7 @@ func (c SyncConfig) normalized() SyncConfig {
 	return d
 }
 
-// SyncStatus is a snapshot for /healthz and the eventual sync chip.
+// SyncStatus is a snapshot for /healthz.
 type SyncStatus struct {
 	Started           bool       `json:"started"`
 	Pushing           bool       `json:"pushing"`

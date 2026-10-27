@@ -852,7 +852,7 @@ button {
 }
 
 .dock-drawer[open] {
-  padding: 0 16px calc(10px + env(safe-area-inset-bottom));
+  padding: 0 16px 10px;
   border-top: 1.5px dashed var(--line);
   background: var(--bg);
   box-shadow: 0 -8px 22px var(--dock-shadow);
@@ -909,7 +909,7 @@ button {
 .dock-drawer:not([open]) .dock-toggle {
   position: absolute;
   right: calc(16px + env(safe-area-inset-right));
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: 16px;
   display: grid;
   place-items: center;
   width: 62px;
@@ -943,11 +943,11 @@ button {
 
 /* Keep the last history card and any toast clear of the floating button. */
 .app:has(.dock-drawer:not([open])) .app-main {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: 96px;
 }
 
 .app:has(.dock-drawer:not([open])) .toast-region {
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: 84px;
 }
 
 .dock-panel {
@@ -959,6 +959,51 @@ button {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ---------- Bottom navigation ---------- */
+
+.tabbar {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  border-top: 1.5px solid var(--line);
+  background: var(--bg);
+  box-shadow: 0 -6px 18px var(--dock-shadow);
+}
+
+.tabbar-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: 4px;
+  border-radius: 16px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.tabbar-link .icon {
+  width: 23px;
+  height: 23px;
+}
+
+.tabbar-link:hover {
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
+.tabbar-link.is-active {
+  background: var(--surface-soft);
+  color: var(--coral);
 }
 
 .timer-card {
@@ -2158,6 +2203,11 @@ textarea {
     right: calc(12px + env(safe-area-inset-right));
   }
 
+  .tabbar {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
   .baby-name {
     max-width: 48vw;
     font-size: 22px;
@@ -2264,6 +2314,15 @@ textarea {
 
   .dock-drawer:not([open]) .dock-toggle {
     right: calc(10px + env(safe-area-inset-right));
+  }
+
+  .tabbar {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .tabbar-link {
+    font-size: 11px;
   }
 
   .pip-header {
@@ -2398,60 +2457,6 @@ textarea {
   gap: 8px;
 }
 
-.sync-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 164px;
-  min-height: 48px;
-  padding: 0 12px;
-  overflow: hidden;
-  border: 2px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.1;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.sync-chip .icon {
-  flex: none;
-  width: 17px;
-  height: 17px;
-}
-
-.sync-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sage);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 35%, transparent);
-}
-
-.sync-pending .sync-dot {
-  background: var(--butter);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--butter) 35%, transparent);
-}
-
-.sync-warn .sync-dot {
-  background: var(--coral);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--coral) 30%, transparent);
-}
-
-.sync-local .sync-dot {
-  background: var(--sky);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sky) 35%, transparent);
-}
-
-.sync-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .offline-banner {
   flex: none;
   margin: 0 16px 6px;
@@ -2463,33 +2468,6 @@ textarea {
   font-size: 13px;
   font-weight: 700;
   text-align: center;
-}
-
-.today-nav {
-  display: flex;
-  justify-content: flex-end;
-  gap: 14px;
-  margin: -2px 0 10px;
-}
-
-.text-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 48px;
-  color: var(--ink-soft);
-  font-size: 14px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.text-link .icon {
-  width: 17px;
-  height: 17px;
-}
-
-.text-link:hover {
-  color: var(--ink);
 }
 
 /* ---------- Full history page ---------- */
@@ -2887,32 +2865,13 @@ textarea {
 }
 
 @media (max-width: 420px) {
-  .sync-chip {
-    justify-content: center;
-    gap: 5px;
-    width: 48px;
-    height: 48px;
-    padding: 0;
-    border-radius: 50%;
-  }
-
-  .sync-chip .icon {
-    width: 18px;
-    height: 18px;
-  }
-
-  .sync-label {
-    display: none;
-  }
-
   .timeline-day-summary {
     max-width: 55vw;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sync-chip,
-  .text-link,
+  .tabbar-link,
   .back-link {
     transition: none;
   }
@@ -2921,7 +2880,7 @@ textarea {
 .settings-toast {
   position: fixed;
   right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: calc(72px + env(safe-area-inset-bottom));
   left: 16px;
   z-index: 40;
 }
@@ -3054,12 +3013,6 @@ textarea {
 
 .changelog-actions .btn {
   width: 100%;
-}
-
-.changelog-foot {
-  display: flex;
-  justify-content: center;
-  padding: 4px 0 24px;
 }
 
 /* ---------- Admin ---------- */

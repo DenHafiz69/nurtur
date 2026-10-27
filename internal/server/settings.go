@@ -559,34 +559,6 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 	return out, nil
 }
 
-// syncChip is the header's short sync state. It is intentionally separate from
-// network connectivity: the phone can be online while Turso is catching up.
-func (s *Server) syncChip() *view.SyncChipView {
-	if s.worker == nil {
-		return &view.SyncChipView{
-			Label: "Local",
-			Tone:  "local",
-			Title: "Saved on this device's server. No cloud copy configured.",
-		}
-	}
-	status := s.worker.Status()
-	switch {
-	case status.LastPushError != "" || status.LastPullError != "":
-		return &view.SyncChipView{Label: "Local copy", Tone: "warn", Title: "Cloud sync is having trouble. Logging still works."}
-	case status.Pushing || status.Dirty:
-		return &view.SyncChipView{Label: "Syncing…", Tone: "pending", Title: "Changes are saved locally and being pushed to Turso Cloud."}
-	case status.LastPush == nil:
-		return &view.SyncChipView{Label: "Not synced yet", Tone: "pending", Title: "Waiting for the first push to Turso Cloud."}
-	default:
-		return &view.SyncChipView{Label: "Synced", Tone: "ok", Title: "Local and cloud copies are caught up."}
-	}
-}
-
-func (s *Server) handleSyncChip(w http.ResponseWriter, r *http.Request) {
-	data := &view.PageData{SyncChip: s.syncChip()}
-	s.writeFragments(w, r, http.StatusOK, "sync-chip", data, false, nil, "", false, "", "")
-}
-
 func (s *Server) handleOffline(w http.ResponseWriter, r *http.Request) {
 	data := &view.PageData{Nonce: nonceFrom(r.Context()), Version: s.version}
 	s.renderNamed(w, r, http.StatusOK, "offline", data)

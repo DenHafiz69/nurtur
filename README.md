@@ -31,8 +31,8 @@ Nurtur goes the other way.
   place. No reload, no jump, no losing your spot.
 - **The timer is honest.** Lock the phone, switch apps, refresh, or restart the
   server — the feed keeps counting from the real start time in the database.
-- **Nothing to lose.** Local-first storage, automatic cloud sync when you want
-  it, and one-click JSON, CSV, and SQL exports.
+- **Nothing to lose.** Local-first storage and one-click JSON, CSV, and SQL
+  exports.
 - **Quiet by design.** A low-glare night palette, no pure black, no flashing, no
   growth-hacking notifications. Just your baby's day.
 
@@ -122,10 +122,8 @@ wake, or log a diaper straight from the row.
   browser chrome.
 - The service worker caches the shell and static assets, and shows a calm
   offline page instead of a browser error.
-- A header chip tells you whether you're **Synced**, **Syncing…**, on a
-  **Local copy**, or fully **Local** — separate from whether the network is up.
-- The local database is the write path. Logging is instant; syncing happens in
-  the background and a cloud outage never blocks a feed.
+- The local database is the write path. Logging is instant and never waits for
+  the network.
 
 ### Your data stays yours
 

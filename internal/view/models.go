@@ -45,7 +45,6 @@ type PageData struct {
 	// CSRF is set only when the optional passcode gate is enabled.
 	CSRF        string
 	AuthEnabled bool
-	SyncChip    *SyncChipView
 
 	// FeedAlertMinutes is the nursing ping threshold. Zero disables it.
 	FeedAlertMinutes int
@@ -221,13 +220,6 @@ type TimelineDay struct {
 	Meta  string
 	Feeds FeedSummary
 	Rows  []EventRow
-}
-
-// SyncChipView is the header's sync state indicator.
-type SyncChipView struct {
-	Label string
-	Tone  string // ok, pending, warn, local
-	Title string
 }
 
 // SettingsView backs the settings page.

@@ -1,0 +1,13 @@
+{{define "tabbar"}}
+<nav class="tabbar" aria-label="Main">
+  <a class="tabbar-link{{if eq .View ""}} is-active{{end}}" href="/"{{if eq .View ""}} aria-current="page"{{end}}>
+    {{icon "home"}}<span>Home</span>
+  </a>
+  <a class="tabbar-link{{if eq .View "timeline"}} is-active{{end}}" href="/timeline"{{if eq .View "timeline"}} aria-current="page"{{end}}>
+    {{icon "history"}}<span>History</span>
+  </a>
+  <a class="tabbar-link{{if eq .View "settings"}} is-active{{end}}" href="/settings"{{if eq .View "settings"}} aria-current="page"{{end}}>
+    {{icon "settings"}}<span>Settings</span>
+  </a>
+</nav>
+{{end}}

@@ -30,6 +30,34 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.4",
+		Date:    "Oct 27, 2026",
+		Title:   "One thumb, three places",
+		Summary: "A bottom menu keeps Home, History, and Settings one tap away.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"A bottom menu with Home, History, and Settings.",
+					"The current screen stays highlighted, and quick logging still sits just above the menu.",
+				},
+			},
+			{
+				Title: "Changed",
+				Items: []string{
+					"Today no longer needs its own History and Settings links.",
+					"The quick-log button and its drawer sit above the menu, within easy reach of a thumb.",
+				},
+			},
+			{
+				Title: "Removed",
+				Items: []string{
+					"The small status chip in the header, for a calmer screen. Sync details are still in Settings.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.3",
 		Date:    "Oct 27, 2026",
 		Title:   "Quick actions from the running row",
