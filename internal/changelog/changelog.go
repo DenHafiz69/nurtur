@@ -30,6 +30,22 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.3",
+		Date:    "Oct 27, 2026",
+		Title:   "Quick actions from the running row",
+		Summary: "Tapping the running activity in Today now opens the same quick-log menu as the floating + button.",
+		Sections: []Section{
+			{
+				Title: "Changed",
+				Items: []string{
+					"Tap the running nursing or sleep row in Today to open the quick log.",
+					"Pause, switch sides, finish, wake, or log a diaper without leaving the row.",
+					"The pencil and trash on that row still edit or delete it.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.2",
 		Date:    "Oct 27, 2026",
 		Title:   "The nursing clock keeps its time",
