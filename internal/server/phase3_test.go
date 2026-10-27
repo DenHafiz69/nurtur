@@ -332,8 +332,9 @@ func TestPasscodeGateAndCSRF(t *testing.T) {
 		cfg.Passcode = "secret"
 	})
 
+	// A signed-out visitor sees the landing page rather than the passcode form.
 	rec := env.do(t, http.MethodGet, "/", nil, false)
-	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/login") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "One less thing to remember.") {
 		t.Fatalf("root = %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 

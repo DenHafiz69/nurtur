@@ -14,6 +14,12 @@ import (
 // covers sessions that were already signed in before the profile existed.
 func (s *Server) requireBabyProfile(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A signed-out visitor on the landing page has no baby profile yet.
+		// Sending them to onboarding would be both confusing and wrong.
+		if s.landingRequest(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !needsBabyProfilePrompt(r) {
 			next.ServeHTTP(w, r)
 			return

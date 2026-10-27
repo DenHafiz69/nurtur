@@ -113,6 +113,14 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 
 		accountID, csrf, ok := a.session(r)
 		if !ok {
+			// The root is the public front door. Let it through so the
+			// dashboard handler can show the landing page instead of a
+			// sign-in wall. Signed-in browsers already have a session and
+			// never reach this branch.
+			if publicLanding(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			next := r.URL.RequestURI()
 			http.Redirect(w, r, "/login?next="+url.QueryEscape(next), http.StatusSeeOther)
 			return
@@ -129,6 +137,25 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 		ctx = store.WithAccount(ctx, accountID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// publicLanding reports whether an unauthenticated browser may reach the root
+// page to read the landing page. It is limited to top-level document loads so
+// fragments and mutations keep the normal sign-in gate.
+func publicLanding(r *http.Request) bool {
+	if r.URL.Path != "/" {
+		return false
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	return !isHTMX(r)
+}
+
+// signedIn reports whether the request carries a valid household session.
+func (a *auth) signedIn(r *http.Request) bool {
+	_, _, ok := a.session(r)
+	return ok
 }
 
 func requiresAuth(r *http.Request) bool {

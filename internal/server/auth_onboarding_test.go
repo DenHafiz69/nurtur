@@ -17,16 +17,29 @@ func TestOnboardingSignupThenLogin(t *testing.T) {
 		cfg.SessionSecret = "test-session-secret"
 	})
 
-	// An unauthenticated browser is asked the onboarding question.
+	// A signed-out browser at the root gets the public landing page, not a
+	// sign-in wall. Both entry points are visible without scrolling far.
 	rec := env.do(t, http.MethodGet, "/", nil, false)
-	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/login") {
+	if rec.Code != http.StatusOK {
 		t.Fatalf("root = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"One less thing to remember.",
+		"/login?mode=signin",
+		"/login?mode=signup",
+		">Sign in<",
+		">Sign up<",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("landing page missing %q\n%s", want, body)
+		}
 	}
 	rec = env.do(t, http.MethodGet, "/login", nil, false)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("onboarding status = %d", rec.Code)
 	}
-	body := rec.Body.String()
+	body = rec.Body.String()
 	for _, want := range []string{
 		"Do you already have an account?",
 		"/login?mode=signin",

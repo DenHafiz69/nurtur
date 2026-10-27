@@ -14,6 +14,10 @@ import (
 )
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	if s.landingRequest(r) {
+		s.handleLanding(w, r)
+		return
+	}
 	data, err := s.buildPage(r.Context(), nonceFrom(r.Context()), nil)
 	if err != nil {
 		s.serverError(w, r, err)
