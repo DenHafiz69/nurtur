@@ -964,6 +964,31 @@ button {
   gap: 8px;
 }
 
+/* While nursing or sleep is running, the dock keeps its attention on that
+   activity: the unrelated options step aside until it is done. When both are
+   running (nursing down to sleep), both controls stay visible and only the
+   diapers wait. */
+.dock-stack:has(> #timer-card:not(.is-idle)) > .diaper-row,
+.dock-stack:has(> .sleep-slot .sleep-pill.is-asleep) > .diaper-row {
+  display: none;
+}
+
+.dock-stack:has(> #timer-card:not(.is-idle)) > .sleep-slot {
+  display: none;
+}
+
+.dock-stack:has(> #timer-card:not(.is-idle)):has(> .sleep-slot .sleep-pill.is-asleep) > .sleep-slot {
+  display: flex;
+}
+
+.dock-stack:has(> .sleep-slot .sleep-pill.is-asleep) > #timer-card {
+  display: none;
+}
+
+.dock-stack:has(> .sleep-slot .sleep-pill.is-asleep):has(> #timer-card:not(.is-idle)) > #timer-card {
+  display: block;
+}
+
 /* ---------- Bottom navigation ---------- */
 
 .tabbar {

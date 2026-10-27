@@ -234,6 +234,43 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByText(/Awake\. That was/)).toBeVisible();
   });
 
+  test("quick log focuses on the running activity", async ({ page }) => {
+    await page.goto("/");
+    const drawer = page.locator("details.dock-drawer");
+    if (!(await drawer.evaluate((el) => el.open))) {
+      await page.locator(".dock-toggle").click();
+    }
+    await expect(drawer).toHaveAttribute("open", "");
+
+    // With nothing running, every option is available.
+    await expect(page.getByRole("button", { name: "Wet", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Start sleep/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
+
+    // Nursing hides the diaper and sleep options until the feed is done.
+    await page.getByRole("button", { name: "Left", exact: true }).click();
+    await expect(page.locator(".timer-label")).toContainText("Nursing Left");
+    await expect(page.getByRole("button", { name: "Wet", exact: true })).toBeHidden();
+    await expect(page.getByRole("button", { name: /Start sleep/ })).toBeHidden();
+
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Wet", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Start sleep/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
+
+    // Sleep leaves only the wake-up control.
+    await page.getByRole("button", { name: /Start sleep/ }).click();
+    await expect(page.locator(".sleep-pill.is-asleep")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Wet", exact: true })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeHidden();
+
+    // Waking brings the other options back.
+    await page.getByRole("button", { name: /Wake up/ }).click();
+    await expect(page.getByRole("button", { name: "Wet", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Start sleep/ })).toBeVisible();
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);
