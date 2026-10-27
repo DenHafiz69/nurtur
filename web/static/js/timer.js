@@ -23,6 +23,9 @@
     // htmx injects a <style> block for indicators by default, which a strict
     // style-src 'self' CSP correctly blocks. The rules live in app.css instead.
     htmx.config.includeIndicatorStyles = false;
+    // Do not persist page HTML in localStorage. The pages hold baby data and
+    // must not outlive the passcode gate; a history miss refetches instead.
+    htmx.config.historyCacheSize = 0;
     // Swap validation errors (422) into the dialog instead of treating them as
     // transport failures. The server supplies HX-Retarget for those responses.
     htmx.config.responseHandling = [
@@ -120,6 +123,15 @@
     });
   }
 
+  var dockSyncing = false;
+
+  function setDockOpen(open) {
+    if (!dockDrawer || dockDrawer.open === open) return;
+    // Do not record a preference for a change the app made on its own.
+    dockSyncing = true;
+    dockDrawer.open = open;
+  }
+
   if (dockDrawer) {
     var dockPreference = null;
     try { dockPreference = localStorage.getItem(DOCK_KEY); } catch (e) {}
@@ -127,10 +139,34 @@
       dockDrawer.open = dockPreference === "open";
     }
     dockDrawer.addEventListener("toggle", function () {
+      if (dockSyncing) {
+        dockSyncing = false;
+        syncDockExpanded();
+        return;
+      }
       try { localStorage.setItem(DOCK_KEY, dockDrawer.open ? "open" : "closed"); } catch (e) {}
       syncDockExpanded();
     });
     syncDockExpanded();
+  }
+
+  // Home opens the drawer and History collapses it until the user picks a
+  // state of their own. Boosted tab swaps keep the old drawer open otherwise.
+  function syncDockDefault(path) {
+    if (!dockDrawer || !path) return;
+    var preference = null;
+    try { preference = localStorage.getItem(DOCK_KEY); } catch (e) {}
+    if (preference === "open" || preference === "closed") return;
+    setDockOpen(path !== "/timeline");
+  }
+
+  // Settings and the changelog hide quick logging. The drawer still lives in
+  // the shell so switching tabs does not tear it down.
+  function syncDockView(path) {
+    if (!dockDrawer) return;
+    var hidden = path === "/settings" || path === "/changelog";
+    dockDrawer.hidden = hidden;
+    if (!hidden) syncDockDefault(path);
   }
 
   // Tapping the running activity's row opens the same quick-log drawer as the
@@ -142,6 +178,53 @@
     dockDrawer.open = true;
     var toggle = dockDrawer.querySelector(".dock-toggle");
     if (toggle) toggle.focus({ preventScroll: true });
+  });
+
+  /* ---------- Tab navigation ---------- */
+
+  // Tabs swap only <main> through htmx so the dock, timer, and header stay put
+  // instead of reloading the whole document on every tap.
+  var tabNavigationPending = false;
+  var tabNavigationTarget = "";
+
+  function pathOf(link) {
+    try {
+      var path = new URL(link.href, location.origin).pathname;
+      return path.length > 1 ? path.replace(/\/+$/, "") : path;
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function syncTabbar(path) {
+    var here = path || location.pathname;
+    if (here.length > 1) here = here.replace(/\/+$/, "");
+    document.querySelectorAll(".tabbar-link").forEach(function (link) {
+      var active = pathOf(link) === here;
+      link.classList.toggle("is-active", active);
+      if (active) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    });
+    syncDockView(here);
+  }
+
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest ? event.target.closest(".tabbar-link") : null;
+    if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    tabNavigationPending = true;
+    tabNavigationTarget = link.href;
+    // Paint the destination tab immediately and drop a toast from the page
+    // being left behind; the page itself follows a moment later.
+    clearToast();
+    syncTabbar(pathOf(link));
+  });
+
+  // Back and forward move between tabs without a full reload, so put the tab
+  // bar back in step with the URL.
+  window.addEventListener("popstate", function () {
+    window.requestAnimationFrame(function () {
+      syncTabbar();
+    });
   });
 
   /* ---------- Time formatting (mirrors internal/view) ---------- */
@@ -312,6 +395,7 @@
   function tick() {
     tickLiveClocks();
     var card = timerCard();
+    if (card) syncBodyFeedState(card);
 
     if (card) {
       if (card.dataset.feedId && !timerPaused(card)) {
@@ -416,6 +500,25 @@
         return Math.max(0, total + (Date.now() - labelOffset - serverNow));
       }
     };
+  }
+
+  // Boosted tab navigation keeps <body> alive, so mirror the timer card's feed
+  // state onto it for fallbacks that only have the body to read.
+  function syncBodyFeedState(card) {
+    var body = document.body;
+    if (!card || !body) return;
+    if (card.dataset.feedId) {
+      body.dataset.activeFeedId = card.dataset.feedId;
+      body.dataset.feedTotalMs = card.dataset.feedTotalMs || "";
+      if (card.dataset.serverNow) body.dataset.serverNow = card.dataset.serverNow;
+      if (card.dataset.alertMinutes) body.dataset.alertMinutes = card.dataset.alertMinutes;
+      if (card.dataset.paused === "true") body.dataset.feedPaused = "true";
+      else delete body.dataset.feedPaused;
+      return;
+    }
+    delete body.dataset.activeFeedId;
+    delete body.dataset.feedTotalMs;
+    delete body.dataset.feedPaused;
   }
 
   function parseAlertMinutes(raw) {
@@ -887,6 +990,16 @@
 
   var ALERT_ICON = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5"/><circle cx="12" cy="16.4" r=".6" fill="currentColor" stroke="none"/></svg>';
 
+  function clearToast() {
+    if (toastTimer) {
+      window.clearTimeout(toastTimer);
+      toastTimer = null;
+    }
+    document.querySelectorAll("[data-toast]").forEach(function (toast) {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    });
+  }
+
   function localToast(message, kind) {
     var region = document.getElementById("toast-region");
     if (!region) return;
@@ -908,6 +1021,16 @@
   function handleSwap(target) {
     if (!target) return;
 
+    if (target.id === "main") {
+      // A boosted tab swap only replaces the page body; bring the tab bar and
+      // focus along with it.
+      syncTabbar();
+      if (tabNavigationPending) {
+        tabNavigationPending = false;
+        tabNavigationTarget = "";
+        try { target.focus({ preventScroll: true }); } catch (e) {}
+      }
+    }
     if (target.tagName === "DIALOG" && target.classList.contains("sheet")) {
       document.querySelectorAll("dialog.sheet[open]").forEach(function (other) {
         if (other !== target) closeDialog(other);
@@ -916,6 +1039,7 @@
     }
     if (target.id === "timer-card") {
       onTimerSwap();
+      syncBodyFeedState(target);
     }
     if (target.id === "toast-region") {
       armToast();
@@ -938,13 +1062,33 @@
     handleSwap(event.detail ? event.detail.target : null);
   });
 
+  // Boosted history restores do not run the tab link's request, so update the
+  // active tab after htmx puts the cached page back.
+  document.body.addEventListener("htmx:historyRestore", function () {
+    syncTabbar();
+  });
+
   document.body.addEventListener("htmx:responseError", function (event) {
     var status = event.detail && event.detail.xhr ? event.detail.xhr.status : 0;
+    if (tabNavigationPending) {
+      tabNavigationPending = false;
+      tabNavigationTarget = "";
+      syncTabbar();
+    }
     if (status === 422) return;
     localToast("Couldn't save that. Check the connection and try again.", "error");
   });
 
   document.body.addEventListener("htmx:sendError", function () {
+    if (tabNavigationPending && tabNavigationTarget) {
+      // A boosted tab cannot load; fall back to a normal navigation so the
+      // service worker can serve its offline page.
+      var fallback = tabNavigationTarget;
+      tabNavigationPending = false;
+      tabNavigationTarget = "";
+      window.location.assign(fallback);
+      return;
+    }
     isOffline = true;
     updateOfflineHint();
     localToast("Can't reach the server. Your timer is still running.", "warn");
