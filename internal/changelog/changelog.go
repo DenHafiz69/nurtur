@@ -30,7 +30,7 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
-		Version: "v0.5.0",
+		Version: "v0.4.4",
 		Date:    "Oct 27, 2026",
 		Title:   "One thumb, three places",
 		Summary: "A bottom menu keeps Home, History, and Settings one tap away.",
