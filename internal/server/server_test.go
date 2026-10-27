@@ -157,6 +157,106 @@ func TestDashboardShellAndSecurityHeaders(t *testing.T) {
 	}
 }
 
+// statusCardMarkup returns the opening card anchor for one dashboard domain.
+func statusCardMarkup(t *testing.T, body, kind string) string {
+	t.Helper()
+	re := regexp.MustCompile(`(?s)<a class="status-card status-` + kind + `.*?</a>`)
+	match := re.FindString(body)
+	if match == "" {
+		t.Fatalf("status card %q not found", kind)
+	}
+	return match
+}
+
+// feedRowMarkup returns one Today list row with the given extra classes.
+func feedRowMarkup(t *testing.T, body, classes string) string {
+	t.Helper()
+	re := regexp.MustCompile(`(?s)<li class="feed-row ` + regexp.QuoteMeta(classes) + `">.*?</li>`)
+	match := re.FindString(body)
+	if match == "" {
+		t.Fatalf("event row %q not found", classes)
+	}
+	return match
+}
+
+// liveRowLink returns the opening anchor of a running activity's row.
+func liveRowLink(t *testing.T, row string) string {
+	t.Helper()
+	re := regexp.MustCompile(`<a class="live-row-main"[^>]*>`)
+	match := re.FindString(row)
+	if match == "" {
+		t.Fatalf("live row link not found:\n%s", row)
+	}
+	return match
+}
+
+func TestRunningActivityRowOpensQuickLogDock(t *testing.T) {
+	env := newTestEnv(t)
+
+	rec := env.do(t, http.MethodGet, "/", nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("dashboard status = %d", rec.Code)
+	}
+	if body := rec.Body.String(); strings.Contains(body, "data-open-dock") {
+		t.Fatal("idle dashboard has a row that opens the dock")
+	}
+
+	// A running feed turns its row in Today into a shortcut for the dock.
+	rec = env.do(t, http.MethodPost, "/feeds", url.Values{"side": {"left"}}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start feed status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	rec = env.do(t, http.MethodPost, "/diapers", url.Values{"type": {"wet"}}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("log diaper status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	rec = env.do(t, http.MethodGet, "/", nil, false)
+	body := rec.Body.String()
+
+	live := feedRowMarkup(t, body, "event-feed is-active live-row")
+	for _, want := range []string{`class="live-row-main"`, "data-open-dock", `aria-controls="quick-log"`, `aria-expanded="true"`, "Open quick log"} {
+		if !strings.Contains(live, want) {
+			t.Errorf("running feed row missing %q\n%s", want, live)
+		}
+	}
+	liveMain := liveRowLink(t, live)
+	if strings.Contains(liveMain, "hx-get=") {
+		t.Errorf("running feed row should not fetch a sheet:\n%s", liveMain)
+	}
+	if diaper := feedRowMarkup(t, body, "event-diaper"); strings.Contains(diaper, "data-open-dock") {
+		t.Errorf("idle diaper row should not open the dock:\n%s", diaper)
+	}
+
+	// Status cards keep opening their detail sheets.
+	if nursing := statusCardMarkup(t, body, "nursing"); !strings.Contains(nursing, `hx-get="/feeds/sheet"`) {
+		t.Errorf("active nursing card should still open its sheet:\n%s", nursing)
+	}
+
+	// The same holds for a running sleep.
+	rec = env.do(t, http.MethodPost, "/feeds/1/stop", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stop feed status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	rec = env.do(t, http.MethodPost, "/sleeps", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start sleep status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	rec = env.do(t, http.MethodGet, "/", nil, false)
+	body = rec.Body.String()
+	sleep := feedRowMarkup(t, body, "event-sleep is-active live-row")
+	for _, want := range []string{`data-open-dock`, "Open quick log"} {
+		if !strings.Contains(sleep, want) {
+			t.Errorf("running sleep row missing %q\n%s", want, sleep)
+		}
+	}
+	if strings.Contains(liveRowLink(t, sleep), "hx-get=") {
+		t.Errorf("running sleep row should not fetch a sheet:\n%s", sleep)
+	}
+	if feedRow := feedRowMarkup(t, body, "event-feed"); strings.Contains(feedRow, "data-open-dock") {
+		t.Errorf("finished feed row should not open the dock:\n%s", feedRow)
+	}
+}
+
 func TestStaticFingerprintTracksBundleContent(t *testing.T) {
 	first, err := staticFingerprint(fstest.MapFS{
 		"app.css":      {Data: []byte("one")},
