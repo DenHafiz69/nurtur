@@ -1668,6 +1668,24 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* iOS Safari renders date and time fields as inline-flex with a native minimum
+   width, so width: 100% is ignored: a field-pair overflows its column and the
+   two controls overlap. appearance: none puts them back on the standard box
+   model; the wheel picker still opens on tap. Gated on the WebKit marker used
+   elsewhere in this file so Chromium on Android keeps its native widget. */
+@supports (-webkit-touch-callout: none) {
+  input[type="datetime-local"],
+  input[type="date"],
+  input[type="time"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
 .field-error {
   color: var(--danger);
   font-size: 14px;
