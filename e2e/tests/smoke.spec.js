@@ -328,6 +328,30 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByRole("button", { name: /Start sleep/ })).toBeVisible();
   });
 
+  test("the app shell stays put and only the page body scrolls", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".app-main")).toBeVisible();
+
+    const layout = await page.evaluate(() => {
+      const app = document.querySelector(".app").getBoundingClientRect();
+      const tabbar = document.querySelector(".tabbar").getBoundingClientRect();
+      return {
+        documentScrollHeight: document.scrollingElement.scrollHeight,
+        viewportHeight: window.innerHeight,
+        appTop: app.top,
+        appBottom: app.bottom,
+        tabbarBottom: tabbar.bottom
+      };
+    });
+
+    // The document is exactly one screen tall: iOS must not be able to drag the
+    // header under the status bar or the tab bar off the bottom edge.
+    expect(layout.documentScrollHeight).toBeLessThanOrEqual(layout.viewportHeight);
+    expect(layout.appTop).toBe(0);
+    expect(layout.appBottom).toBe(layout.viewportHeight);
+    expect(layout.tabbarBottom).toBe(layout.viewportHeight);
+  });
+
   test("export endpoints download data", async ({ request }) => {
     const csv = await request.get("/export.csv");
     expect(csv.status()).toBe(200);

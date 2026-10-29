@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.11",
+		Date:    "Oct 29, 2026",
+		Title:   "A screen that stays put",
+		Summary: "On iOS the header and bottom nav no longer drift with the page; only the day's feed scrolls.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The app now fills exactly one screen on iOS, so the header cannot slide under the status bar and the bottom nav stays flush.",
+					"Only the page body scrolls, which removes the small whole-screen shift when browsing the day.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.10",
 		Date:    "Oct 29, 2026",
 		Title:   "An Album tab and a + that stays close",
