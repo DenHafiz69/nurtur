@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.13",
+		Date:    "Oct 29, 2026",
+		Title:   "Room for the last row",
+		Summary: "The final entry in Today can now scroll clear of the bottom nav on iOS instead of resting half-hidden beneath it.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The scroll area reserves the iOS home-indicator inset, so the last log row can be read in full above the tab bar.",
+					"The bottom nav stays flush against the bottom of the screen.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.12",
 		Date:    "Oct 29, 2026",
 		Title:   "A bottom bar that reaches the bottom",
