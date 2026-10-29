@@ -215,6 +215,18 @@ body.app-body {
   margin: 0 auto;
 }
 
+/* Installed iOS apps resolve the viewport without the home-indicator strip
+   even though env() still reports it. Reach past that edge so the tab bar's
+   background fills the strip; its own bottom padding keeps the labels above
+   the indicator. Browsers and Android already include the full screen. */
+@media (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    .app {
+      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+    }
+  }
+}
+
 /* ---------- Header ---------- */
 
 .app-header {
