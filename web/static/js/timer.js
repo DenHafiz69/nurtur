@@ -108,19 +108,26 @@
 
   /* ---------- Quick-log dock ---------- */
 
-  // Home renders the drawer open and History renders it collapsed. Once the
-  // user chooses, keep that choice on every screen instead of letting the next
-  // server render reopen (or close) it.
+  // Home renders the drawer open and every other page renders it collapsed.
+  // Once the user chooses, keep that choice instead of letting the next server
+  // render reopen (or close) it.
   var DOCK_KEY = "nurtur.dock";
   var dockDrawer = document.querySelector(".dock-drawer");
 
-  // The running activity row is a disclosure for the dock, so keep its
-  // aria-expanded in step with the drawer even after an OOB swap replaces it.
+  // Keep the running activity row and the centered nav button in step with the
+  // drawer, even after an OOB swap replaces the row or a boosted tab swaps the
+  // page body.
   function syncDockExpanded() {
     var expanded = !!(dockDrawer && dockDrawer.open);
     document.querySelectorAll("[data-open-dock]").forEach(function (row) {
       row.setAttribute("aria-expanded", expanded ? "true" : "false");
     });
+    var quick = document.querySelector("[data-quick-log-toggle]");
+    if (quick) {
+      quick.classList.toggle("is-open", expanded);
+      quick.setAttribute("aria-expanded", expanded ? "true" : "false");
+      quick.setAttribute("aria-label", expanded ? "Close quick log" : "Open quick log");
+    }
   }
 
   var dockSyncing = false;
@@ -150,30 +157,22 @@
     syncDockExpanded();
   }
 
-  // Home opens the drawer and History and Album collapse it until the user
-  // picks a state of their own. Boosted tab swaps keep the old drawer open
-  // otherwise.
+  // Home opens the drawer; History, Album, Settings, and the changelog start
+  // it collapsed. Boosted tab swaps keep the old drawer state otherwise.
   function syncDockDefault(path) {
     if (!dockDrawer || !path) return;
     var preference = null;
     try { preference = localStorage.getItem(DOCK_KEY); } catch (e) {}
     if (preference === "open" || preference === "closed") return;
-    setDockOpen(path !== "/timeline" && path !== "/album");
+    setDockOpen(path === "/");
   }
 
-  // Settings and the changelog hide quick logging. The drawer still lives in
-  // the shell so switching tabs does not tear it down.
   function syncDockView(path) {
-    if (!dockDrawer) return;
-    var hidden = path === "/settings" || path === "/changelog";
-    dockDrawer.hidden = hidden;
-    var tabbar = document.querySelector(".tabbar");
-    if (tabbar) tabbar.classList.toggle("tabbar-no-quick", hidden);
-    if (!hidden) syncDockDefault(path);
+    syncDockDefault(path);
   }
 
   // Tapping the running activity's row opens the same quick-log drawer as the
-  // floating + button, so the actions for that activity stay one tap away.
+  // centered nav button, so the actions for that activity stay one tap away.
   document.addEventListener("click", function (event) {
     var row = event.target.closest ? event.target.closest("[data-open-dock]") : null;
     if (!row || !dockDrawer) return;
@@ -181,6 +180,15 @@
     dockDrawer.open = true;
     var toggle = dockDrawer.querySelector(".dock-toggle");
     if (toggle) toggle.focus({ preventScroll: true });
+  });
+
+  // The centered + stays put on every page. When the drawer is open it reads as
+  // an X and the same tap collapses the quick log.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest ? event.target.closest("[data-quick-log-toggle]") : null;
+    if (!button || !dockDrawer) return;
+    event.preventDefault();
+    dockDrawer.open = !dockDrawer.open;
   });
 
   /* ---------- Tab navigation ---------- */

@@ -18,6 +18,7 @@ func TestAlbumPagePlaceholder(t *testing.T) {
 		"No photos yet.",
 		`class="tabbar-link is-active"`,
 		`aria-current="page"`,
+		`data-quick-log-toggle`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("album page missing %q:\n%s", want, body)

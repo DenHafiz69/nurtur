@@ -94,29 +94,34 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
 
     const drawer = page.locator("details.dock-drawer");
-    const toggle = page.locator(".dock-toggle");
+    const quick = page.locator("[data-quick-log-toggle]");
     await expect(drawer).not.toHaveAttribute("open", "");
-    await expect(toggle).toBeVisible();
+    await expect(quick).toBeVisible();
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
 
-    await toggle.click();
+    await quick.click();
     await expect(drawer).toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "true");
+    await expect(quick.locator(".icon")).toHaveCSS("transform", /matrix/);
     await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Wet", exact: true }).click();
     await expect(page.getByText(/Wet diaper( was just)? logged\./)).toBeVisible();
 
-    await toggle.click();
+    await quick.click();
     await expect(drawer).not.toHaveAttribute("open", "");
   });
 
-  test("hiding quick logging sticks on the main screen and reloads", async ({ page }) => {
+  test("collapsed quick logging sticks on the main screen and reloads", async ({ page }) => {
     await page.goto("/");
     const drawer = page.locator("details.dock-drawer");
-    const toggle = page.locator(".dock-toggle");
+    const quick = page.locator("[data-quick-log-toggle]");
     await expect(drawer).toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "true");
 
-    await toggle.click();
+    await quick.click();
     await expect(drawer).not.toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
 
     // Leaving History must not hand the old open-by-default rendering back.
     await page.getByRole("link", { name: "History", exact: true }).click();
@@ -131,51 +136,27 @@ test.describe("Nurtur smoke path at 390×844", () => {
 
     await page.reload();
     await expect(drawer).not.toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("the quick log appears with its page, not while the last one is still up", async ({ page }) => {
-    await page.goto("/");
-    const drawer = page.locator("details.dock-drawer");
-    const toggle = page.locator(".dock-toggle");
+  test("the quick log button stays available on settings", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
-    // Remember a collapsed dock so Home and History both use the floating +.
-    await toggle.click();
+    const drawer = page.locator("details.dock-drawer");
+    const quick = page.locator("[data-quick-log-toggle]");
+    await expect(quick).toBeVisible();
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
     await expect(drawer).not.toHaveAttribute("open", "");
 
-    await page.getByRole("link", { name: "Settings", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(drawer).toBeHidden();
-
-    // Leave Settings while the next page is still loading. The dock must stay
-    // hidden until that page arrives, or the red + flashes over Settings.
-    await page.route((url) => url.pathname === "/timeline", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await route.continue();
-    });
-    await page.getByRole("link", { name: "History", exact: true }).click();
-    await page.waitForTimeout(150);
-    await expect(drawer).toBeHidden();
-    await expect(toggle).toBeHidden();
-    await expect(page.getByRole("link", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
-
-    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
-    await expect(drawer).not.toHaveAttribute("hidden", "");
-    await expect(toggle).toBeVisible();
-    await page.unroute((url) => url.pathname === "/timeline");
-
-    // The reverse: an open drawer stays put until Settings has swapped in.
-    await toggle.click();
+    await quick.click();
     await expect(drawer).toHaveAttribute("open", "");
-    await page.route((url) => url.pathname === "/settings", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      await route.continue();
-    });
-    await page.getByRole("link", { name: "Settings", exact: true }).click();
-    await page.waitForTimeout(150);
-    await expect(drawer).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-    await expect(drawer).toHaveAttribute("hidden", "");
-    await page.unroute((url) => url.pathname === "/settings");
+    await expect(quick).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
+
+    await quick.click();
+    await expect(drawer).not.toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
   });
 
   test("theme toggle flips on a single click in both directions", async ({ page }) => {
