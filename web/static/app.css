@@ -387,7 +387,10 @@ body.app-body {
 .app-main {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 4px 16px 18px;
+  /* The shell reaches into the iOS home-indicator strip, so the scroll area
+     needs the same inset at its end. Without it the last row can come to rest
+     behind the tab bar and stay clipped even at full scroll. */
+  padding: 4px 16px calc(18px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
