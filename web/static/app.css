@@ -194,20 +194,24 @@ button {
   top: calc(8px + env(safe-area-inset-top));
 }
 
+/* The shell owns the screen: the header and tab bar stay put and only the page
+   body scrolls. Keeping the document itself fixed avoids the whole screen
+   drifting on iOS, where the dynamic viewport height and the bottom safe area
+   can disagree by a few dozen pixels and leave the page scrollable. */
+body.app-body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 .app {
-  position: relative;
+  position: fixed;
+  inset: 0;
   z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 520px;
-  /* Installed iOS web apps report 100dvh without the bottom safe area, which
-     leaves the tab bar floating above the screen edge. Add the inset back to
-     the shell; Android reports 0px and keeps the dynamic viewport height. */
-  height: 100vh;
-  height: calc(100dvh + env(safe-area-inset-bottom, 0px));
-  min-height: 100vh;
-  min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
   margin: 0 auto;
 }
 
