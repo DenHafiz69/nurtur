@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nurtur — the baby tracker that stays on your phone</title>
+  <meta name="description" content="Nursing, diapers, and sleep in one thumb. Nurtur is coming to Android: offline-first, no account, no ads, and a nursing alert that works while your phone is locked.">
+  <meta name="theme-color" content="#fff8f0" id="theme-color">
+  <meta name="color-scheme" content="light dark">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Nurtur — the baby tracker that stays on your phone">
+  <meta property="og:description" content="One thumb, no account, no ads. A calm Android baby tracker for the 3 a.m. version of you.">
+  <meta property="og:image" content="assets/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="assets/pip-face.svg">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="preload" href="assets/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <script>
+    // Resolve the theme before first paint so there is never a white flash.
+    (function () {
+      try {
+        var saved = localStorage.getItem("nurtur.promo.theme");
+        var hour = new Date().getHours();
+        var auto = (hour >= 21 || hour < 7) ? "night" : "day";
+        var theme = (saved === "day" || saved === "night") ? saved : auto;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.classList.add("js");
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
+      } catch (e) {
+        document.documentElement.classList.add("js");
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/main.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19 6.8"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 16.5h11l-1.2-2.1a2 2 0 0 1-.3-1V10a4 4 0 0 0-8 0v3.4a2 2 0 0 1-.3 1l-1.2 2.1Z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.5 8.5 0 1 0 20 14.2Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="9" rx="2.4"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><circle cx="12" cy="15" r="1"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></symbol>
+    <symbol id="i-widget" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-offline" viewBox="0 0 24 24"><path d="M6.5 17.5h9.8a3.7 3.7 0 0 0 .6-7.4A5.2 5.2 0 0 0 7.2 8.3"/><path d="M4 4l16 16"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="3"/><path d="M10.5 18.5h3"/></symbol>
+    <symbol id="i-diaper" viewBox="0 0 24 24"><path d="M5 8h14l-1.1 6a4 4 0 0 1-4 3.4h-3.8a4 4 0 0 1-4-3.4L5 8Z"/><path d="M8 8V6.5A1.5 1.5 0 0 1 9.5 5h5A1.5 1.5 0 0 1 16 6.5V8"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.2 19 6v5.4c0 4.3-2.9 7.4-7 9.4-4.1-2-7-5.1-7-9.4V6l7-2.8Z"/><path d="m8.8 12 2.2 2.2 4.2-4.4"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.4-7.5-9.5A4.2 4.2 0 0 1 12 7.7a4.2 4.2 0 0 1 7.5 2.8C19.5 15.6 12 20 12 20Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5-10-6.5Z"/></symbol>
+    <symbol id="i-drop-left" viewBox="0 0 24 24"><path d="M12 3.4c3.1 4 5.4 6.8 5.4 9.5a5.4 5.4 0 0 1-10.8 0c0-2.7 2.3-5.5 5.4-9.5Z"/><path d="M13.7 15.4H10.3l2.1-3.1"/></symbol>
+    <symbol id="i-drop-right" viewBox="0 0 24 24"><path d="M12 3.4c3.1 4 5.4 6.8 5.4 9.5a5.4 5.4 0 0 1-10.8 0c0-2.7 2.3-5.5 5.4-9.5Z"/><path d="M10.3 15.4h3.4l-2.1-3.1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4.4l8 6.8"/><path d="M6.4 10.2V19a1 1 0 0 0 1 1h9.2a1 1 0 0 0 1-1v-8.8"/><path d="M10 20v-5.2h4V20"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 7h12M8 12h12M8 17h12"/><circle cx="4.5" cy="7" r=".8" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17" r=".8" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="M18.5 16.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7Z"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7 7.5 6 7.5-6"/></symbol>
+    <symbol id="i-google-play" viewBox="0 0 24 24"><path d="M4.5 3.5 19.5 12 4.5 20.5Z"/><path d="M4.5 3.5 14 12l-9.5 8.5"/></symbol>
+  </svg>
+
+  <div id="page">
+    <header class="site-header" id="site-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="#top" aria-label="Nurtur home">
+          <img class="brand-pip" src="assets/pip-face.svg" alt="" width="36" height="36">
+          <span class="brand-name">Nurtur</span>
+          <span class="brand-tag">Android</span>
+        </a>
+
+        <nav class="nav" aria-label="Main">
+          <a href="#why">Why it works</a>
+          <a href="#features">Features</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" aria-pressed="false">
+            <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+            <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+          </button>
+          <button class="btn btn-primary btn-sm" type="button" data-open-beta>Join the beta</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero ------------------------------------------------------------ -->
+      <section class="hero" id="top">
+        <div class="hero-glow" aria-hidden="true"></div>
+        <div class="wrap hero-grid">
+          <div class="hero-copy" data-reveal>
+            <p class="eyebrow"><span class="eyebrow-dot"></span> Coming to Android · 2026</p>
+            <h1 class="hero-title">The baby tracker that <em>stays on your phone</em>.</h1>
+            <p class="hero-lede">
+              Nursing, diapers, and sleep in one thumb. No account, no ads, no cloud you
+              didn't ask for. Just a quiet log that works at 3 a.m. — even when the Wi-Fi
+              doesn't.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary btn-lg" type="button" data-open-beta>
+                Join the Android beta
+                <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+              </button>
+              <a class="btn btn-ghost btn-lg" href="#pricing">See what's free</a>
+            </div>
+            <ul class="trust-row" role="list">
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Free forever</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Works offline</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> No ads. Ever.</li>
+            </ul>
+          </div>
+
+          <div class="hero-art" data-reveal>
+            <div class="phone-stage">
+              <div class="phone-glow" aria-hidden="true"></div>
+
+              <div class="phone" role="group" aria-label="Interactive Nurtur timer demo">
+                <div class="phone-notch" aria-hidden="true"></div>
+                <div class="phone-screen">
+                  <div class="phone-status" aria-hidden="true">
+                    <span>9:41</span>
+                    <span class="phone-status-right">
+                      <span class="signal"><i></i><i></i><i></i><i></i></span>
+                      <span class="wifi"></span>
+                      <span class="battery"></span>
+                    </span>
+                  </div>
+
+                  <div class="app-head">
+                    <div class="app-brand">
+                      <img src="assets/pip-face.svg" alt="" width="30" height="30">
+                      <div>
+                        <strong>Nurtur</strong>
+                        <span>Mia · 3 weeks</span>
+                      </div>
+                    </div>
+                    <button class="app-icon-btn" type="button" data-theme-toggle aria-label="Switch the demo to night mode" aria-pressed="false">
+                      <svg class="icon icon-moon" aria-hidden="true"><use href="#i-moon"/></svg>
+                      <svg class="icon icon-sun" aria-hidden="true"><use href="#i-sun"/></svg>
+                    </button>
+                  </div>
+
+                  <div class="status-grid">
+                    <div class="status-card" data-status="nursing">
+                      <span class="status-label">Nursing</span>
+                      <strong data-last-side>Left</strong>
+                      <span data-last-feed>12m ago</span>
+                    </div>
+                    <div class="status-card" data-status="diaper">
+                      <span class="status-label">Diaper</span>
+                      <strong data-last-diaper>Wet</strong>
+                      <span data-last-diaper-time>1h ago</span>
+                    </div>
+                    <div class="status-card" data-status="sleep">
+                      <span class="status-label">Sleep</span>
+                      <strong>Awake</strong>
+                      <span>45m</span>
+                    </div>
+                  </div>
+
+                  <div class="timer-card" data-timer-card>
+                    <div class="timer-head">
+                      <span class="timer-eyebrow">Nursing</span>
+                      <span class="timer-state" aria-live="polite"><span class="state-dot" aria-hidden="true"></span><span data-timer-state>Ready</span></span>
+                    </div>
+                    <div class="timer-display" role="timer" aria-live="off" data-timer-display>00:00</div>
+                    <p class="timer-side" data-timer-side>Tap a side to start</p>
+
+                    <div class="side-row">
+                      <button class="side-btn" type="button" data-side="left" aria-pressed="false">
+                        <svg class="icon" aria-hidden="true"><use href="#i-drop-left"/></svg>
+                        Left
+                      </button>
+                      <button class="side-btn" type="button" data-side="right" aria-pressed="false">
+                        <svg class="icon" aria-hidden="true"><use href="#i-drop-right"/></svg>
+                        Right
+                      </button>
+                    </div>
+
+                    <div class="timer-actions">
+                      <button class="timer-action" type="button" data-action="pause" hidden>
+                        <svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>
+                        <span data-pause-label>Pause</span>
+                      </button>
+                      <button class="timer-action timer-action-done" type="button" data-action="done" hidden>Done</button>
+                    </div>
+                  </div>
+
+                  <div class="quick-log">
+                    <div class="quick-log-head">
+                      <span>Quick log</span>
+                      <span class="quick-hint">One tap</span>
+                    </div>
+                    <div class="quick-row">
+                      <button type="button" data-diaper="wet">Wet</button>
+                      <button type="button" data-diaper="dirty">Dirty</button>
+                      <button type="button" data-diaper="both">Both</button>
+                    </div>
+                  </div>
+
+                  <div class="today">
+                    <div class="today-head">
+                      <span>Today</span>
+                      <span data-today-count>3 entries</span>
+                    </div>
+                    <ul class="today-list" data-today-list>
+                      <li>
+                        <span class="dot dot-feed" aria-hidden="true"></span>
+                        <div><strong>Nursed · Left</strong><small>12 min · 1h ago</small></div>
+                      </li>
+                      <li>
+                        <span class="dot dot-sleep" aria-hidden="true"></span>
+                        <div><strong>Woke up</strong><small>45m ago</small></div>
+                      </li>
+                      <li>
+                        <span class="dot dot-diaper" aria-hidden="true"></span>
+                        <div><strong>Wet diaper</strong><small>2h ago</small></div>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="phone-toast" data-phone-toast role="status" aria-live="polite"></div>
+
+                  <div class="phone-dock" aria-hidden="true">
+                    <span class="dock-item is-active"><svg class="icon"><use href="#i-home"/></svg><span>Home</span></span>
+                    <span class="dock-add"><svg class="icon"><use href="#i-plus"/></svg></span>
+                    <span class="dock-item"><svg class="icon"><use href="#i-list"/></svg><span>Timeline</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="float-card float-alert" aria-hidden="true">
+                <div class="float-icon"><svg class="icon"><use href="#i-bell"/></svg></div>
+                <div class="float-copy">
+                  <strong>Nursing alert</strong>
+                  <span>20 min · tap Done</span>
+                </div>
+                <span class="float-time">now</span>
+              </div>
+
+              <div class="float-card float-widget" aria-hidden="true">
+                <div class="float-widget-head">
+                  <img src="assets/pip-face.svg" alt="" width="18" height="18">
+                  <span>Today</span>
+                </div>
+                <div class="float-widget-grid">
+                  <div><strong>6</strong><span>feeds</span></div>
+                  <div><strong>5</strong><span>wet</span></div>
+                  <div><strong>2</strong><span>naps</span></div>
+                </div>
+              </div>
+            </div>
+
+            <p class="hero-caption">Tap <strong>Left</strong> or <strong>Right</strong> to try the timer. It keeps running while you scroll.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Why it works ---------------------------------------------------- -->
+      <section class="section" id="why">
+        <div class="wrap">
+          <div class="section-head" data-reveal>
+            <p class="eyebrow">Made for the phone</p>
+            <h2 class="section-title">It runs on the phone.<br><em>Not on the network.</em></h2>
+            <p class="section-lede">
+              Everything starts with one decision: the log belongs on the device in your
+              hand. The alert, the offline taps, the widget — all of it follows from that.
+            </p>
+          </div>
+
+          <div class="proof-grid">
+            <article class="proof-card" data-reveal>
+              <span class="proof-num">01</span>
+              <div class="proof-icon"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg></div>
+              <h3>The alert that actually arrives</h3>
+              <p>
+                An exact alarm and a high-importance notification, even when the screen is
+                locked. A soft ping and a gentle buzz, repeating until you tap Done. It never
+                resets when you switch sides.
+              </p>
+              <div class="proof-mock" aria-hidden="true">
+                <span class="mock-icon"><svg class="icon"><use href="#i-bell"/></svg></span>
+                <span class="mock-copy"><strong>Nursing · 20 min</strong><small>Left side · tap Done</small></span>
+                <span class="mock-time">now</span>
+              </div>
+            </article>
+
+            <article class="proof-card" data-reveal>
+              <span class="proof-num">02</span>
+              <div class="proof-icon"><svg class="icon" aria-hidden="true"><use href="#i-offline"/></svg></div>
+              <h3>No signal, no spinner</h3>
+              <p>
+                The log lives on your phone. Basement, plane, hospital waiting room, or a
+                3 a.m. Wi-Fi outage — every tap still lands immediately. Sync catches up
+                later, or never, if you don't want it.
+              </p>
+              <div class="proof-mock proof-mock-row" aria-hidden="true">
+                <span class="chip chip-saved"><svg class="icon"><use href="#i-check"/></svg> Saved locally</span>
+                <span class="chip chip-quiet">No account</span>
+              </div>
+            </article>
+
+            <article class="proof-card" data-reveal>
+              <span class="proof-num">03</span>
+              <div class="proof-icon"><svg class="icon" aria-hidden="true"><use href="#i-widget"/></svg></div>
+              <h3>On your home screen</h3>
+              <p>
+                A quiet widget with the last feed and one-tap Left, Right, and Diaper.
+                Notification actions, a Quick Settings tile, and long-press shortcuts —
+                without opening the app.
+              </p>
+              <div class="proof-mock proof-mock-widget" aria-hidden="true">
+                <div><strong>1h 20m</strong><span>since left</span></div>
+                <div class="widget-btns"><span>Left</span><span>Right</span><span>Diaper</span></div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features ------------------------------------------------------- -->
+      <section class="section" id="features">
+        <div class="wrap">
+          <div class="section-head" data-reveal>
+            <p class="eyebrow">Everything you'll actually use</p>
+            <h2 class="section-title">Built for the hand<br><em>holding the baby.</em></h2>
+            <p class="section-lede">
+              No dashboards to decode. No menus to dig through. The things you do twenty
+              times a day are the things that are easiest to do.
+            </p>
+          </div>
+
+          <div class="features-grid">
+            <article class="feature-card tone-butter" data-reveal>
+              <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-drop-left"/></svg></div>
+              <h3>One thumb. Two taps.</h3>
+              <p>Left, right, wet, dirty, asleep, awake. Every frequent action sits in the bottom third, sized for a hand that is already full.</p>
+            </article>
+            <article class="feature-card tone-sage" data-reveal>
+              <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></div>
+              <h3>The timer refuses to lie</h3>
+              <p>Lock the phone, switch apps, restart the phone. The feed keeps counting from the real start time. Pause when your baby unlatches, and resume where you left off.</p>
+            </article>
+            <article class="feature-card tone-lilac" data-reveal>
+              <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg></div>
+              <h3>Soft on tired eyes</h3>
+              <p>A warm, low-glare night palette with no white flash at first paint. No pure black, no blinking badges, no wake-the-room glow.</p>
+            </article>
+            <article class="feature-card tone-peach" data-reveal>
+              <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-diaper"/></svg></div>
+              <h3>Diapers in one tap</h3>
+              <p>Wet, dirty, or both — logged immediately. Colour and consistency are there when a check-up asks, tucked behind a details sheet when it doesn't.</p>
+            </article>
+            <article class="feature-card tone-sky" data-reveal>
+              <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></div>
+              <h3>Sleep and wake windows</h3>
+              <p>Start a nap, see how long your little one has been awake, and spot the overtired window before the meltdown rather than after.</p>
+            </article>
+            <article class="feature-card tone-butter" data-reveal>
+              <div class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg></div>
+              <h3>Yours to keep</h3>
+              <p>One-tap JSON, CSV, SQL, and PDF export, plus import from a backup file. No account, no lock-in, no "contact support to get your data."</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Privacy -------------------------------------------------------- -->
+      <section class="section section-privacy" id="privacy">
+        <div class="wrap privacy-grid">
+          <div data-reveal>
+            <p class="eyebrow eyebrow-band">The data promise</p>
+            <h2 class="section-title band-title">Your baby's data is <em>not a product</em>.</h2>
+            <p class="band-lede">
+              Most trackers make money by watching, upselling, or holding your log hostage.
+              Nurtur is built the other way: local first, quiet by default, and honest about
+              what leaves the phone.
+            </p>
+            <ul class="privacy-list">
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> No ads, no ad SDKs, no advertising ID.</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> No analytics by default. Play Console vitals, not surveillance.</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> No account required for the free app.</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Export everything, in formats a spreadsheet can read.</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Cloud is opt-in, encrypted, and one tap to leave.</li>
+            </ul>
+          </div>
+
+          <div class="privacy-card" data-reveal>
+            <div class="privacy-seal"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg></div>
+            <p class="privacy-card-title">What leaves your phone</p>
+            <p class="privacy-card-big">Only what you choose.</p>
+            <div class="privacy-flow">
+              <div>
+                <span class="flow-dot"></span>
+                <strong>On this phone</strong>
+                <small>Always. No account.</small>
+              </div>
+              <div class="flow-line" aria-hidden="true"></div>
+              <div>
+                <span class="flow-dot flow-dot-optional"></span>
+                <strong>Nurtur Cloud</strong>
+                <small>Optional. Encrypted.</small>
+              </div>
+            </div>
+            <p class="privacy-card-foot">One tap to export. One tap to delete. No hostage data.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pricing -------------------------------------------------------- -->
+      <section class="section" id="pricing">
+        <div class="wrap">
+          <div class="section-head center" data-reveal>
+            <p class="eyebrow">Launch pricing</p>
+            <h2 class="section-title">Free is the whole app.<br><em>Plus is for more than one phone.</em></h2>
+            <p class="section-lede">
+              No trial timer on the tracker. No ads. No "pro" version of a diaper log.
+            </p>
+          </div>
+
+          <div class="pricing-grid">
+            <article class="price-card" data-reveal>
+              <div class="price-head">
+                <span class="price-tag">Free forever</span>
+                <h3>Nurtur</h3>
+                <p>The complete tracker, on your phone.</p>
+              </div>
+              <p class="price"><span class="price-amount">$0</span><span class="price-period">no account, no card</span></p>
+              <ul class="price-list">
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Nursing timer with left/right, pause, and corrections</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Diapers, sleep, wake windows, and the full timeline</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Locked-screen nursing alert</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Home screen widget and quick actions</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Up to two babies</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Unlimited local history</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Encrypted local backup and JSON/CSV/SQL/PDF export</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Night mode with no white flash</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> No account, no ads, no analytics</li>
+              </ul>
+              <button class="btn btn-ghost btn-block" type="button" data-open-beta>Join the beta</button>
+              <p class="price-note">The free tier is not a trial.</p>
+            </article>
+
+            <article class="price-card price-plus" data-reveal>
+              <span class="price-badge">Optional</span>
+              <div class="price-head">
+                <span class="price-tag">Nurtur Plus</span>
+                <h3>For the whole household</h3>
+                <p>Cloud backup, sync, and sharing.</p>
+              </div>
+              <p class="price"><span class="price-amount">$19.99</span><span class="price-period">per year · or $2.99/month</span></p>
+              <ul class="price-list">
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Everything in Free</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Encrypted cloud backup and restore</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Sync across your phone and tablet</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Caregiver sharing for up to 5 people</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Unlimited baby profiles</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> 30- and 90-day insights</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Wear OS companion</li>
+                <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg> Priority support and beta channel</li>
+              </ul>
+              <button class="btn btn-primary btn-block" type="button" data-open-beta>Start with 30 days free</button>
+              <p class="price-note">No card for the first 30 days. Cancel and keep your data.</p>
+            </article>
+          </div>
+          <p class="pricing-foot">Prices shown in USD for the Android launch; Google Play sets local prices. The free app stays free.</p>
+        </div>
+      </section>
+
+      <!-- FAQ ------------------------------------------------------------ -->
+      <section class="section" id="faq">
+        <div class="wrap">
+          <div class="section-head center" data-reveal>
+            <p class="eyebrow">Fair questions</p>
+            <h2 class="section-title">The things you're<br><em>probably wondering.</em></h2>
+          </div>
+
+          <div class="faq" data-reveal>
+            <details>
+              <summary>Is the free version really the whole tracker?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">Yes. Nursing, diapers, sleep, the timeline, corrections, night mode, the locked-screen alert, widgets, two babies, unlimited local history, and export are all free. The free tier is not a trial, and it does not expire.</div>
+            </details>
+            <details>
+              <summary>Do I need an account?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">No. The app works on your phone with no sign-up, no email, and no server. You only need an account if you choose Plus for cloud backup, sync, or caregiver sharing.</div>
+            </details>
+            <details>
+              <summary>What happens if I cancel Plus?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">Sync pauses and the cloud copy stays readable for 90 days in case you change your mind. Everything on your phone keeps working. Export is always one tap away, and nothing is deleted just because a subscription ended.</div>
+            </details>
+            <details>
+              <summary>Does the nursing alert work when the phone is locked?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">That is the feature we are building the native app around. It uses an exact alarm and a high-importance notification, so it can fire while the screen is off and the app is closed. Android's battery settings and some phone makers can still interfere; the app will explain how to fix that rather than pretending it never happens.</div>
+            </details>
+            <details>
+              <summary>Does it work offline?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">Yes. The local database is the write path. Logging never waits for the network. If you use Plus, changes sync when you are back online, and conflicts are shown in plain language instead of silently picking a winner.</div>
+            </details>
+            <details>
+              <summary>Where is my data stored?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">On your phone, in the app's private database. If you enable Plus, an encrypted copy is stored in Nurtur Cloud. If you self-host the Nurtur server, it stays on your server. There is no third-party analytics or ad network in the middle.</div>
+            </details>
+            <details>
+              <summary>Is Nurtur a medical device?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">No. Nurtur is a logbook. It does not diagnose, predict, or give medical advice. If something about your baby worries you, talk to your paediatrician or midwife — not an app.</div>
+            </details>
+            <details>
+              <summary>When is iOS?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">Not soon. Android first is a deliberate choice, not a marketing line. The shared domain layer is being written so an iOS app can reuse the rules and the sync API later, but no date is promised until the Android app has earned it.</div>
+            </details>
+            <details>
+              <summary>Can I share the log with my partner or a sitter?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">Yes, with Plus. Invite up to five caregivers into one household — no per-seat charge — and everyone sees the same timeline. The free app stays on one phone with no account.</div>
+            </details>
+            <details>
+              <summary>How much will it cost in my country?<span class="faq-icon" aria-hidden="true"><svg class="icon"><use href="#i-chevron-down"/></svg></span></summary>
+              <div class="faq-answer">Google Play sets local prices, and we will adjust the big markets rather than let a straight currency conversion produce something silly. The free app is free everywhere. The Plus price will be shown in your local currency before you buy.</div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA ------------------------------------------------------------ -->
+      <section class="section section-cta" id="beta">
+        <div class="wrap">
+          <div class="cta-panel" data-reveal>
+            <div class="cta-glow" aria-hidden="true"></div>
+            <p class="eyebrow">Android first</p>
+            <h2>Be first at 3 a.m.</h2>
+            <p>Join the beta list. One email when the Android app is ready — no newsletter, no noise.</p>
+            <button class="btn btn-primary btn-lg" type="button" data-open-beta>
+              Join the Android beta
+              <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+            </button>
+            <p class="cta-note">No account needed. Unsubscribe in one tap.</p>
+            <noscript><p class="cta-note">JavaScript is off, so the beta form is unavailable. Say hello on <a href="https://github.com/DenHafiz69/nurtur">GitHub</a> instead.</p></noscript>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-grid">
+        <div>
+          <a class="brand" href="#top" aria-label="Nurtur home">
+            <img class="brand-pip" src="assets/pip-face.svg" alt="" width="36" height="36">
+            <span class="brand-name">Nurtur</span>
+          </a>
+          <p class="footer-blurb">A calm little nursery companion for nursing, diapers, and sleep.</p>
+        </div>
+        <nav class="footer-nav" aria-label="Footer">
+          <a href="#why">Why it works</a>
+          <a href="#features">Features</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <div class="footer-meta">
+          <a class="footer-link" href="https://github.com/DenHafiz69/nurtur">GitHub <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></a>
+          <p>Made for the long nights, the short naps, and the one free hand.</p>
+        </div>
+      </div>
+      <div class="wrap footer-fine">
+        <p>© 2026 Nurtur. Prices and features shown are planned for the Android launch.</p>
+        <p>Nurtur is a logbook, not medical advice.</p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Waitlist sheet ----------------------------------------------------- -->
+  <div class="scrim" data-sheet-close hidden></div>
+  <section class="sheet" id="beta-sheet" role="dialog" aria-modal="true" aria-labelledby="beta-title" aria-hidden="true" hidden>
+    <div class="sheet-grab" data-sheet-grab aria-hidden="true"><span></span></div>
+    <button class="sheet-close icon-btn" type="button" data-sheet-close aria-label="Close beta signup">
+      <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg>
+    </button>
+
+    <div class="sheet-content">
+      <img class="sheet-pip" src="assets/pip-face.svg" alt="" width="64" height="64">
+      <p class="eyebrow">Android beta</p>
+      <h2 id="beta-title">Be first at 3 a.m.</h2>
+      <p>One email when the Android app is ready. No newsletter, no noise.</p>
+
+      <form class="waitlist-form" data-waitlist novalidate>
+        <label class="sr-only" for="beta-email">Email address</label>
+        <input id="beta-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+        <button class="btn btn-primary" type="submit">Join the beta</button>
+      </form>
+      <p class="form-msg" data-form-msg role="status" aria-live="polite"></p>
+      <p class="sheet-fine">We'll only use this to tell you about the Android beta. No ads, no sharing.</p>
+
+      <div class="sheet-success" data-sheet-success hidden>
+        <div class="success-mark"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></div>
+        <h3>You're on the list.</h3>
+        <p>We'll email you when the Android beta opens. Until then, get some sleep.</p>
+        <button class="btn btn-ghost" type="button" data-sheet-close>Close</button>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
