@@ -4,14 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nurtur — a calm little nursery companion</title>
-  <meta name="description" content="Nurtur keeps track of nursing, diapers, and sleep in one tap — so your hands and your head can stay with your baby.">
+  <meta name="description" content="Nurtur keeps nursing, diapers, and sleep in one quiet place — so your hands and your head can stay with your baby.">
   <meta name="theme-color" content="#fff8f0">
   <meta name="color-scheme" content="light dark">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Nurtur — a calm little nursery companion">
+  <meta property="og:description" content="One thumb, one quiet log. Nursing, diapers, and sleep, made for the 3 a.m. version of you.">
+  <meta property="og:image" content="/static/img/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
   <script nonce="{{.Nonce}}">
     (function () {
       try {
+        document.documentElement.classList.add("js");
         var mode = localStorage.getItem("nurtur.theme") || "auto";
         var hour = new Date().getHours();
         var auto = (hour >= 21 || hour < 7) ? "night" : "day";
@@ -19,7 +25,9 @@
         document.documentElement.dataset.theme = theme;
         var meta = document.querySelector('meta[name="theme-color"]');
         if (meta) meta.setAttribute("content", theme === "night" ? "#1a1621" : "#fff8f0");
-      } catch (e) {}
+      } catch (e) {
+        document.documentElement.classList.add("js");
+      }
     })();
   </script>
   <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
@@ -27,79 +35,285 @@
   <link rel="stylesheet" href="{{asset "/static/app.css"}}">
 </head>
 <body class="landing-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+
   <header class="landing-header">
     <a class="landing-brand" href="/" aria-label="Nurtur home">
       <span class="pip landing-brand-pip" aria-hidden="true">{{.Mascot "awake"}}</span>
       <span class="landing-brand-name">Nurtur</span>
     </a>
-    <nav class="landing-nav" aria-label="Account">
-      <a class="landing-nav-link" href="/login?mode=signin">Sign in</a>
-      <a class="btn btn-primary landing-nav-cta" href="/login?mode=signup">Sign up</a>
+
+    <nav class="landing-nav landing-nav-sections" aria-label="Sections">
+      <a href="#why">Why it works</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#questions">Questions</a>
     </nav>
+
+    <div class="landing-header-actions">
+      <button class="theme-toggle landing-theme" type="button" data-landing-theme aria-label="Switch to night mode" aria-pressed="false">
+        <span class="theme-icon theme-icon-day">{{icon "sun"}}</span>
+        <span class="theme-icon theme-icon-night">{{icon "moon"}}</span>
+      </button>
+      <nav class="landing-nav" aria-label="Account">
+        <a class="landing-nav-link" href="/login?mode=signin">Sign in</a>
+        <a class="btn btn-primary landing-nav-cta" href="/login?mode=signup">Sign up</a>
+      </nav>
+    </div>
   </header>
 
-  <main class="landing">
-    <section class="landing-hero">
+  <main class="landing" id="main">
+    <section class="landing-hero" aria-labelledby="hero-title">
       <div class="landing-hero-copy">
-        <p class="landing-eyebrow">For the 3 a.m. version of you</p>
-        <h1 class="landing-title">One less thing to remember.</h1>
-        <p class="landing-lede">Nurtur keeps track of feeds, diapers, and sleep in a single tap — so your hands and your head can stay with your baby.</p>
+        <p class="landing-eyebrow"><span class="landing-eyebrow-dot" aria-hidden="true"></span> For the 3 a.m. version of you</p>
+        <h1 class="landing-title" id="hero-title">One less thing to remember.</h1>
+        <p class="landing-lede">Nursing, diapers, and sleep in one quiet place. The last side, the last change, and the wake window stay within one thumb — so your hands and your head can stay with your baby.</p>
         <div class="landing-actions">
-          <a class="btn btn-primary landing-cta" href="/login?mode=signup">Create your account</a>
+          <a class="btn btn-primary landing-cta" href="/login?mode=signup">
+            Create your account
+            <span class="landing-cta-icon" aria-hidden="true">{{icon "arrow-right"}}</span>
+          </a>
           <a class="btn btn-ghost landing-cta" href="/login?mode=signin">Sign in</a>
         </div>
+        <ul class="landing-trust" role="list">
+          <li>{{icon "check"}} One tap at a time</li>
+          <li>{{icon "check"}} Private to your household</li>
+          <li>{{icon "check"}} Export anytime</li>
+        </ul>
         <p class="landing-hint">No ads, no feed to scroll — just your baby's day.</p>
       </div>
-      <div class="landing-art" aria-hidden="true">{{.Mascot "awake"}}</div>
+
+      <div class="landing-hero-art">
+        <div class="preview-stage">
+          <div class="preview-phone" aria-hidden="true">
+            <span class="preview-speaker"></span>
+            <div class="preview-screen">
+              <div class="preview-status">
+                <span>9:41</span>
+                <span class="preview-status-icons"><i></i><i></i><i></i><i></i></span>
+              </div>
+
+              <div class="preview-head">
+                <span class="preview-pip">{{.Mascot "awake"}}</span>
+                <div class="preview-head-copy">
+                  <small>Good morning</small>
+                  <strong>Aisyah</strong>
+                  <small>4 months old · Girl</small>
+                </div>
+                <span class="preview-sun">{{icon "sun"}}</span>
+              </div>
+
+              <span class="preview-last">Last: Left · 1h 50m ago</span>
+
+              <div class="preview-cards">
+                <div class="preview-card preview-card-peach">
+                  <span class="preview-card-label">Nursing</span>
+                  <strong>1h 50m</strong>
+                  <small>Right side</small>
+                </div>
+                <div class="preview-card preview-card-butter">
+                  <span class="preview-card-label">Diaper</span>
+                  <strong>15m</strong>
+                  <small>Wet</small>
+                </div>
+                <div class="preview-card preview-card-sage">
+                  <span class="preview-card-label">Sleep</span>
+                  <strong>45m</strong>
+                  <small>Awake</small>
+                </div>
+              </div>
+
+              <div class="preview-today">
+                <strong>Today</strong>
+                <span>Thursday, October 29</span>
+              </div>
+
+              <div class="preview-timer">
+                <div class="preview-timer-head">
+                  <span>{{icon "drop-left"}} Nursing</span>
+                  <strong>12:34</strong>
+                </div>
+                <div class="preview-timer-sides">
+                  <span>Left</span>
+                  <span>Right</span>
+                </div>
+              </div>
+
+              <div class="preview-row">
+                <span class="preview-row-icon preview-row-moon">{{icon "moon"}}</span>
+                <div><strong>8:11 AM · Slept</strong><small>1h 42m · 8:11 AM–9:53 AM</small></div>
+              </div>
+              <div class="preview-row">
+                <span class="preview-row-icon preview-row-drop">{{icon "drop-left"}}</span>
+                <div><strong>7:57 AM · Nursed</strong><small>Right 7m</small></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="preview-note preview-note-top">
+            <span class="preview-note-icon">{{icon "clock"}}</span>
+            <div><strong>One thumb</strong><small>Every tap in reach</small></div>
+          </div>
+          <div class="preview-note preview-note-bottom">
+            <span class="preview-note-icon">{{icon "moon"}}</span>
+            <div><strong>Quiet at 3 a.m.</strong><small>A low-glare night palette</small></div>
+          </div>
+        </div>
+        <p class="landing-caption">A calm log for the long nights and the short naps.</p>
+      </div>
     </section>
 
-    <section class="landing-features" aria-labelledby="features-title">
-      <h2 class="landing-section-title" id="features-title">Everything you'll actually use</h2>
+    <section class="landing-proof" id="why" aria-labelledby="why-title">
+      <div class="landing-section-head">
+        <p class="landing-eyebrow">Made for the phone</p>
+        <h2 class="landing-section-title" id="why-title">It fits the hand <em>holding the baby</em>.</h2>
+        <p class="landing-section-lede">Everything starts with one decision: the next tap should be the easy one. No menus to decode, no dashboard to read while someone is waiting.</p>
+      </div>
+
+      <div class="landing-proof-grid">
+        <article class="landing-proof-card">
+          <span class="landing-proof-num" aria-hidden="true">01</span>
+          <span class="landing-proof-icon" aria-hidden="true">{{icon "drop-left"}}</span>
+          <h3>One thumb. Two taps.</h3>
+          <p>Left, right, wet, dirty, asleep, awake. The things you do twenty times a day are the things that are easiest to do.</p>
+          <div class="landing-mini landing-mini-sides" aria-hidden="true">
+            <span>Left</span><span>Right</span>
+          </div>
+        </article>
+
+        <article class="landing-proof-card">
+          <span class="landing-proof-num" aria-hidden="true">02</span>
+          <span class="landing-proof-icon" aria-hidden="true">{{icon "clock"}}</span>
+          <h3>The timer keeps the real time.</h3>
+          <p>Lock the phone, switch apps, or refresh the page. The feed keeps counting from its real start, not from the last screen you saw.</p>
+          <div class="landing-mini landing-mini-timer" aria-hidden="true">
+            <span class="landing-mini-dot"></span>
+            <span>Nursing · Left</span>
+            <strong>12:34</strong>
+          </div>
+        </article>
+
+        <article class="landing-proof-card">
+          <span class="landing-proof-num" aria-hidden="true">03</span>
+          <span class="landing-proof-icon" aria-hidden="true">{{icon "moon"}}</span>
+          <h3>Soft on tired eyes.</h3>
+          <p>After the night window, the screen settles into a warm, low-glare palette. No pure black, no white flash, nothing blinking for attention.</p>
+          <div class="landing-mini landing-mini-night" aria-hidden="true">
+            <span class="landing-mini-dot"></span>
+            <span>Night mode</span>
+            <strong>On</strong>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-features" id="features" aria-labelledby="features-title">
+      <div class="landing-section-head landing-section-head-center">
+        <p class="landing-eyebrow">Everything you'll actually use</p>
+        <h2 class="landing-section-title" id="features-title">Built for the <em>long nights</em>.</h2>
+        <p class="landing-section-lede">A small set of tools, made calm. Nothing to configure before the first feed, and nothing extra to scroll past at 3 a.m.</p>
+      </div>
+
       <ul class="landing-grid">
-        <li class="landing-card">
+        <li class="landing-card landing-card-peach">
           <span class="landing-card-icon" aria-hidden="true">{{icon "drop-left"}}</span>
           <h3>Nursing that keeps up</h3>
-          <p>Tap left or right to start. The timer keeps counting even when your screen locks. Pause when your baby unlatches, and switch sides without stopping.</p>
+          <p>Tap left or right to start. Switch sides without stopping, pause when your baby unlatches, and let the timer keep the real start time.</p>
         </li>
-        <li class="landing-card">
+        <li class="landing-card landing-card-butter">
           <span class="landing-card-icon" aria-hidden="true">{{icon "clock"}}</span>
           <h3>The last side, at a glance</h3>
-          <p>The top of the screen always shows which side and how long ago — so the next feed starts without the mental maths.</p>
+          <p>The top of the screen always shows which side and how long ago, so the next feed starts without the mental maths.</p>
         </li>
-        <li class="landing-card">
+        <li class="landing-card landing-card-sky">
           <span class="landing-card-icon" aria-hidden="true">{{icon "diaper"}}</span>
           <h3>Diapers in one tap</h3>
-          <p>Wet, dirty, or both. The time since the last one is always right there, ready for the next check-up question.</p>
+          <p>Wet, dirty, or both — logged right away. Colour and consistency are there when a check-up asks, tucked away when it doesn't.</p>
         </li>
-        <li class="landing-card">
+        <li class="landing-card landing-card-lilac">
           <span class="landing-card-icon" aria-hidden="true">{{icon "moon"}}</span>
-          <h3>Sleep, gently tracked</h3>
+          <h3>Sleep and wake windows</h3>
           <p>Start a nap and see how long your little one has been awake — before the overtired meltdown, not after.</p>
         </li>
-        <li class="landing-card">
+        <li class="landing-card landing-card-sage">
           <span class="landing-card-icon" aria-hidden="true">{{icon "pencil"}}</span>
           <h3>Easy to fix later</h3>
-          <p>Forgot to stop the timer? Add or take away five minutes, or edit the times. No starting over, no guilt.</p>
+          <p>Forgot to stop the timer? Nudge the time, or edit the start and end. No starting over, and no guilt.</p>
         </li>
-        <li class="landing-card">
+        <li class="landing-card landing-card-peach">
           <span class="landing-card-icon" aria-hidden="true">{{icon "lock"}}</span>
-          <h3>Yours, and only yours</h3>
-          <p>Private to your household. No ads, no selling your data, and you can download every log whenever you like.</p>
+          <h3>Yours to keep</h3>
+          <p>Private to your household. No ads, no tracking, and every log can be exported whenever you like.</p>
         </li>
       </ul>
     </section>
 
-    <section class="landing-night" aria-labelledby="night-title">
-      <div class="landing-night-copy">
-        <p class="landing-eyebrow">Quiet hours</p>
-        <h2 class="landing-section-title" id="night-title">Soft on tired eyes</h2>
-        <p>At night the screen settles into a warm, low-glare palette. If a feed runs long, a soft ping and a gentle buzz let you know — repeating until you tap Done, never resetting when you switch sides.</p>
+    <section class="landing-band" id="privacy" aria-labelledby="privacy-title">
+      <div class="landing-band-inner">
+        <div class="landing-band-copy">
+          <p class="landing-eyebrow landing-eyebrow-band">The data promise</p>
+          <h2 class="landing-section-title landing-band-title" id="privacy-title">Your baby's day is <em>not a product</em>.</h2>
+          <p class="landing-band-lede">Nurtur is a quiet logbook, not a growth machine. The log lives on the Nurtur server you run, and nothing in the page phones home to an ad network.</p>
+          <ul class="landing-band-list">
+            <li>{{icon "check"}} No ads, no ad SDKs, no advertising ID.</li>
+            <li>{{icon "check"}} No third-party analytics or CDN in the page.</li>
+            <li>{{icon "check"}} Private to the people you invite.</li>
+            <li>{{icon "check"}} JSON, CSV, and SQL exports whenever you want them.</li>
+          </ul>
+        </div>
+
+        <div class="landing-band-card">
+          <span class="landing-band-seal" aria-hidden="true">{{icon "lock"}}</span>
+          <p class="landing-band-kicker">Where your data lives</p>
+          <p class="landing-band-big">On your server. Not ours.</p>
+          <div class="landing-band-flow" aria-hidden="true">
+            <div>
+              <span class="landing-flow-dot"></span>
+              <strong>Your log</strong>
+              <small>Private by default</small>
+            </div>
+            <span class="landing-flow-line"></span>
+            <div>
+              <span class="landing-flow-dot landing-flow-dot-open"></span>
+              <strong>Your export</strong>
+              <small>Whenever you like</small>
+            </div>
+          </div>
+          <p class="landing-band-foot">No hostage data. No selling. No surprises.</p>
+        </div>
       </div>
-      <div class="landing-night-art" aria-hidden="true">{{.Mascot "sleeping"}}</div>
+    </section>
+
+    <section class="landing-faq" id="questions" aria-labelledby="faq-title">
+      <div class="landing-section-head">
+        <p class="landing-eyebrow">Fair questions</p>
+        <h2 class="landing-section-title" id="faq-title">Good to know.</h2>
+      </div>
+
+      <div class="landing-faq-list">
+        <details>
+          <summary>Do I need an account?<span class="landing-faq-icon" aria-hidden="true">{{icon "chevron-down"}}</span></summary>
+          <div class="landing-faq-answer">On this server, yes. An account keeps the log private to your household, and each account gets its own baby profile. Sign-ups may be invite-only — the app will tell you if you need a key.</div>
+        </details>
+        <details>
+          <summary>Does it work offline?<span class="landing-faq-icon" aria-hidden="true">{{icon "chevron-down"}}</span></summary>
+          <div class="landing-faq-answer">Nurtur installs to your home screen and caches its shell, so it opens without a connection. New logs wait for the connection to return instead of getting lost.</div>
+        </details>
+        <details>
+          <summary>Can I fix a mistake?<span class="landing-faq-icon" aria-hidden="true">{{icon "chevron-down"}}</span></summary>
+          <div class="landing-faq-answer">Every feed, diaper, and sleep can be edited or deleted. Deletions have an Undo, and the app checks the times so you cannot accidentally create two open feeds or overlapping sleeps.</div>
+        </details>
+        <details>
+          <summary>Is Nurtur a medical device?<span class="landing-faq-icon" aria-hidden="true">{{icon "chevron-down"}}</span></summary>
+          <div class="landing-faq-answer">No. Nurtur is a logbook. It does not diagnose, predict, or give medical advice. If something about your baby worries you, talk to your paediatrician or midwife — not an app.</div>
+        </details>
+      </div>
     </section>
 
     <section class="landing-cta-band" aria-labelledby="cta-title">
-      <h2 class="landing-section-title" id="cta-title">Ready when you are</h2>
+      <div class="landing-cta-glow" aria-hidden="true"></div>
+      <p class="landing-eyebrow">Ready when you are</p>
+      <h2 class="landing-section-title" id="cta-title">One less thing to carry.</h2>
       <p>Setting up takes a minute. After that, it's one tap at a time.</p>
       <div class="landing-actions landing-actions-inline">
         <a class="btn btn-primary landing-cta" href="/login?mode=signup">Sign up</a>
@@ -110,8 +324,52 @@
   </main>
 
   <footer class="landing-footer">
-    <p>Nurtur · a calm little nursery companion</p>
-    <p>Made for the parent holding the baby.</p>
+    <div class="landing-footer-brand">
+      <span class="pip landing-footer-pip" aria-hidden="true">{{.Mascot "sleeping"}}</span>
+      <div>
+        <strong>Nurtur</strong>
+        <p>A calm little nursery companion for nursing, diapers, and sleep.</p>
+      </div>
+    </div>
+    <nav class="landing-footer-nav" aria-label="Footer">
+      <a href="#why">Why it works</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#questions">Questions</a>
+      <a href="/login?mode=signin">Sign in</a>
+    </nav>
+    <p class="landing-footer-fine">Made for the long nights, the short naps, and the one free hand. Nurtur is a logbook, not medical advice.</p>
   </footer>
+
+  <script nonce="{{.Nonce}}">
+    (function () {
+      var root = document.documentElement;
+      var meta = document.querySelector('meta[name="theme-color"]');
+      var button = document.querySelector("[data-landing-theme]");
+
+      function currentTheme() {
+        return root.dataset.theme === "night" ? "night" : "day";
+      }
+
+      function syncThemeButton() {
+        if (!button) return;
+        var theme = currentTheme();
+        var next = theme === "night" ? "day" : "night";
+        button.setAttribute("aria-label", "Switch to " + next + " mode");
+        button.setAttribute("aria-pressed", theme === "night" ? "true" : "false");
+      }
+
+      if (button) {
+        button.addEventListener("click", function () {
+          var next = currentTheme() === "night" ? "day" : "night";
+          root.dataset.theme = next;
+          try { localStorage.setItem("nurtur.theme", next); } catch (e) {}
+          if (meta) meta.setAttribute("content", next === "night" ? "#1a1621" : "#fff8f0");
+          syncThemeButton();
+        });
+        syncThemeButton();
+      }
+    })();
+  </script>
 </body>
 </html>{{end}}
