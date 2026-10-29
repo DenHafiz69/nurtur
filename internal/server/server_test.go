@@ -616,6 +616,7 @@ func TestBoostedTabNavigationReturnsOnlyMain(t *testing.T) {
 		headers map[string]string
 	}{
 		{name: "tab link", path: "/timeline", headers: map[string]string{"HX-Target": "main"}},
+		{name: "album tab", path: "/album", headers: map[string]string{"HX-Target": "main"}},
 		{name: "history restore", path: "/settings", headers: map[string]string{"HX-History-Restore-Request": "true"}},
 	}
 	for _, tc := range cases {

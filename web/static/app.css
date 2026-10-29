@@ -916,24 +916,26 @@ button {
 }
 
 .dock-drawer:not([open]) .dock-toggle {
-  position: absolute;
-  right: calc(16px + env(safe-area-inset-right));
-  bottom: 16px;
+  position: fixed;
+  bottom: calc(6px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 30;
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
-  min-height: 62px;
+  width: 56px;
+  height: 56px;
+  min-height: 56px;
   border: 2px solid var(--line);
   border-radius: 50%;
   background: var(--coral);
   color: var(--on-coral);
   box-shadow: 0 5px 0 var(--shadow);
+  transform: translateX(-50%);
   transition: transform 90ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 .dock-drawer:not([open]) .dock-toggle:active {
-  transform: scale(0.95);
+  transform: translateX(-50%) scale(0.95);
 }
 
 .dock-drawer:not([open]) .dock-toggle-grip,
@@ -950,15 +952,8 @@ button {
   height: 28px;
 }
 
-/* Keep the last history card and any toast clear of the floating button. */
-.app:has(.dock-drawer:not([open]):not([hidden])) .app-main {
-  padding-bottom: 96px;
-}
-
-.app:has(.dock-drawer:not([open]):not([hidden])) .toast-region {
-  bottom: 84px;
-}
-
+/* The floating quick-log button now sits in the middle of the bottom nav, so
+   the page no longer needs extra clearance for it. */
 .dock-panel {
   display: flex;
   flex-direction: column;
@@ -1000,12 +995,26 @@ button {
 .tabbar {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
   border-top: 1.5px solid var(--line);
   background: var(--bg);
   box-shadow: 0 -6px 18px var(--dock-shadow);
+}
+
+/* Settings and the changelog have no quick log, so the middle slot closes up
+   instead of leaving a hole in the nav. */
+.tabbar-no-quick {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tabbar-no-quick .tabbar-spacer {
+  display: none;
+}
+
+.tabbar-spacer {
+  display: block;
 }
 
 .tabbar-link {
@@ -1045,6 +1054,10 @@ button {
 @supports (-webkit-touch-callout: none) {
   .tabbar {
     padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .dock-drawer:not([open]) .dock-toggle {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -2279,13 +2292,13 @@ textarea {
     padding-left: 12px;
   }
 
-  .dock-drawer:not([open]) .dock-toggle {
-    right: calc(12px + env(safe-area-inset-right));
-  }
-
   .tabbar {
     padding-right: 8px;
     padding-left: 8px;
+  }
+
+  .tabbar-link {
+    font-size: 11px;
   }
 
   .baby-name {
@@ -2390,10 +2403,6 @@ textarea {
   .dock-drawer[open] {
     padding-right: 10px;
     padding-left: 10px;
-  }
-
-  .dock-drawer:not([open]) .dock-toggle {
-    right: calc(10px + env(safe-area-inset-right));
   }
 
   .tabbar {

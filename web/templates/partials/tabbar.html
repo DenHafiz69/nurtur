@@ -1,8 +1,12 @@
 {{define "tabbar"}}
-<nav class="tabbar" aria-label="Main" hx-boost="true" hx-target="#main" hx-select="#main" hx-swap="outerHTML" hx-push-url="true">
+<nav class="tabbar{{if or (eq .View "settings") (eq .View "changelog")}} tabbar-no-quick{{end}}" aria-label="Main" hx-boost="true" hx-target="#main" hx-select="#main" hx-swap="outerHTML" hx-push-url="true">
   <a class="tabbar-link{{if eq .View ""}} is-active{{end}}" href="/"{{if eq .View ""}} aria-current="page"{{end}}>
     {{icon "home"}}<span>Home</span>
   </a>
+  <a class="tabbar-link{{if eq .View "album"}} is-active{{end}}" href="/album"{{if eq .View "album"}} aria-current="page"{{end}}>
+    {{icon "camera"}}<span>Album</span>
+  </a>
+  <span class="tabbar-spacer" aria-hidden="true"></span>
   <a class="tabbar-link{{if eq .View "timeline"}} is-active{{end}}" href="/timeline"{{if eq .View "timeline"}} aria-current="page"{{end}}>
     {{icon "history"}}<span>History</span>
   </a>

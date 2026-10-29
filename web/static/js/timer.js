@@ -150,14 +150,15 @@
     syncDockExpanded();
   }
 
-  // Home opens the drawer and History collapses it until the user picks a
-  // state of their own. Boosted tab swaps keep the old drawer open otherwise.
+  // Home opens the drawer and History and Album collapse it until the user
+  // picks a state of their own. Boosted tab swaps keep the old drawer open
+  // otherwise.
   function syncDockDefault(path) {
     if (!dockDrawer || !path) return;
     var preference = null;
     try { preference = localStorage.getItem(DOCK_KEY); } catch (e) {}
     if (preference === "open" || preference === "closed") return;
-    setDockOpen(path !== "/timeline");
+    setDockOpen(path !== "/timeline" && path !== "/album");
   }
 
   // Settings and the changelog hide quick logging. The drawer still lives in
@@ -166,6 +167,8 @@
     if (!dockDrawer) return;
     var hidden = path === "/settings" || path === "/changelog";
     dockDrawer.hidden = hidden;
+    var tabbar = document.querySelector(".tabbar");
+    if (tabbar) tabbar.classList.toggle("tabbar-no-quick", hidden);
     if (!hidden) syncDockDefault(path);
   }
 

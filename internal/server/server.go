@@ -176,6 +176,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sleeps/{id}/delete", s.handleDeleteSleep)   // no-JS fallback
 	mux.HandleFunc("POST /sleeps/{id}/restore", s.handleRestoreSleep) // undo
 
+	mux.HandleFunc("GET /album", s.handleAlbumPage)
+
 	mux.HandleFunc("GET /timeline", s.handleTimelinePage)
 	mux.HandleFunc("GET /timeline/partial", s.handleTimelinePartial)
 	mux.HandleFunc("DELETE /timeline/{kind}/{id}", s.handleTimelineDelete)

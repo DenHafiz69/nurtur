@@ -9,7 +9,7 @@ import (
 )
 
 // requireBabyProfile sends people with an incomplete baby profile to the
-// one-time welcome page. It only guards the three full-page screens, so HTMX
+// one-time welcome page. It only guards the full-page screens, so HTMX
 // fragments and exports keep working while the prompt is pending. This also
 // covers sessions that were already signed in before the profile existed.
 func (s *Server) requireBabyProfile(next http.Handler) http.Handler {
@@ -49,7 +49,7 @@ func needsBabyProfilePrompt(r *http.Request) bool {
 		return false
 	}
 	switch r.URL.Path {
-	case "/", "/timeline", "/settings":
+	case "/", "/timeline", "/album", "/settings":
 		return true
 	default:
 		return false

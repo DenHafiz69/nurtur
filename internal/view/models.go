@@ -24,7 +24,7 @@ type PageData struct {
 	Location   *time.Location
 
 	// View selects the page body inside layout.html: "" or "dashboard",
-	// "timeline", "settings".
+	// "timeline", "album", "settings".
 	View string
 
 	Active *ActiveView

@@ -63,7 +63,7 @@
 
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
-      <details id="quick-log" class="dock-drawer"{{if or (eq .View "settings") (eq .View "changelog")}} hidden{{else if ne .View "timeline"}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
+      <details id="quick-log" class="dock-drawer"{{if or (eq .View "settings") (eq .View "changelog")}} hidden{{else if and (ne .View "timeline") (ne .View "album")}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
         <summary class="dock-toggle" title="Show or hide quick logging">
           <span class="dock-toggle-grip" aria-hidden="true"></span>
           <span class="dock-toggle-label sr-only">Quick log</span>
@@ -110,6 +110,7 @@
 
 {{define "main-content"}}
   {{if eq .View "timeline"}}{{template "timeline-page" .}}
+  {{else if eq .View "album"}}{{template "album-page" .}}
   {{else if eq .View "settings"}}{{template "settings-page" .}}
   {{else if eq .View "changelog"}}{{template "changelog-page" .}}
   {{else}}{{template "dashboard" .}}{{end}}
