@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.12",
+		Date:    "Oct 29, 2026",
+		Title:   "A bottom bar that reaches the bottom",
+		Summary: "On iOS the tab bar now sits flush against the physical screen edge again instead of floating above a strip of empty background.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The app shell fills the home-indicator strip on iOS, so the bottom nav reaches the bottom of the screen.",
+					"The nav labels stay clear of the home indicator, and the page still scrolls inside the shell without moving the header or tab bar.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.11",
 		Date:    "Oct 29, 2026",
 		Title:   "A screen that stays put",
