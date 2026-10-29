@@ -79,10 +79,9 @@ prototype, not for collecting real signups.
 
 ## Design notes
 
-The palette, fonts, and mascot come from the app's existing design system
-(`web/static/app.css` and `web/static/fonts`), so the promo does not drift from
-the product. Day is warm cream; night is lifted plum with muted amber. The
-primary type is Fredoka; body copy is Nunito Sans.
+The palette, fonts, and mascot match the app's design system, so the promo does
+not drift from the product. Day is warm cream; night is lifted plum with muted
+amber. The primary type is Fredoka; body copy is Nunito Sans.
 
 The page is deliberately calm: no autoplay, no looping background motion, no
 countdowns, no fake scarcity. The only ongoing animation is the small status dot
