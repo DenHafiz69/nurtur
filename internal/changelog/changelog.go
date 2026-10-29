@@ -30,6 +30,27 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.10",
+		Date:    "Oct 29, 2026",
+		Title:   "An Album tab and a + that stays close",
+		Summary: "A new Album tab joins the bottom nav, and the quick-log button now stays in the middle of every page — turning into an X when the log is open.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"An Album tab directly to the right of Home, with a calm empty page ready for photos.",
+				},
+			},
+			{
+				Title: "Changed",
+				Items: []string{
+					"The quick-log button now sits in the middle of the bottom nav on every page, including Settings.",
+					"When quick logging is open the + rotates into an X; tap it to collapse the panel.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.9",
 		Date:    "Oct 27, 2026",
 		Title:   "The quick log waits its turn",
