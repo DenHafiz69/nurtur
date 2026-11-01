@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.16",
+		Date:    "Nov 1, 2026",
+		Title:   "Back on the bottom edge",
+		Summary: "The tab labels and the quick-log button are fully visible again instead of slipping off the bottom of the screen on iOS.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The extra bottom offset is gone: in an installed iOS web app the fixed shell already reaches the physical screen edge, so extending it pushed the tab labels and part of the + button below the visible screen.",
+					"The bottom nav keeps a single safe-area padding again, leaving the labels just above the home indicator with the bar flush to the edge.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.15",
 		Date:    "Nov 1, 2026",
 		Title:   "The bar sits on the edge",

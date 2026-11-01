@@ -204,17 +204,14 @@ body.app-body {
   overscroll-behavior: none;
 }
 
-/* The layout viewport in an installed iOS web app disagrees about the
-   home-indicator strip across iOS versions: some include it, some stop above
-   it. Guessing one inset here created three round-trips of regressions.
-   Instead, the head script measures the real gap on the device and hands it
-   over as --app-extend; the negative offset reaches past the layout viewport
-   so the shell ends at the physical screen edge. iOS only — on Android the
-   system navigation bar already sits outside the viewport. */
+/* The shell owns the whole screen. In an installed iOS web app the fixed
+   viewport already reaches the physical bottom edge (the gap between
+   screen.height and innerHeight is the status bar at the top, not a missing
+   strip), so no extra bottom offset is needed: the nav's own env() padding
+   keeps the labels a safe area above the home indicator. */
 .app {
   position: fixed;
   inset: 0;
-  bottom: calc(-1 * var(--app-extend, 0px));
   z-index: 1;
   display: flex;
   flex-direction: column;
@@ -1100,10 +1097,10 @@ html.js .tabbar-quick {
   color: var(--coral);
 }
 
-/* The fixed shell reaches exactly to the screen edge (its shortfall is passed
-   in as --app-extend by the measurement script), so the base safe-area padding
-   is the only lift the nav needs: the labels sit just above the home
-   indicator and the plus button keeps its bottom edge aligned with them. */
+/* The fixed shell reaches the physical screen edge on every platform, so the
+   base safe-area padding above is the only lift the nav needs: the labels sit
+   just above the home indicator and the plus button keeps its bottom edge
+   aligned with them. */
 
 .timer-card {
   position: relative;
