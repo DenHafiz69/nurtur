@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.17",
+		Date:    "Nov 1, 2026",
+		Title:   "The bottom edge, the browser's way",
+		Summary: "The bottom nav sits flush on the screen edge again with the labels just above the home indicator.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The shell extends past the iOS standalone viewport by exactly the safe-area inset, so the tab bar's background fills the strip below it instead of leaving a band of empty page.",
+					"The row is placed with the browser's own safe-area value again, not with screen dimensions that mixed in the status bar.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.16",
 		Date:    "Nov 1, 2026",
 		Title:   "Back on the bottom edge",
