@@ -37,17 +37,28 @@
     // iOS installed web apps resolve the layout viewport inconsistently across
     // versions: some include the home-indicator strip, some stop above it.
     // Guessing env(safe-area-inset-bottom) here led to round-trips of regressions,
-    // so the fixed shell reaches exactly what this gap says instead.
+    // so the fixed shell reaches past the measured gap instead. iOS only: the
+    // Android system bars already sit outside the page viewport.
     (function () {
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      if (!isIOS) return;
       var compute = function () {
         var standalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
-        if (!standalone) return;
+        // Only a plausible status-bar + home-indicator gap. Larger values are
+        // the keyboard or another transient resize and would push the shell
+        // off-screen.
         var gap = Math.round(window.screen.height - window.innerHeight);
-        document.documentElement.style.setProperty("--app-extend", Math.max(0, gap) + "px");
+        if (standalone && gap > 0 && gap <= 200) {
+          document.documentElement.style.setProperty("--app-extend", gap + "px");
+        } else {
+          document.documentElement.style.removeProperty("--app-extend");
+        }
       };
       try {
         compute();
         window.addEventListener("resize", compute);
+        window.addEventListener("orientationchange", compute);
       } catch (err) {}
     })();
   </script>

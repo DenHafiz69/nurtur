@@ -207,15 +207,14 @@ body.app-body {
 /* The layout viewport in an installed iOS web app disagrees about the
    home-indicator strip across iOS versions: some include it, some stop above
    it. Guessing one inset here created three round-trips of regressions.
-   Instead, script.js measures the real gap on the device and hands it over as
-   --app-extend; where the viewport already reaches the screen edge it is 0.
-
-   --app-extend is only measured when the app runs standalone, so browsers and
-   Android keep the plain viewport. */
+   Instead, the head script measures the real gap on the device and hands it
+   over as --app-extend; the negative offset reaches past the layout viewport
+   so the shell ends at the physical screen edge. iOS only — on Android the
+   system navigation bar already sits outside the viewport. */
 .app {
   position: fixed;
   inset: 0;
-  bottom: var(--app-extend, 0px);
+  bottom: calc(-1 * var(--app-extend, 0px));
   z-index: 1;
   display: flex;
   flex-direction: column;
