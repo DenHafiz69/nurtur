@@ -224,7 +224,7 @@ func TestRunningActivityRowOpensQuickLogDock(t *testing.T) {
 	body := rec.Body.String()
 
 	live := feedRowMarkup(t, body, "event-feed is-active live-row")
-	for _, want := range []string{`class="live-row-main"`, "data-open-dock", `aria-controls="quick-log"`, `aria-expanded="true"`, "Open quick log"} {
+	for _, want := range []string{`class="live-row-main"`, "data-open-dock", `aria-controls="quick-log"`, `aria-expanded="false"`, "Open quick log"} {
 		if !strings.Contains(live, want) {
 			t.Errorf("running feed row missing %q\n%s", want, live)
 		}

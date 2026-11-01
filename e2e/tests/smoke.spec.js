@@ -7,12 +7,14 @@ test.describe("Nurtur smoke path at 390×844", () => {
   test("feed survives reload, switch, and stop", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Pip" })).toBeVisible();
+    await openQuickLog(page);
 
     await page.getByRole("button", { name: "Left", exact: true }).click();
     await expect(page.locator(".timer-label")).toContainText("Nursing Left");
 
     // The server, not the page, owns the active feed.
     await page.reload();
+    await openQuickLog(page);
     await expect(page.locator(".timer-label")).toContainText("Nursing Left");
 
     await page.getByRole("button", { name: /Switch to Right/ }).click();
@@ -24,6 +26,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
 
   test("diaper and sleep log in one tap", async ({ page }) => {
     await page.goto("/");
+    await openQuickLog(page);
 
     await page.getByRole("button", { name: "Wet", exact: true }).click();
     await expect(page.getByText("Wet diaper logged.")).toBeVisible();
@@ -142,7 +145,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
     expect(response.headers()["content-type"]).toMatch(/^image\/webp|^image\/jpeg$/);
   });
 
-  test("history collapses quick logging into an expandable drawer", async ({ page }) => {
+  test("history opens and closes the quick-log sheet", async ({ page }) => {
     await page.goto("/timeline");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
 
@@ -161,22 +164,52 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await page.getByRole("button", { name: "Wet", exact: true }).click();
     await expect(page.getByText(/Wet diaper( was just)? logged\./)).toBeVisible();
 
-    await quick.click();
-    await expect(drawer).not.toHaveAttribute("open", "");
-  });
-
-  test("collapsed quick logging sticks on the main screen and reloads", async ({ page }) => {
-    await page.goto("/");
-    const drawer = page.locator("details.dock-drawer");
-    const quick = page.locator("[data-quick-log-toggle]");
-    await expect(drawer).toHaveAttribute("open", "");
-    await expect(quick).toHaveAttribute("aria-expanded", "true");
-
-    await quick.click();
+    await page.locator(".dock-close").click();
     await expect(drawer).not.toHaveAttribute("open", "");
     await expect(quick).toHaveAttribute("aria-expanded", "false");
 
-    // Leaving History must not hand the old open-by-default rendering back.
+    // The dimmed background collapses the same sheet.
+    await quick.click();
+    await expect(drawer).toHaveAttribute("open", "");
+    await page.locator(".dock-scrim").click({ position: { x: 10, y: 10 } });
+    await expect(drawer).not.toHaveAttribute("open", "");
+  });
+
+  test("the quick-log + sits where the album camera does", async ({ page }) => {
+    await page.goto("/");
+    const quick = page.locator("[data-quick-log-toggle]");
+    await expect(quick).toBeVisible();
+    const quickBox = await quick.boundingBox();
+
+    await page.getByRole("link", { name: "Album", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Album" })).toBeVisible();
+    const camera = page.locator(".album-capture");
+    await expect(camera).toBeVisible();
+    const cameraBox = await camera.boundingBox();
+
+    expect(Math.abs(quickBox.x - cameraBox.x)).toBeLessThan(1);
+    expect(Math.abs(quickBox.y - cameraBox.y)).toBeLessThan(1);
+    expect(Math.abs(quickBox.width - cameraBox.width)).toBeLessThan(1);
+    expect(Math.abs(quickBox.height - cameraBox.height)).toBeLessThan(1);
+  });
+
+  test("quick logging starts closed and closes on tab navigation", async ({ page }) => {
+    await page.goto("/");
+    const drawer = page.locator("details.dock-drawer");
+    const quick = page.locator("[data-quick-log-toggle]");
+    await expect(drawer).not.toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
+
+    await quick.click();
+    await expect(drawer).toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator(".dock-scrim")).toBeVisible();
+
+    await page.locator(".dock-close").click();
+    await expect(drawer).not.toHaveAttribute("open", "");
+    await expect(quick).toHaveAttribute("aria-expanded", "false");
+
+    // Leaving Home must not hand the old open-by-default rendering back.
     await page.getByRole("link", { name: "History", exact: true }).click();
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     await expect(page.getByRole("link", { name: "History", exact: true })).toHaveAttribute("aria-current", "page");
@@ -207,7 +240,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(quick).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
 
-    await quick.click();
+    await page.locator(".dock-close").click();
     await expect(drawer).not.toHaveAttribute("open", "");
     await expect(quick).toHaveAttribute("aria-expanded", "false");
   });
@@ -259,6 +292,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.locator('input[name="feed_alert_minutes"]')).toHaveValue("1");
 
     await page.goto("/");
+    await openQuickLog(page);
     await page.getByRole("button", { name: "Left", exact: true }).click();
     await expect(page.locator(".timer-label")).toContainText("Nursing Left");
 
@@ -280,6 +314,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByText("Nursing alert saved.")).toBeVisible();
 
     await page.goto("/");
+    await openQuickLog(page);
     await page.getByRole("button", { name: "Left", exact: true }).click();
     await expect(page.locator(".timer-label")).toContainText("Nursing Left");
 
@@ -289,12 +324,14 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByText(/Nursing for 1 minute\./)).toBeVisible();
 
     await page.goto("/");
+    await openQuickLog(page);
     await page.getByRole("button", { name: "Done", exact: true }).click();
     await expect(page.locator(".timer-label")).toHaveCount(0);
   });
 
   test("pause holds the timer until resume", async ({ page }) => {
     await page.goto("/");
+    await openQuickLog(page);
     await page.getByRole("button", { name: "Left", exact: true }).click();
     await expect(page.locator(".timer-label")).toContainText("Nursing Left");
 
@@ -304,6 +341,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
 
     // Pausing is server-owned, so it survives a reload and the digits stop.
     await page.reload();
+    await openQuickLog(page);
     await expect(page.locator(".timer-label")).toContainText("Paused Left");
     const frozen = await page.locator("[data-timer-digits]").textContent();
     await page.waitForTimeout(1200);
@@ -315,23 +353,22 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.getByText(/Last: Left/)).toBeVisible();
   });
 
-  test("tapping the running activity row opens the quick-log dock", async ({ page }) => {
+  test("tapping the running activity row opens the quick-log sheet", async ({ page }) => {
     await page.goto("/");
+    await openQuickLog(page);
     await page.getByRole("button", { name: /Start sleep/ }).click();
     await expect(page.locator(".sleep-pill.is-asleep")).toBeVisible();
-
-    const drawer = page.locator("details.dock-drawer");
-    const toggle = page.locator(".dock-toggle");
-    await toggle.click();
-    await expect(drawer).not.toHaveAttribute("open", "");
+    await closeQuickLog(page);
 
     // The running activity's row in Today is a shortcut for the + menu.
+    const drawer = page.locator("details.dock-drawer");
     const liveRow = page.locator(".feed-row.is-active .live-row-main");
     await expect(liveRow).toHaveAttribute("aria-expanded", "false");
     await liveRow.click();
     await expect(drawer).toHaveAttribute("open", "");
     await expect(liveRow).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("button", { name: /Wake up/ })).toBeVisible();
+    await closeQuickLog(page);
 
     // Status cards keep opening their own detail sheets.
     await page.locator(".status-card.status-sleep").click();
@@ -340,6 +377,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Close", exact: true }).click();
+    await openQuickLog(page);
     await page.getByRole("button", { name: /Wake up/ }).click();
     await expect(page.getByText(/Awake\. That was/)).toBeVisible();
   });
@@ -347,9 +385,7 @@ test.describe("Nurtur smoke path at 390×844", () => {
   test("quick log focuses on the running activity", async ({ page }) => {
     await page.goto("/");
     const drawer = page.locator("details.dock-drawer");
-    if (!(await drawer.evaluate((el) => el.open))) {
-      await page.locator(".dock-toggle").click();
-    }
+    await openQuickLog(page);
     await expect(drawer).toHaveAttribute("open", "");
 
     // With nothing running, every option is available.
@@ -420,6 +456,22 @@ test.describe("Nurtur smoke path at 390×844", () => {
     expect(await sql.text()).toContain("BEGIN TRANSACTION");
   });
 });
+
+async function openQuickLog(page) {
+  const drawer = page.locator("details.dock-drawer");
+  if (!(await drawer.evaluate((el) => el.open))) {
+    await page.locator("[data-quick-log-toggle]").click();
+  }
+  await expect(drawer).toHaveAttribute("open", "");
+}
+
+async function closeQuickLog(page) {
+  const drawer = page.locator("details.dock-drawer");
+  if (await drawer.evaluate((el) => el.open)) {
+    await page.locator(".dock-close").click();
+  }
+  await expect(drawer).not.toHaveAttribute("open", "");
+}
 
 test.describe("Album capture dates", () => {
   test.use({ timezoneId: "Asia/Kuala_Lumpur" });
