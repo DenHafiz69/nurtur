@@ -1,36 +1,93 @@
 {{define "album-page"}}
-<section class="page-head">
-  <div class="page-head-row">
-    <h2 class="page-title">Album</h2>
+<section class="page-head album-head">
+  <div class="page-head-row album-head-row">
+    <div class="album-heading">
+      <h2 class="page-title">Album</h2>
+      <p class="page-sub">Photos of the small moments.</p>
+      {{if .Album.HasDays}}<p class="album-count">{{.Album.Count}} photo{{if ne .Album.Count 1}}s{{end}}</p>{{end}}
+    </div>
+    <button type="button" class="btn album-add-btn" data-album-add>
+      {{icon "camera"}}<span>Add photos</span>
+    </button>
   </div>
-  <p class="page-sub">Photos of the small moments.</p>
 </section>
 
-{{template "album-days" .}}
-{{end}}
+<div id="album-upload-previews" class="album-upload-previews" hidden></div>
 
-{{define "album-days"}}
+<form class="album-nojs album-nojs-inline" method="post" action="/album/photos" enctype="multipart/form-data">
+  <label class="field">
+    <span class="field-label">Add a photo</span>
+    <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required>
+  </label>
+  <p class="sheet-copy">Without JavaScript, the photo is stored as-is. Date and time come from the upload.</p>
+  <button type="submit" class="btn btn-primary">Upload photo</button>
+</form>
+
 <div id="album-days" class="album-days">
-  {{if and .Album .Album.HasDays}}
-    {{range .Album.Days}}
-      <section class="album-day" data-day="{{.Key}}">
-        <h3 class="album-day-title">{{.Label}}</h3>
-        <div class="album-grid">
-          {{range .Rows}}
-            <a class="album-tile" href="{{.FullURL}}" data-photo-id="{{.ID}}">
-              <img src="{{.ThumbURL}}" alt="{{.Alt}}" width="{{.Width}}" height="{{.Height}}" loading="lazy" decoding="async">
-              <span class="album-tile-time">{{.TimeLabel}}</span>
-            </a>
-          {{end}}
-        </div>
-      </section>
-    {{end}}
+  {{if .Album.HasDays}}
+    {{template "album-days" .}}
+  {{else if .Album.HasMore}}
+    {{template "album-days" .}}
   {{else}}
-    <div class="empty">
+    <div class="empty album-empty">
       <span class="pip pip-empty">{{.Mascot "empty"}}</span>
       <p class="empty-title">No photos yet.</p>
       <p class="empty-copy">Snap the first one.</p>
     </div>
   {{end}}
 </div>
+
+<button type="button" class="album-capture" data-album-add aria-label="Add photos">
+  {{icon "camera"}}
+  <span class="sr-only">Add photos</span>
+</button>
+
+<dialog id="album-chooser" class="sheet" data-keep-content aria-labelledby="album-chooser-title">
+  <div class="sheet-inner">
+    <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+    <div class="sheet-head">
+      <h2 id="album-chooser-title">Add photos</h2>
+      <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+    </div>
+    <p class="sheet-copy">Take one now, or pick a few from your library.</p>
+    <div class="album-chooser-actions">
+      <button type="button" class="btn btn-primary" data-album-source="camera">
+        {{icon "camera"}}<span>Take photo</span>
+      </button>
+      <button type="button" class="btn btn-ghost" data-album-source="library">
+        {{icon "plus"}}<span>Choose photos</span>
+      </button>
+    </div>
+  </div>
+</dialog>
+
+<input id="album-camera-input" type="file" accept="image/*" capture="environment" hidden>
+<input id="album-library-input" type="file" accept="image/*" multiple hidden>
+{{end}}
+
+{{define "album-days"}}
+  {{range .Album.Days}}{{template "album-day" .}}{{end}}
+  {{if .Album.HasMore}}
+    <div id="album-more" class="album-more">
+      <a class="btn btn-ghost" href="/album?before={{.Album.NextCursor}}" hx-get="/album/partial?before={{.Album.NextCursor}}" hx-target="#album-more" hx-swap="outerHTML">Load earlier days</a>
+    </div>
+  {{end}}
+{{end}}
+
+{{define "album-day"}}
+<section id="album-day-{{.Key}}" class="album-day" data-day="{{.Key}}" data-start="{{iso .Start}}">
+  <h3 class="album-day-title">{{.Label}}</h3>
+  <div class="album-grid">
+    {{range .Rows}}{{template "album-tile" .}}{{end}}
+  </div>
+</section>
+{{end}}
+
+{{define "album-tile"}}
+<a class="album-tile" href="{{.FullURL}}" data-photo-id="{{.ID}}" data-taken-at="{{iso .TakenAt}}" aria-label="{{.Alt}}">
+  <span class="album-tile-frame {{.RatioClass}}">
+    <img src="{{.ThumbURL}}" alt="{{.Alt}}" width="{{.Width}}" height="{{.Height}}" loading="lazy" decoding="async">
+  </span>
+  <span class="album-tile-time">{{.TimeLabel}}</span>
+</a>
 {{end}}

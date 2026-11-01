@@ -879,7 +879,7 @@
     } else {
       dialog.removeAttribute("open");
     }
-    dialog.innerHTML = "";
+    if (!dialog.hasAttribute("data-keep-content")) dialog.innerHTML = "";
     if (!document.activeElement || document.activeElement === document.body) {
       var fallback = document.querySelector(".timer-adjust") || document.querySelector("[data-theme-toggle]");
       if (fallback) fallback.focus({ preventScroll: true });
@@ -894,7 +894,9 @@
 
   document.querySelectorAll("dialog.sheet").forEach(function (dialog) {
     var dragStart = null;
-    dialog.addEventListener("close", function () { dialog.innerHTML = ""; });
+    dialog.addEventListener("close", function () {
+      if (!dialog.hasAttribute("data-keep-content")) dialog.innerHTML = "";
+    });
     dialog.addEventListener("click", function (event) {
       if (event.target === dialog) closeDialog(dialog);
     });
@@ -1027,7 +1029,7 @@
     });
   }
 
-  function localToast(message, kind) {
+  function localToast(message, kind, actionLabel, actionURL) {
     var region = document.getElementById("toast-region");
     if (!region) return;
     region.innerHTML = "";
@@ -1039,9 +1041,24 @@
     text.className = "toast-text";
     text.textContent = message;
     toast.appendChild(text);
+    if (actionLabel && actionURL) {
+      var action = document.createElement("a");
+      action.className = "toast-action";
+      action.href = actionURL;
+      action.textContent = actionLabel;
+      action.addEventListener("click", clearToast);
+      toast.appendChild(action);
+    }
     region.appendChild(toast);
     armToast();
   }
+
+  // Album uploads report out-of-range dates without an htmx request. The
+  // event keeps the toast markup and timer in one place.
+  document.body.addEventListener("nurtur:toast", function (event) {
+    var detail = event.detail || {};
+    localToast(detail.message, detail.kind, detail.actionLabel, detail.actionURL);
+  });
 
   /* ---------- HTMX lifecycle ---------- */
 

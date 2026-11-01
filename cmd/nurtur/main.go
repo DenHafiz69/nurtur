@@ -128,9 +128,12 @@ func run() error {
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// A phone on weak data can spend a while sending one photo. The album
+		// route enforces a 12 MiB body; the timeout keeps slow uploads alive
+		// without leaving every other route open indefinitely.
+		ReadTimeout:  2 * time.Minute,
+		WriteTimeout: 2 * time.Minute,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	mode := "sync"

@@ -61,6 +61,16 @@ NURTUR_COOKIE_SECURE=true
 NURTUR_NIGHT_START=19:00
 NURTUR_NIGHT_END=07:00
 NURTUR_LOG_LEVEL=info
+
+# Album photos. Local storage stays on the /data volume; R2 is recommended so
+# photo bytes survive a lost VPS. Fill all four R2 values or none of them.
+NURTUR_ALBUM_STORAGE=auto
+NURTUR_ALBUM_DIR=/data/album
+# NURTUR_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+# NURTUR_R2_BUCKET=nurtur-album
+# NURTUR_R2_ACCESS_KEY_ID=
+# NURTUR_R2_SECRET_ACCESS_KEY=
+# NURTUR_R2_REGION=auto
 ```
 
 Do not reuse `.env-example` unchanged in the container: `NURTUR_DB=./data/nurtur.db`
@@ -82,6 +92,27 @@ and open `/admin`. Sign in as `admin`, generate a magic link, and send it to the
 person. The link opens signup directly, works once, and expires after the
 period you choose (7 days by default). Set `NURTUR_PUBLIC_URL` to the exact
 public origin so generated links work behind Caddy.
+
+### Album photo storage
+
+The album keeps metadata in the database and photo bytes in either
+`NURTUR_ALBUM_DIR` or a private Cloudflare R2 bucket. For a VPS deployment,
+R2 is the safer choice: the `/data` volume only survives while the host does.
+
+1. In the Cloudflare dashboard, create an R2 bucket. Leave public access
+   disabled; Nurtur serves every photo through its own account-scoped routes.
+2. Create an R2 API token with **Object Read & Write** permission scoped to
+   that bucket only. Do not create an account-wide admin token.
+3. Copy the bucket's S3 endpoint, access key ID, and secret access key into
+   `NURTUR_R2_ENDPOINT`, `NURTUR_R2_ACCESS_KEY_ID`, and
+   `NURTUR_R2_SECRET_ACCESS_KEY`. Set `NURTUR_R2_BUCKET` to the bucket name.
+4. Leave `NURTUR_ALBUM_STORAGE=auto`. With all four values present, Nurtur uses
+   R2; with none present, it uses local disk and logs one warning. A partially
+   filled R2 block stops startup on purpose.
+
+The bucket needs no CORS policy and no public hostname: the browser uploads to
+Nurtur, and Nurtur proxies every read. Credentials stay in the environment and
+are never written to HTML or logs.
 
 ## 2. Add Nurtur to your Compose stack
 
@@ -225,6 +256,16 @@ docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
 With Caddy on the host, use `sudo caddy validate` / `sudo systemctl reload caddy`
 instead. Caddy obtains and renews the certificate automatically once DNS points
 at the VPS.
+
+Caddy has no request-body limit by default. Nurtur caps an album upload at
+12 MiB and allows two minutes for the request. If you put nginx in front instead
+of Caddy, raise the matching limits:
+
+```
+client_max_body_size 16m;
+proxy_read_timeout 120s;
+proxy_send_timeout 120s;
+```
 
 Firewall: allow 80/443, and leave 8080/8005 closed.
 

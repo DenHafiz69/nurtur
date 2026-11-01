@@ -124,6 +124,40 @@ func (s *Store) ListAlbumPhotos(ctx context.Context, before time.Time, limit int
 	return photos, nil
 }
 
+// ListAlbumPhotosBetween returns live photos in the half-open local-day range
+// [from, to), newest first. It is how the album loads one whole day at a time.
+func (s *Store) ListAlbumPhotosBetween(ctx context.Context, from, to time.Time, limit int) ([]album.Photo, error) {
+	if !to.After(from) {
+		return nil, nil
+	}
+	if limit <= 0 || limit > maxAlbumListLimit {
+		limit = maxAlbumListLimit
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+albumColumns+` FROM album_photos
+		WHERE account_id = ? AND deleted_at IS NULL AND taken_at >= ? AND taken_at < ?
+		ORDER BY taken_at DESC, id DESC
+		LIMIT ?`,
+		AccountID(ctx), encodeTime(from), encodeTime(to), limit)
+	if err != nil {
+		return nil, fmt.Errorf("store: album photos between: %w", err)
+	}
+	defer rows.Close()
+
+	var photos []album.Photo
+	for rows.Next() {
+		photo, err := scanAlbumPhoto(rows)
+		if err != nil {
+			return nil, err
+		}
+		photos = append(photos, photo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: album photos between: %w", err)
+	}
+	return photos, nil
+}
+
 // HasAlbumPhotosBefore reports whether any live photo is older than t. It
 // drives "Load earlier days" without loading an extra page just to check.
 func (s *Store) HasAlbumPhotosBefore(ctx context.Context, before time.Time) (bool, error) {

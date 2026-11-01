@@ -16,6 +16,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"nurtur/internal/album"
 	"nurtur/internal/clock"
 	"nurtur/internal/feed"
 	"nurtur/internal/store"
@@ -71,6 +72,14 @@ func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool)
 	}
 
 	fakeClock := clock.NewFake(testNow)
+	photos, err := album.NewStorage(album.StorageConfig{
+		Driver: "local",
+		Dir:    filepath.Join(t.TempDir(), "album"),
+		Logger: logger,
+	})
+	if err != nil {
+		t.Fatalf("album.NewStorage: %v", err)
+	}
 	cfg := Config{
 		Store:      st,
 		Clock:      fakeClock,
@@ -81,6 +90,7 @@ func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool)
 		Migrations: os.DirFS("../../migrations"),
 		Logger:     logger,
 		LocalOnly:  true,
+		Album:      photos,
 	}
 	if mutate != nil {
 		mutate(&cfg)

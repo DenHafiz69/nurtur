@@ -224,13 +224,13 @@ type TimelineDay struct {
 }
 
 // AlbumPageView is one page of photos, grouped by the local day each photo was
-// taken. The empty shell uses HasDays=false; capture and browsing fill it in
-// later phases.
+// taken. HasDays is false when the account has no photos yet.
 type AlbumPageView struct {
 	Days       []AlbumDay
 	HasDays    bool
 	HasMore    bool
 	NextCursor string
+	Oldest     string
 	Count      int
 }
 
@@ -238,21 +238,22 @@ type AlbumPageView struct {
 type AlbumDay struct {
 	Key   string
 	Label string
+	Start time.Time
 	Rows  []AlbumRow
 }
 
 // AlbumRow is one photo tile. URLs are Nurtur routes, never object keys.
 type AlbumRow struct {
-	ID          int64
-	TakenAt     time.Time
-	TimeLabel   string
-	Alt         string
-	ThumbURL    string
-	FullURL     string
-	Width       int
-	Height      int
-	AspectRatio string
-	Caption     string
+	ID         int64
+	TakenAt    time.Time
+	TimeLabel  string
+	Alt        string
+	ThumbURL   string
+	FullURL    string
+	Width      int
+	Height     int
+	RatioClass string
+	Caption    string
 }
 
 // SettingsView backs the settings page.

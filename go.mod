@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/minio/minio-go/v7 v7.0.95
+	golang.org/x/image v0.35.0
 	turso.tech/database/tursogo v0.8.3
 )
 
@@ -24,5 +25,5 @@ require (
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 )

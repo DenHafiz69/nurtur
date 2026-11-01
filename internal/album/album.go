@@ -126,7 +126,7 @@ func (p Photo) Validate() error {
 	if p.Bytes <= 0 || p.Bytes > MaxFullBytes {
 		return &ValidationError{Field: "full", Message: "That photo is too large."}
 	}
-	if p.ThumbBytes <= 0 || p.ThumbBytes > MaxThumbBytes {
+	if p.ThumbBytes <= 0 || (p.ThumbBytes > MaxThumbBytes && p.ThumbKey != p.FullKey) {
 		return &ValidationError{Field: "thumb", Message: "That thumbnail is too large."}
 	}
 	if !ValidContentType(p.ContentType) {

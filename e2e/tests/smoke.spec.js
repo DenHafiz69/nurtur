@@ -1,5 +1,8 @@
 const { test, expect } = require("@playwright/test");
 
+const ALBUM_JPEG_BASE64 =
+  "/9j/2wCEAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSgBBwcHCggKEwoKEygaFhooKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKP/AABEIACAAIAMBIgACEQEDEQH/xAGiAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgsQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+gEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoLEQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AN4LTwtPC08LXvOR7kJDAtPC08LTwtQ5HTCQwLTwtPC1IFqHI86EiMLUgWnhaeFqHI6YSP/Z";
+
 test.describe("Nurtur smoke path at 390×844", () => {
   test("feed survives reload, switch, and stop", async ({ page }) => {
     await page.goto("/");
@@ -111,6 +114,8 @@ test.describe("Nurtur smoke path at 390×844", () => {
     // The album owns the screen: the quick-log drawer and its + step away.
     await expect(page.locator("[data-quick-log-toggle]")).toBeHidden();
     await expect(page.locator("details.dock-drawer")).toBeHidden();
+    await expect(page.locator(".album-capture")).toBeVisible();
+    await expect(page.locator(".album-add-btn")).toBeVisible();
     const columns = await page.locator(".tabbar").evaluate((node) => {
       return getComputedStyle(node).gridTemplateColumns.split(" ").filter(Boolean).length;
     });
@@ -118,6 +123,23 @@ test.describe("Nurtur smoke path at 390×844", () => {
 
     const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflows).toBe(false);
+  });
+
+  test("album upload adds a photo and serves its thumbnail", async ({ page }) => {
+    const jpeg = Buffer.from(ALBUM_JPEG_BASE64, "base64");
+    await page.goto("/album");
+    await expect(page.getByText("No photos yet.")).toBeVisible();
+    await uploadAlbumJpeg(page, jpeg);
+
+    await expect(page.locator(".album-tile")).toHaveCount(1, { timeout: 15_000 });
+    await expect(page.getByText("1 photo")).toBeVisible();
+    await expect(page.locator(".album-tile-time")).toHaveText(/\d{1,2}:\d{2}/);
+    await expect(page.locator(".album-day-title")).toContainText(/Today|Yesterday/);
+    const src = await page.locator(".album-tile img").getAttribute("src");
+    expect(src).toMatch(/^\/album\/photos\/\d+\/thumb$/);
+    const response = await page.request.get(src);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toMatch(/^image\/webp|^image\/jpeg$/);
   });
 
   test("history collapses quick logging into an expandable drawer", async ({ page }) => {
@@ -398,3 +420,121 @@ test.describe("Nurtur smoke path at 390×844", () => {
     expect(await sql.text()).toContain("BEGIN TRANSACTION");
   });
 });
+
+test.describe("Album capture dates", () => {
+  test.use({ timezoneId: "Asia/Kuala_Lumpur" });
+
+  test("EXIF capture time drives the day, with and without an offset", async ({ page }) => {
+    const first = albumExifDate(2);
+    const second = albumExifDate(3);
+
+    await page.goto("/album");
+    await uploadAlbumJpeg(page, Buffer.from(ALBUM_JPEG_BASE64, "base64"));
+    await expect(page.locator(".album-tile")).toHaveCount(1, { timeout: 15_000 });
+
+    await uploadAlbumJpeg(page, exifJpeg(Buffer.from(ALBUM_JPEG_BASE64, "base64"), first.exif, ""));
+    await expect(page.getByText(/Saved to /)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("link", { name: "View that day" }).click();
+    await expect(page.locator(`#album-day-${first.key} .album-tile-time`)).toHaveText("2:07 PM");
+
+    const offsetExif = second.exif.replace("14:07:00", "06:07:00");
+    await uploadAlbumJpeg(page, exifJpeg(Buffer.from(ALBUM_JPEG_BASE64, "base64"), offsetExif, "+00:00"));
+    await expect(page.getByText(/Saved to /)).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("link", { name: "View that day" }).click();
+    await expect(page.locator(`#album-day-${second.key} .album-tile-time`)).toHaveText("2:07 PM");
+  });
+});
+
+async function uploadAlbumJpeg(page, buffer) {
+  await page.locator("[data-album-add]").first().click();
+  await expect(page.locator("#album-chooser")).toHaveAttribute("open", "");
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.locator('[data-album-source="library"]').click()
+  ]);
+  await chooser.setFiles({
+    name: "photo.jpg",
+    mimeType: "image/jpeg",
+    buffer
+  });
+}
+
+// albumExifDate returns an EXIF date at 14:07 in the household timezone, a few
+// whole days ago, plus the local date key the server will use.
+function albumExifDate(daysAgo) {
+  const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  const parts = {};
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  })
+    .formatToParts(date)
+    .forEach((part) => {
+      if (part.type !== "literal") parts[part.type] = part.value;
+    });
+  return {
+    key: `${parts.year}-${parts.month}-${parts.day}`,
+    exif: `${parts.year}:${parts.month}:${parts.day} 14:07:00`
+  };
+}
+
+// exifJpeg inserts a minimal APP1 EXIF block after the JPEG SOI. It carries
+// Orientation, DateTimeOriginal, and optionally OffsetTimeOriginal, matching
+// the tags album.js reads from a real phone photo.
+function exifJpeg(jpeg, dateText, offsetText) {
+  const date = Buffer.from(dateText + "\0", "ascii");
+  const offset = offsetText ? Buffer.from(offsetText + "\0", "ascii") : null;
+  const ifd0Entries = 2;
+  const ifd0Size = 2 + ifd0Entries * 12 + 4;
+  const exifEntries = offset ? 2 : 1;
+  const exifOffset = 8 + ifd0Size;
+  const exifSize = 2 + exifEntries * 12 + 4;
+  const dateOffset = exifOffset + exifSize;
+  const offsetOffset = dateOffset + date.length;
+  const tiffLength = offsetOffset + (offset ? offset.length : 0);
+
+  const tiff = Buffer.alloc(tiffLength);
+  tiff.write("MM", 0, "ascii");
+  tiff.writeUInt16BE(42, 2);
+  tiff.writeUInt32BE(8, 4);
+  tiff.writeUInt16BE(ifd0Entries, 8);
+
+  let entry = 8 + 2;
+  tiff.writeUInt16BE(0x0112, entry);
+  tiff.writeUInt16BE(3, entry + 2);
+  tiff.writeUInt32BE(1, entry + 4);
+  tiff.writeUInt16BE(1, entry + 8);
+  entry += 12;
+  tiff.writeUInt16BE(0x8769, entry);
+  tiff.writeUInt16BE(4, entry + 2);
+  tiff.writeUInt32BE(1, entry + 4);
+  tiff.writeUInt32BE(exifOffset, entry + 8);
+  tiff.writeUInt32BE(0, 8 + 2 + ifd0Entries * 12);
+
+  tiff.writeUInt16BE(exifEntries, exifOffset);
+  let exifEntry = exifOffset + 2;
+  tiff.writeUInt16BE(0x9003, exifEntry);
+  tiff.writeUInt16BE(2, exifEntry + 2);
+  tiff.writeUInt32BE(date.length, exifEntry + 4);
+  tiff.writeUInt32BE(dateOffset, exifEntry + 8);
+  exifEntry += 12;
+  if (offset) {
+    tiff.writeUInt16BE(0x9011, exifEntry);
+    tiff.writeUInt16BE(2, exifEntry + 2);
+    tiff.writeUInt32BE(offset.length, exifEntry + 4);
+    tiff.writeUInt32BE(offsetOffset, exifEntry + 8);
+  }
+  tiff.writeUInt32BE(0, exifOffset + 2 + exifEntries * 12);
+  date.copy(tiff, dateOffset);
+  if (offset) offset.copy(tiff, offsetOffset);
+
+  const app1 = Buffer.alloc(10 + tiff.length);
+  app1[0] = 0xff;
+  app1[1] = 0xe1;
+  app1.writeUInt16BE(2 + 6 + tiff.length, 2);
+  app1.write("Exif\0\0", 4, "ascii");
+  tiff.copy(app1, 10);
+  return Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]);
+}
