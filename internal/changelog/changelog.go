@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.14",
+		Date:    "Nov 1, 2026",
+		Title:   "Snug at the bottom edge again",
+		Summary: "The tab row sits just above the home indicator again, and the bar stays flush because the shell now measures the real screen gap instead of guessing it.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"Too much empty room below the tab row on iOS is gone; the labels and the quick-log button sit a safe-area's height above the bottom edge again.",
+					"The bottom bar reaches the physical screen edge on every iOS version, because the shell now measures the viewport gap instead of assuming how the standalone browser reports it.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.13",
 		Date:    "Oct 29, 2026",
 		Title:   "Room for the last row",
