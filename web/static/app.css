@@ -204,11 +204,14 @@ body.app-body {
   overscroll-behavior: none;
 }
 
-/* The shell owns the whole screen. In an installed iOS web app the fixed
-   viewport already reaches the physical bottom edge (the gap between
-   screen.height and innerHeight is the status bar at the top, not a missing
-   strip), so no extra bottom offset is needed: the nav's own env() padding
-   keeps the labels a safe area above the home indicator. */
+/* The shell owns the whole screen. In an installed iOS web app the layout
+   viewport stops one safe-area short of the physical bottom edge even though
+   env() still reports that strip, so a plain inset: 0 leaves the tab bar
+   floating above a band of empty background. Reach past the edge by exactly
+   that inset: the bar's background then fills the strip while its own bottom
+   padding keeps the labels just above the home indicator. Browsers and
+   Android already include the full screen, so this only applies standalone
+   on iOS. */
 .app {
   position: fixed;
   inset: 0;
@@ -218,6 +221,14 @@ body.app-body {
   width: 100%;
   max-width: 520px;
   margin: 0 auto;
+}
+
+@media (display-mode: standalone) {
+  @supports (-webkit-touch-callout: none) {
+    .app {
+      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+    }
+  }
 }
 
 /* ---------- Header ---------- */
@@ -1097,10 +1108,10 @@ html.js .tabbar-quick {
   color: var(--coral);
 }
 
-/* The fixed shell reaches the physical screen edge on every platform, so the
-   base safe-area padding above is the only lift the nav needs: the labels sit
-   just above the home indicator and the plus button keeps its bottom edge
-   aligned with them. */
+/* The fixed shell reaches the physical screen edge (it extends past the iOS
+   standalone viewport by the safe-area inset), so the base safe-area padding
+   is the only lift the nav needs: the labels sit just above the home
+   indicator and the plus button keeps its bottom edge aligned with them. */
 
 .timer-card {
   position: relative;
