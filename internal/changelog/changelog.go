@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.4.15",
+		Date:    "Nov 1, 2026",
+		Title:   "The bar sits on the edge",
+		Summary: "The bottom nav stops floating above a strip of empty page on iOS and Android.",
+		Sections: []Section{
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The measured safe-area gap was applied as a positive offset, which pulled the fixed shell up and left a strip of background under the tab bar instead of extending it to the screen edge.",
+					"The gap measurement now runs only on iOS, where the home-indicator strip can fall outside the layout viewport; Android keeps its full height.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.14",
 		Date:    "Nov 1, 2026",
 		Title:   "Snug at the bottom edge again",
