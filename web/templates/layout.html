@@ -64,7 +64,8 @@
 
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
-      <details id="quick-log" class="dock-drawer"{{if eq .View ""}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
+      <div class="dock-scrim" data-dock-close hidden></div>
+      <details id="quick-log" class="dock-drawer"{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
         <summary class="dock-toggle" title="Show or hide quick logging">
           <span class="dock-toggle-grip" aria-hidden="true"></span>
           <span class="dock-toggle-label sr-only">Quick log</span>
@@ -72,6 +73,10 @@
           <span class="dock-toggle-icon dock-toggle-plus" aria-hidden="true">{{icon "plus"}}</span>
         </summary>
         <div class="dock-panel">
+          <div class="sheet-head">
+            <h2 id="quick-log-title">Quick log</h2>
+            <button type="button" class="icon-btn dock-close" data-dock-close aria-label="Close quick log">{{icon "close"}}</button>
+          </div>
           <div class="dock-stack">
             {{template "timer" .}}
             {{template "diaper-row" .}}

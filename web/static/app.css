@@ -400,6 +400,11 @@ body.app-body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Every tab with the floating quick-log button keeps its last row clear of it. */
+body:not([data-view="album"]) .app-main {
+  padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+}
+
 .summary-section {
   margin: 2px 0 14px;
 }
@@ -698,7 +703,7 @@ body.app-body {
   background: var(--surface-soft);
 }
 
-/* The running activity's row is a shortcut for the quick-log dock, so its
+/* The running activity's row is a shortcut for the quick-log sheet, so its
    icon and copy share one link instead of two grid cells. */
 .live-row {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -873,8 +878,58 @@ body.app-body {
 
 .dock {
   position: relative;
-  z-index: 20;
+  z-index: 50;
   flex: none;
+}
+
+/* The quick log opens as a bottom sheet over the page. The scrim is revealed
+   by timer.js; without JavaScript the native <details> panel still expands in
+   place under the tab bar. */
+.dock-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(20, 12, 8, 0.42);
+  animation: backdrop-in 120ms ease-out;
+}
+
+html.js .dock-drawer[open] {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 46;
+  max-width: 520px;
+  max-height: 88dvh;
+  margin: 0 auto;
+  padding: 8px 18px calc(20px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border: 2px solid var(--line);
+  border-bottom: 0;
+  border-radius: 28px 28px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.22);
+  animation: sheet-up 180ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+html.js .dock-drawer[open] .dock-toggle {
+  margin-bottom: 2px;
+}
+
+html.js .dock-drawer[open] .dock-toggle-chevron {
+  display: none;
+}
+
+.dock-close {
+  flex: none;
+}
+
+html:not(.js) .dock-close {
+  display: none;
+}
+
+body.dock-open .app-main {
+  overflow: hidden;
 }
 
 .dock-drawer[open] {
@@ -940,20 +995,20 @@ body.app-body {
 
 .dock-drawer:not([open]) .dock-toggle {
   position: fixed;
-  bottom: calc(6px + env(safe-area-inset-bottom));
-  left: 50%;
-  z-index: 30;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  left: auto;
+  z-index: 40;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
-  min-height: 56px;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
   border: 2px solid var(--line);
   border-radius: 50%;
   background: var(--coral);
   color: var(--on-coral);
   box-shadow: 0 5px 0 var(--shadow);
-  transform: translateX(-50%);
   transition: transform 90ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
@@ -964,7 +1019,7 @@ html.js .dock-drawer:not([open]) .dock-toggle {
 }
 
 .dock-drawer:not([open]) .dock-toggle:active {
-  transform: translateX(-50%) scale(0.95);
+  transform: scale(0.95);
 }
 
 .dock-drawer:not([open]) .dock-toggle-grip,
@@ -981,8 +1036,8 @@ html.js .dock-drawer:not([open]) .dock-toggle {
   height: 28px;
 }
 
-/* The floating quick-log button now sits in the middle of the bottom nav, so
-   the page no longer needs extra clearance for it. */
+/* The fixed sheet paints its own padding, so the panel itself is just a
+   stack. */
 .dock-panel {
   display: flex;
   flex-direction: column;
@@ -1025,7 +1080,7 @@ html.js .dock-drawer:not([open]) .dock-toggle {
   position: relative;
   flex: none;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
   border-top: 1.5px solid var(--line);
@@ -1033,27 +1088,24 @@ html.js .dock-drawer:not([open]) .dock-toggle {
   box-shadow: 0 -6px 18px var(--dock-shadow);
 }
 
-.tabbar-spacer {
-  display: block;
-}
-
-/* The quick-log button sits in the middle of the nav and stays there on every
-   page. It is a real button because it also collapses an open drawer. */
+/* The quick-log button sits above the tab bar on the right, in the same spot
+   as the album camera button. It is a real button because it also collapses an
+   open sheet. */
 .tabbar-quick {
-  position: absolute;
-  bottom: calc(6px + env(safe-area-inset-bottom));
-  left: 50%;
-  z-index: 30;
+  position: fixed;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  left: auto;
+  z-index: 40;
   display: none;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border: 2px solid var(--line);
   border-radius: 50%;
   background: var(--coral);
   color: var(--on-coral);
   box-shadow: 0 5px 0 var(--shadow);
-  transform: translateX(-50%);
   transition: transform 90ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
@@ -1063,7 +1115,7 @@ html.js .tabbar-quick {
 }
 
 .tabbar-quick:active {
-  transform: translateX(-50%) scale(0.95);
+  transform: scale(0.95);
 }
 
 .tabbar-quick .icon {
@@ -1076,17 +1128,20 @@ html.js .tabbar-quick {
   transform: rotate(45deg);
 }
 
-/* The album needs the vertical room for photos and brings its own add button
-   in the next phase, so the quick-log drawer and its centered + step aside.
-   The markup stays in place: boosted tab swaps only replace <main>, and the
-   body's data-view keeps the four-tab layout correct without a reload. */
-body[data-view="album"] .tabbar {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+/* Quick logging belongs to Home. History and Settings keep their bottom nav
+   clean; the toast region still lives in the dock on every page. */
+body:not([data-view=""]) .tabbar .tabbar-quick,
+body:not([data-view=""]) .dock-drawer:not([open]) .dock-toggle {
+  display: none;
 }
 
-body[data-view="album"] .tabbar-spacer,
+/* The album brings its own camera button in the same spot, so the quick-log
+   drawer and its + step aside. The markup stays in place: boosted tab swaps
+   only replace <main>, and the body's data-view keeps the layout correct
+   without a reload. */
 body[data-view="album"] .tabbar-quick,
-body[data-view="album"] .dock-drawer {
+body[data-view="album"] .dock-drawer,
+body[data-view="album"] .dock-scrim {
   display: none;
 }
 
@@ -1544,10 +1599,20 @@ body[data-view="album"] .dock-drawer {
   right: 16px;
   bottom: calc(100% + 8px);
   left: 16px;
-  z-index: 10;
+  z-index: 60;
   display: flex;
   justify-content: center;
   pointer-events: none;
+}
+
+/* A toast from inside the quick-log sheet moves to the top so it never sits
+   over the controls the user is still tapping. */
+body.dock-open .toast-region {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 16px;
+  bottom: auto;
+  left: 16px;
 }
 
 .toast {

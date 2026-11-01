@@ -4,7 +4,7 @@
  *   - ticks the running clock from server timestamps,
  *   - mirrors the active timer in localStorage for fast recovery,
  *   - reconciles with /partials/feed/timer on resume,
- *   - handles the theme toggle, the quick-log drawer, <dialog>, toasts, and
+ *   - handles the theme toggle, the quick-log sheet, <dialog>, toasts, and
  *     relative labels.
  *
  * No inline handlers: the CSP allows only this file plus the tiny theme
@@ -108,14 +108,18 @@
 
   /* ---------- Quick-log dock ---------- */
 
-  // Home renders the drawer open and every other page renders it collapsed.
-  // Once the user chooses, keep that choice instead of letting the next server
-  // render reopen (or close) it.
-  var DOCK_KEY = "nurtur.dock";
+  // The quick log is a sheet above the tab bar. It starts closed and closing
+  // is never persisted: a reload or tab change always returns to the button.
   var dockDrawer = document.querySelector(".dock-drawer");
+  var dockScrim = document.querySelector(".dock-scrim");
 
-  // Keep the running activity row and the centered nav button in step with the
-  // drawer, even after an OOB swap replaces the row or a boosted tab swaps the
+  function focusQuickLog() {
+    var quick = document.querySelector("[data-quick-log-toggle]");
+    if (quick) quick.focus({ preventScroll: true });
+  }
+
+  // Keep the running activity row and the quick-log button in step with the
+  // sheet, even after an OOB swap replaces the row or a boosted tab swaps the
   // page body.
   function syncDockExpanded() {
     var expanded = !!(dockDrawer && dockDrawer.open);
@@ -128,67 +132,65 @@
       quick.setAttribute("aria-expanded", expanded ? "true" : "false");
       quick.setAttribute("aria-label", expanded ? "Close quick log" : "Open quick log");
     }
+    if (dockScrim) dockScrim.hidden = !expanded;
+    document.body.classList.toggle("dock-open", expanded);
   }
-
-  var dockSyncing = false;
 
   function setDockOpen(open) {
     if (!dockDrawer || dockDrawer.open === open) return;
-    // Do not record a preference for a change the app made on its own.
-    dockSyncing = true;
     dockDrawer.open = open;
   }
 
   if (dockDrawer) {
-    var dockPreference = null;
-    try { dockPreference = localStorage.getItem(DOCK_KEY); } catch (e) {}
-    if (dockPreference === "open" || dockPreference === "closed") {
-      dockDrawer.open = dockPreference === "open";
-    }
-    dockDrawer.addEventListener("toggle", function () {
-      if (dockSyncing) {
-        dockSyncing = false;
-        syncDockExpanded();
-        return;
-      }
-      try { localStorage.setItem(DOCK_KEY, dockDrawer.open ? "open" : "closed"); } catch (e) {}
-      syncDockExpanded();
-    });
+    dockDrawer.addEventListener("toggle", syncDockExpanded);
     syncDockExpanded();
   }
 
-  // Home opens the drawer; History, Album, Settings, and the changelog start
-  // it collapsed. Boosted tab swaps keep the old drawer state otherwise.
-  function syncDockDefault(path) {
-    if (!dockDrawer || !path) return;
-    var preference = null;
-    try { preference = localStorage.getItem(DOCK_KEY); } catch (e) {}
-    if (preference === "open" || preference === "closed") return;
-    setDockOpen(path === "/");
+  // Tabs and reloads always return quick logging to its closed button.
+  function syncDockView() {
+    setDockOpen(false);
   }
 
-  function syncDockView(path) {
-    syncDockDefault(path);
-  }
-
-  // Tapping the running activity's row opens the same quick-log drawer as the
-  // centered nav button, so the actions for that activity stay one tap away.
+  // Tapping the running activity's row opens the same quick-log sheet as the
+  // floating button, so the actions for that activity stay one tap away.
   document.addEventListener("click", function (event) {
     var row = event.target.closest ? event.target.closest("[data-open-dock]") : null;
     if (!row || !dockDrawer) return;
     event.preventDefault();
     dockDrawer.open = true;
-    var toggle = dockDrawer.querySelector(".dock-toggle");
-    if (toggle) toggle.focus({ preventScroll: true });
+    var close = dockDrawer.querySelector("[data-dock-close]") || dockDrawer.querySelector(".dock-toggle");
+    if (close) close.focus({ preventScroll: true });
   });
 
-  // The centered + stays put on every page. When the drawer is open it reads as
-  // an X and the same tap collapses the quick log.
+  // The + stays put above the tab bar. When the sheet is open it reads as an
+  // X and the same tap collapses quick logging.
   document.addEventListener("click", function (event) {
     var button = event.target.closest ? event.target.closest("[data-quick-log-toggle]") : null;
     if (!button || !dockDrawer) return;
     event.preventDefault();
-    dockDrawer.open = !dockDrawer.open;
+    var opening = !dockDrawer.open;
+    dockDrawer.open = opening;
+    if (opening) {
+      var close = dockDrawer.querySelector("[data-dock-close]");
+      if (close) close.focus({ preventScroll: true });
+    }
+  });
+
+  // The sheet's close button and the dimmed background both collapse it.
+  document.addEventListener("click", function (event) {
+    var closer = event.target.closest ? event.target.closest("[data-dock-close]") : null;
+    if (!closer || !dockDrawer || !dockDrawer.open) return;
+    event.preventDefault();
+    dockDrawer.open = false;
+    focusQuickLog();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || !dockDrawer || !dockDrawer.open) return;
+    if (document.querySelector("dialog.sheet[open]")) return;
+    event.preventDefault();
+    dockDrawer.open = false;
+    focusQuickLog();
   });
 
   /* ---------- Tab navigation ---------- */
@@ -1078,6 +1080,7 @@
       }
     }
     if (target.tagName === "DIALOG" && target.classList.contains("sheet")) {
+      setDockOpen(false);
       document.querySelectorAll("dialog.sheet[open]").forEach(function (other) {
         if (other !== target) closeDialog(other);
       });
@@ -1212,6 +1215,7 @@
   armToast();
   updateConnectivity();
   refreshNotificationUI();
+  syncDockView(location.pathname);
   tick();
   window.setInterval(tick, 250);
   window.setInterval(updateRelativeLabels, 30000);
