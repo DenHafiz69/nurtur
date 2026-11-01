@@ -6,9 +6,31 @@
   <p class="page-sub">Photos of the small moments.</p>
 </section>
 
-<div class="empty">
-  <span class="pip pip-empty">{{.Mascot "empty"}}</span>
-  <p class="empty-title">No photos yet.</p>
-  <p class="empty-copy">Photos will show up here, newest first.</p>
+{{template "album-days" .}}
+{{end}}
+
+{{define "album-days"}}
+<div id="album-days" class="album-days">
+  {{if and .Album .Album.HasDays}}
+    {{range .Album.Days}}
+      <section class="album-day" data-day="{{.Key}}">
+        <h3 class="album-day-title">{{.Label}}</h3>
+        <div class="album-grid">
+          {{range .Rows}}
+            <a class="album-tile" href="{{.FullURL}}" data-photo-id="{{.ID}}">
+              <img src="{{.ThumbURL}}" alt="{{.Alt}}" width="{{.Width}}" height="{{.Height}}" loading="lazy" decoding="async">
+              <span class="album-tile-time">{{.TimeLabel}}</span>
+            </a>
+          {{end}}
+        </div>
+      </section>
+    {{end}}
+  {{else}}
+    <div class="empty">
+      <span class="pip pip-empty">{{.Mascot "empty"}}</span>
+      <p class="empty-title">No photos yet.</p>
+      <p class="empty-copy">Snap the first one.</p>
+    </div>
+  {{end}}
 </div>
 {{end}}

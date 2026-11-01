@@ -1076,6 +1076,20 @@ html.js .tabbar-quick {
   transform: rotate(45deg);
 }
 
+/* The album needs the vertical room for photos and brings its own add button
+   in the next phase, so the quick-log drawer and its centered + step aside.
+   The markup stays in place: boosted tab swaps only replace <main>, and the
+   body's data-view keeps the four-tab layout correct without a reload. */
+body[data-view="album"] .tabbar {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+body[data-view="album"] .tabbar-spacer,
+body[data-view="album"] .tabbar-quick,
+body[data-view="album"] .dock-drawer {
+  display: none;
+}
+
 .tabbar-link {
   display: flex;
   flex-direction: column;

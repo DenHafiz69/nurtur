@@ -37,6 +37,7 @@ type PageData struct {
 	Timeline    *TimelinePageView
 	TimelineDay *TimelineDay // set when a timeline mutation refreshes one day header
 	Settings    *SettingsView
+	Album       *AlbumPageView
 	Row         *EventRow
 
 	// DeletedKey is the DOM id suffix for a deleted timeline row's placeholder.
@@ -220,6 +221,38 @@ type TimelineDay struct {
 	Meta  string
 	Feeds FeedSummary
 	Rows  []EventRow
+}
+
+// AlbumPageView is one page of photos, grouped by the local day each photo was
+// taken. The empty shell uses HasDays=false; capture and browsing fill it in
+// later phases.
+type AlbumPageView struct {
+	Days       []AlbumDay
+	HasDays    bool
+	HasMore    bool
+	NextCursor string
+	Count      int
+}
+
+// AlbumDay is one local-date group in the album.
+type AlbumDay struct {
+	Key   string
+	Label string
+	Rows  []AlbumRow
+}
+
+// AlbumRow is one photo tile. URLs are Nurtur routes, never object keys.
+type AlbumRow struct {
+	ID          int64
+	TakenAt     time.Time
+	TimeLabel   string
+	Alt         string
+	ThumbURL    string
+	FullURL     string
+	Width       int
+	Height      int
+	AspectRatio string
+	Caption     string
 }
 
 // SettingsView backs the settings page.

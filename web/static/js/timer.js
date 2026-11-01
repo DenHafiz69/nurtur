@@ -228,8 +228,10 @@
 
   // After the body has swapped, bring the rest of the shell in step.
   function syncPageChrome(path) {
+    var here = currentPath(path);
+    document.body.dataset.view = here === "/album" ? "album" : "";
     syncTabHighlight(path);
-    syncDockView(currentPath(path));
+    syncDockView(here);
   }
 
   document.addEventListener("click", function (event) {

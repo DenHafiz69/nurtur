@@ -89,6 +89,37 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(page.locator(".back-link")).toHaveCount(0);
   });
 
+  test("album is a fourth tab that fits a 320px phone in night mode", async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem("nurtur.theme", "night");
+      } catch (e) {}
+    });
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto("/album");
+
+    await expect(page.getByRole("heading", { name: "Album" })).toBeVisible();
+    await expect(page.getByText("Snap the first one.")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "night");
+
+    const albumTab = page.getByRole("link", { name: "Album", exact: true });
+    await expect(albumTab).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "History", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
+
+    // The album owns the screen: the quick-log drawer and its + step away.
+    await expect(page.locator("[data-quick-log-toggle]")).toBeHidden();
+    await expect(page.locator("details.dock-drawer")).toBeHidden();
+    const columns = await page.locator(".tabbar").evaluate((node) => {
+      return getComputedStyle(node).gridTemplateColumns.split(" ").filter(Boolean).length;
+    });
+    expect(columns).toBe(4);
+
+    const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflows).toBe(false);
+  });
+
   test("history collapses quick logging into an expandable drawer", async ({ page }) => {
     await page.goto("/timeline");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();

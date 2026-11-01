@@ -30,6 +30,25 @@ type Config struct {
 	SecureCookie  bool
 	AdminPassword string
 	PublicURL     string
+	Album         AlbumConfig
+}
+
+// AlbumConfig controls where photo bytes live. Metadata always stays in the
+// database. A partially configured R2 block is a startup error rather than a
+// silent fallback to local disk.
+type AlbumConfig struct {
+	Storage       string
+	Dir           string
+	R2Endpoint    string
+	R2Bucket      string
+	R2AccessKeyID string
+	R2SecretKey   string
+	R2Region      string
+}
+
+// R2Complete reports whether every required R2 value is present.
+func (a AlbumConfig) R2Complete() bool {
+	return a.R2Endpoint != "" && a.R2Bucket != "" && a.R2AccessKeyID != "" && a.R2SecretKey != ""
 }
 
 // Load reads configuration from the environment and applies defaults. An
@@ -56,6 +75,11 @@ func Load() (Config, error) {
 		LogLevel:     slog.LevelInfo,
 		NightStart:   19 * time.Hour,
 		NightEnd:     7 * time.Hour,
+		Album: AlbumConfig{
+			Storage:  "auto",
+			Dir:      "./data/album",
+			R2Region: "auto",
+		},
 	}
 
 	localOnly, err := parseBool(os.Getenv("NURTUR_LOCAL_ONLY"))
@@ -86,6 +110,40 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("NURTUR_PUBLIC_URL: %w", err)
 		}
 		cfg.PublicURL = base
+	}
+
+	if raw := strings.TrimSpace(os.Getenv("NURTUR_ALBUM_STORAGE")); raw != "" {
+		cfg.Album.Storage = strings.ToLower(raw)
+	}
+	switch cfg.Album.Storage {
+	case "auto", "local", "r2":
+	default:
+		return Config{}, fmt.Errorf("NURTUR_ALBUM_STORAGE must be auto, local, or r2")
+	}
+	if raw := strings.TrimSpace(os.Getenv("NURTUR_ALBUM_DIR")); raw != "" {
+		cfg.Album.Dir = raw
+	}
+	cfg.Album.R2Endpoint = strings.TrimSpace(os.Getenv("NURTUR_R2_ENDPOINT"))
+	cfg.Album.R2Bucket = strings.TrimSpace(os.Getenv("NURTUR_R2_BUCKET"))
+	cfg.Album.R2AccessKeyID = strings.TrimSpace(os.Getenv("NURTUR_R2_ACCESS_KEY_ID"))
+	cfg.Album.R2SecretKey = strings.TrimSpace(os.Getenv("NURTUR_R2_SECRET_ACCESS_KEY"))
+	if raw := strings.TrimSpace(os.Getenv("NURTUR_R2_REGION")); raw != "" {
+		cfg.Album.R2Region = raw
+	}
+
+	// Any R2 value means the block was meant to be used. Missing one is a
+	// configuration mistake, not a reason to quietly write photos to disk.
+	anyR2 := cfg.Album.R2Endpoint != "" || cfg.Album.R2Bucket != "" ||
+		cfg.Album.R2AccessKeyID != "" || cfg.Album.R2SecretKey != ""
+	if anyR2 && !cfg.Album.R2Complete() {
+		return Config{}, fmt.Errorf(
+			"R2 storage is partially configured: set NURTUR_R2_ENDPOINT, NURTUR_R2_BUCKET, " +
+				"NURTUR_R2_ACCESS_KEY_ID, and NURTUR_R2_SECRET_ACCESS_KEY, or unset all four")
+	}
+	if cfg.Album.Storage == "r2" && !cfg.Album.R2Complete() {
+		return Config{}, fmt.Errorf(
+			"NURTUR_ALBUM_STORAGE=r2 needs NURTUR_R2_ENDPOINT, NURTUR_R2_BUCKET, " +
+				"NURTUR_R2_ACCESS_KEY_ID, and NURTUR_R2_SECRET_ACCESS_KEY")
 	}
 
 	if raw := strings.TrimSpace(os.Getenv("NURTUR_SYNC_INTERVAL")); raw != "" {

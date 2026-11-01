@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"nurtur/internal/album"
 	"nurtur/internal/clock"
 	"nurtur/internal/store"
 	"nurtur/internal/view"
@@ -43,6 +44,7 @@ type Config struct {
 	SecureCookie  bool
 	AdminPassword string
 	PublicURL     string
+	Album         album.Storage
 }
 
 // Server holds the router and shared dependencies.
@@ -63,6 +65,7 @@ type Server struct {
 	auth       *auth
 	admin      *adminAuth
 	publicURL  string
+	album      album.Storage
 
 	defaultBabyName string
 }
@@ -134,6 +137,7 @@ func New(cfg Config) (*Server, error) {
 		auth:            newAuth(cfg.Passcode, cfg.SignupKey, cfg.SessionSecret, cfg.SecureCookie, accountCount > 0),
 		admin:           newAdminAuth(cfg.AdminPassword, cfg.SessionSecret, cfg.SecureCookie),
 		publicURL:       strings.TrimRight(cfg.PublicURL, "/"),
+		album:           cfg.Album,
 	}, nil
 }
 
@@ -177,6 +181,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sleeps/{id}/restore", s.handleRestoreSleep) // undo
 
 	mux.HandleFunc("GET /album", s.handleAlbumPage)
+	mux.HandleFunc("GET /album/partial", s.handleAlbumPartial)
 
 	mux.HandleFunc("GET /timeline", s.handleTimelinePage)
 	mux.HandleFunc("GET /timeline/partial", s.handleTimelinePartial)
