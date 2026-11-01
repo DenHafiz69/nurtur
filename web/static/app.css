@@ -204,27 +204,24 @@ body.app-body {
   overscroll-behavior: none;
 }
 
+/* The layout viewport in an installed iOS web app disagrees about the
+   home-indicator strip across iOS versions: some include it, some stop above
+   it. Guessing one inset here created three round-trips of regressions.
+   Instead, script.js measures the real gap on the device and hands it over as
+   --app-extend; where the viewport already reaches the screen edge it is 0.
+
+   --app-extend is only measured when the app runs standalone, so browsers and
+   Android keep the plain viewport. */
 .app {
   position: fixed;
   inset: 0;
+  bottom: var(--app-extend, 0px);
   z-index: 1;
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 520px;
   margin: 0 auto;
-}
-
-/* Installed iOS apps resolve the viewport without the home-indicator strip
-   even though env() still reports it. Reach past that edge so the tab bar's
-   background fills the strip; its own bottom padding keeps the labels above
-   the indicator. Browsers and Android already include the full screen. */
-@media (display-mode: standalone) {
-  @supports (-webkit-touch-callout: none) {
-    .app {
-      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
-    }
-  }
 }
 
 /* ---------- Header ---------- */
@@ -1104,21 +1101,10 @@ html.js .tabbar-quick {
   color: var(--coral);
 }
 
-/* iOS reserves the home-indicator strip inside the safe area. Lift the row a
-   little so its labels sit just above the indicator instead of hugging it. */
-@supports (-webkit-touch-callout: none) {
-  .tabbar {
-    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .dock-drawer:not([open]) .dock-toggle {
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  }
-
-  .tabbar-quick {
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  }
-}
+/* The fixed shell reaches exactly to the screen edge (its shortfall is passed
+   in as --app-extend by the measurement script), so the base safe-area padding
+   is the only lift the nav needs: the labels sit just above the home
+   indicator and the plus button keeps its bottom edge aligned with them. */
 
 .timer-card {
   position: relative;

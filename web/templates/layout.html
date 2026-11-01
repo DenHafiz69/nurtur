@@ -34,6 +34,22 @@
         document.documentElement.dataset.theme = (fallbackHour >= 21 || fallbackHour < 7) ? "night" : "day";
       }
     })();
+    // iOS installed web apps resolve the layout viewport inconsistently across
+    // versions: some include the home-indicator strip, some stop above it.
+    // Guessing env(safe-area-inset-bottom) here led to round-trips of regressions,
+    // so the fixed shell reaches exactly what this gap says instead.
+    (function () {
+      var compute = function () {
+        var standalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+        if (!standalone) return;
+        var gap = Math.round(window.screen.height - window.innerHeight);
+        document.documentElement.style.setProperty("--app-extend", Math.max(0, gap) + "px");
+      };
+      try {
+        compute();
+        window.addEventListener("resize", compute);
+      } catch (err) {}
+    })();
   </script>
   <link rel="preload" href="/static/fonts/fredoka-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
