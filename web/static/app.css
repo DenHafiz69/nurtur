@@ -1128,6 +1128,13 @@ html.js .tabbar-quick {
   transform: rotate(45deg);
 }
 
+/* Quick logging belongs to Home. History and Settings keep their bottom nav
+   clean; the toast region still lives in the dock on every page. */
+body:not([data-view=""]) .tabbar .tabbar-quick,
+body:not([data-view=""]) .dock-drawer:not([open]) .dock-toggle {
+  display: none;
+}
+
 /* The album brings its own camera button in the same spot, so the quick-log
    drawer and its + step aside. The markup stays in place: boosted tab swaps
    only replace <main>, and the body's data-view keeps the layout correct

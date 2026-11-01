@@ -89,8 +89,8 @@ The header also shows your baby's current age, derived from their birth date.
 Enough context to decide what to do next without reading a log.
 
 The status cards open their detail sheets. When something is running, its row
-in Today opens the same quick-log sheet as the floating `+`, so pause, switch,
-wake, or log a diaper straight from the row.
+in Today opens the same quick-log sheet as Home's floating `+`, so pause,
+switch, wake, or log a diaper straight from the row.
 
 ### A timeline you can actually fix
 
@@ -102,8 +102,8 @@ wake, or log a diaper straight from the row.
 - **Real undo.** Deleting a row replaces it with a hidden placeholder; Undo puts
   it back in the exact same spot for eight seconds. Restores are re-validated,
   so you can't accidentally create two open feeds or overlapping sleeps.
-- **Log without leaving.** The floating `+` sheet inserts new events into today's
-  group and refreshes the header totals in place.
+- **Log without leaving.** Home's floating `+` sheet inserts new events into
+  today's group and refreshes the header totals in place.
 
 ### Night mode and one-thumb ergonomics
 

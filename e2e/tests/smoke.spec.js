@@ -145,9 +145,9 @@ test.describe("Nurtur smoke path at 390×844", () => {
     expect(response.headers()["content-type"]).toMatch(/^image\/webp|^image\/jpeg$/);
   });
 
-  test("history opens and closes the quick-log sheet", async ({ page }) => {
-    await page.goto("/timeline");
-    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+  test("home opens and closes the quick-log sheet", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
 
     const drawer = page.locator("details.dock-drawer");
     const quick = page.locator("[data-quick-log-toggle]");
@@ -225,24 +225,24 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(quick).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("the quick log button stays available on settings", async ({ page }) => {
+  test("the quick-log button is only on home", async ({ page }) => {
+    const quick = page.locator("[data-quick-log-toggle]");
+
+    await page.goto("/timeline");
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(quick).toBeHidden();
+
     await page.goto("/settings");
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(quick).toBeHidden();
 
-    const drawer = page.locator("details.dock-drawer");
-    const quick = page.locator("[data-quick-log-toggle]");
+    await page.goto("/album");
+    await expect(page.getByRole("heading", { name: "Album" })).toBeVisible();
+    await expect(quick).toBeHidden();
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
     await expect(quick).toBeVisible();
-    await expect(quick).toHaveAttribute("aria-expanded", "false");
-    await expect(drawer).not.toHaveAttribute("open", "");
-
-    await quick.click();
-    await expect(drawer).toHaveAttribute("open", "");
-    await expect(quick).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("button", { name: "Left", exact: true })).toBeVisible();
-
-    await page.locator(".dock-close").click();
-    await expect(drawer).not.toHaveAttribute("open", "");
-    await expect(quick).toHaveAttribute("aria-expanded", "false");
   });
 
   test("theme toggle flips on a single click in both directions", async ({ page }) => {
