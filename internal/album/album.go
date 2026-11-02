@@ -165,3 +165,19 @@ func PlausibleTakenAt(t, now time.Time) bool {
 	}
 	return !t.Before(now.AddDate(-10, 0, 0))
 }
+
+// ValidateEdit checks the date and caption a household member can correct by
+// hand. Unlike upload dates, a manual correction may point anywhere in the
+// past; only a date more than a day ahead is dismissed as a mistake.
+func ValidateEdit(takenAt time.Time, caption string, now time.Time) error {
+	if takenAt.IsZero() {
+		return &ValidationError{Field: "taken_at", Message: "Choose when the photo was taken."}
+	}
+	if takenAt.After(now.Add(24 * time.Hour)) {
+		return &ValidationError{Field: "taken_at", Message: "That date is in the future."}
+	}
+	if utf8.RuneCountInString(strings.TrimSpace(caption)) > MaxCaption {
+		return &ValidationError{Field: "caption", Message: fmt.Sprintf("Keep the caption under %d characters.", MaxCaption)}
+	}
+	return nil
+}

@@ -107,6 +107,35 @@ func TestAlbumPhotoInsertIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestAlbumPhotoUpdateDateAndCaption(t *testing.T) {
+	st := newTestStore(t)
+	ctx := WithAccount(context.Background(), 1)
+
+	photo, _, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(1))
+	if err != nil {
+		t.Fatalf("CreateAlbumPhoto: %v", err)
+	}
+	changed := testNow.AddDate(0, 0, -3)
+	updated, err := st.UpdateAlbumPhoto(ctx, photo.ID, changed, "  A calmer caption  ")
+	if err != nil {
+		t.Fatalf("UpdateAlbumPhoto: %v", err)
+	}
+	if !updated.TakenAt.Equal(changed) {
+		t.Fatalf("taken at = %v, want %v", updated.TakenAt, changed)
+	}
+	if updated.TakenAtSource != album.SourceManual {
+		t.Fatalf("source = %q, want manual", updated.TakenAtSource)
+	}
+	if updated.Caption != "A calmer caption" {
+		t.Fatalf("caption = %q", updated.Caption)
+	}
+
+	other := WithAccount(context.Background(), 2)
+	if _, err := st.UpdateAlbumPhoto(other, photo.ID, changed, ""); !errors.Is(err, album.ErrNotFound) {
+		t.Fatalf("foreign update error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestAlbumPhotoSoftDeleteAndRestore(t *testing.T) {
 	st := newTestStore(t)
 	ctx := WithAccount(context.Background(), 1)

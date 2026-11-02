@@ -540,6 +540,70 @@ test.describe("Album capture dates", () => {
     );
     await expect(page.locator("#album-loading")).toBeHidden();
   });
+
+  test("viewer edits date and caption, then delete and undo", async ({ page }) => {
+    const jpeg = Buffer.from(ALBUM_JPEG_BASE64, "base64");
+    const today = albumExifDate(0);
+    const seeded = await seedAlbumJpeg(page, jpeg, today.iso);
+    const id = seeded.id;
+    const viewer = page.locator("#album-viewer");
+    const sheet = page.locator("#action-dialog");
+
+    await page.goto("/album");
+    const tile = page.locator(`#album-photo-${id}`);
+    await expect(tile).toBeVisible();
+    await tile.click();
+    await expect(viewer).toHaveAttribute("open", "");
+    const viewerDate = page.locator("[data-album-viewer-date]");
+    await expect(viewerDate).toContainText("at 2:07 PM");
+    const firstLabel = await viewerDate.textContent();
+    await page.keyboard.press("ArrowLeft");
+    await expect(viewerDate).not.toHaveText(firstLabel);
+    await page.keyboard.press("ArrowRight");
+    await expect(viewerDate).toHaveText(firstLabel);
+
+    await page.keyboard.press("Escape");
+    await expect(viewer).not.toHaveAttribute("open", "");
+    await expect(tile).toBeFocused();
+    await tile.click();
+
+    await page.locator("[data-album-viewer-edit]").click();
+    await expect(sheet).toHaveAttribute("open", "");
+    const form = page.locator("[data-album-edit-form]");
+    await form.locator('textarea[name="caption"]').fill("A very first smile");
+    await form.locator('input[name="taken_at"]').fill(`${today.key}T09:15`);
+    await form.getByRole("button", { name: "Save", exact: true }).click();
+
+    await expect(sheet).not.toHaveAttribute("open", "");
+    await expect(tile).toHaveAttribute("data-caption", "A very first smile");
+    await expect(tile.locator(".album-tile-time")).toHaveText("9:15 AM");
+    await expect(page.locator("[data-album-viewer-date]")).toContainText("at 9:15 AM");
+    await expect(page.locator("[data-album-viewer-caption]")).toHaveText("A very first smile");
+
+    const yesterday = albumExifDate(1);
+    await page.locator("[data-album-viewer-edit]").click();
+    await expect(sheet).toHaveAttribute("open", "");
+    const movedForm = page.locator("[data-album-edit-form]");
+    await movedForm.locator('input[name="taken_at"]').fill(`${yesterday.key}T16:45`);
+    await movedForm.getByRole("button", { name: "Save", exact: true }).click();
+
+    await expect(viewer).not.toHaveAttribute("open", "");
+    const moved = page.locator(`#album-day-${yesterday.key} #album-photo-${id}`);
+    await expect(moved).toBeVisible();
+    await expect(moved.locator(".album-tile-time")).toHaveText("4:45 PM");
+    await expect(page.getByText(/Photo moved to /)).toBeVisible();
+
+    await moved.click();
+    await expect(viewer).toHaveAttribute("open", "");
+    await page.locator("[data-album-viewer-delete]").click();
+    await expect(viewer).not.toHaveAttribute("open", "");
+    await expect(page.locator(`#album-photo-${id}`)).toHaveCount(0);
+    await expect(page.getByText("Photo deleted.")).toBeVisible();
+
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(page.getByText("Photo restored.")).toBeVisible();
+    await expect(page.locator(`#album-day-${yesterday.key} #album-photo-${id}`)).toBeVisible();
+  });
 });
 
 async function uploadAlbumJpeg(page, buffer) {
@@ -570,6 +634,7 @@ async function seedAlbumJpeg(page, buffer, takenAt) {
     }
   });
   expect(response.status()).toBe(201);
+  return response.json();
 }
 
 // albumExifDate returns an EXIF date at 14:07 in the household timezone, a few

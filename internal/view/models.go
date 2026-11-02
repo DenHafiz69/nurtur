@@ -38,6 +38,7 @@ type PageData struct {
 	TimelineDay *TimelineDay // set when a timeline mutation refreshes one day header
 	Settings    *SettingsView
 	Album       *AlbumPageView
+	AlbumEdit   *AlbumEditView
 	Row         *EventRow
 
 	// DeletedKey is the DOM id suffix for a deleted timeline row's placeholder.
@@ -251,6 +252,7 @@ type AlbumRow struct {
 	ID          int64
 	TakenAt     time.Time
 	TimeLabel   string
+	FullLabel   string
 	Alt         string
 	ThumbURL    string
 	FullURL     string
@@ -258,6 +260,17 @@ type AlbumRow struct {
 	Height      int
 	AspectRatio string
 	Caption     string
+}
+
+// AlbumEditView backs the date and caption sheet.
+type AlbumEditView struct {
+	ID         int64
+	TimeInput  string
+	Caption    string
+	CaptionMax int
+	FullLabel  string
+	TimeErr    string
+	CaptionErr string
 }
 
 // SettingsView backs the settings page.

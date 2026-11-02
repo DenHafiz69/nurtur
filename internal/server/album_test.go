@@ -474,6 +474,264 @@ func TestAlbumDeletedPhotoReturns404(t *testing.T) {
 	}
 }
 
+func TestAlbumViewerMarkup(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Add(-time.Hour).Format(time.RFC3339),
+		source:   "exif",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	body := env.do(t, http.MethodGet, "/album", nil, false).Body.String()
+	for _, want := range []string{
+		`id="album-viewer"`,
+		`data-album-viewer-image`,
+		`data-album-viewer-prev`,
+		`data-album-viewer-next`,
+		`data-album-viewer-edit`,
+		`data-album-viewer-delete-form`,
+		`data-full-label="` + testNow.Add(-time.Hour).Format("Monday, January 2 at 3:04 PM") + `"`,
+		`data-edit-url="/album/photos/1/edit"`,
+		`data-download-url="/album/photos/1/full?download=1"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("viewer markup missing %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestAlbumEditPageAndUpdate(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Add(-time.Hour).Format(time.RFC3339),
+		source:   "exif",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	rec = env.do(t, http.MethodGet, "/album/photos/1/edit", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("edit sheet status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	sheet := rec.Body.String()
+	for _, want := range []string{
+		`data-album-edit-form`,
+		`action="/album/photos/1"`,
+		`name="taken_at" value="2026-10-20T11:00:00"`,
+		`maxlength="280"`,
+	} {
+		if !strings.Contains(sheet, want) {
+			t.Fatalf("edit sheet missing %q:\n%s", want, sheet)
+		}
+	}
+
+	rec = env.do(t, http.MethodGet, "/album/photos/1/edit", nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("full edit page status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `data-album-edit-form`) {
+		t.Fatalf("full edit page has no sheet:\n%s", rec.Body.String())
+	}
+
+	rec = env.albumJSON(t, http.MethodPatch, "/album/photos/1", url.Values{
+		"taken_at":      {"2026-10-19T09:30:00"},
+		"caption":       {"  First smile  "},
+		"loaded_before": {"2026-10-13T00:00:00Z"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	var payload albumEditResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode update: %v\n%s", err, rec.Body.String())
+	}
+	if !payload.OK || payload.ID != 1 || payload.DayKey != "2026-10-19" {
+		t.Fatalf("update payload = %+v", payload)
+	}
+	if payload.Caption != "First smile" || payload.OutOfRange {
+		t.Fatalf("caption/outOfRange = %q/%v", payload.Caption, payload.OutOfRange)
+	}
+	if !strings.Contains(payload.TileHTML, `data-photo-id="1"`) {
+		t.Fatalf("updated tile missing id:\n%s", payload.TileHTML)
+	}
+
+	photo, err := env.store.GetAlbumPhoto(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if photo.TakenAtSource != album.SourceManual || photo.Caption != "First smile" {
+		t.Fatalf("stored photo = %+v", photo)
+	}
+}
+
+func TestAlbumEditValidation(t *testing.T) {
+	env := newTestEnv(t)
+	env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "upload",
+	})
+
+	tests := []struct {
+		name  string
+		form  url.Values
+		field string
+	}{
+		{
+			name:  "future date",
+			form:  url.Values{"taken_at": {testNow.Add(25 * time.Hour).Format("2006-01-02T15:04:05")}},
+			field: "taken_at",
+		},
+		{
+			name: "long caption",
+			form: url.Values{
+				"taken_at": {testNow.Format("2006-01-02T15:04:05")},
+				"caption":  {strings.Repeat("a", album.MaxCaption+1)},
+			},
+			field: "caption",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := env.albumJSON(t, http.MethodPatch, "/album/photos/1", tt.form)
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d\n%s", rec.Code, rec.Body.String())
+			}
+			var payload albumEditResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Errors[tt.field] == "" {
+				t.Fatalf("field %q has no error: %+v", tt.field, payload)
+			}
+		})
+	}
+}
+
+func TestAlbumDeleteAndUndo(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "upload",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	rec = env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "fedcba9876543210fedcba9876543210",
+		takenAt:  testNow.Add(-time.Hour).Format(time.RFC3339),
+		source:   "upload",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("second upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	rec = env.albumJSON(t, http.MethodDelete, "/album/photos/1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	var deleted albumDeleteResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &deleted); err != nil {
+		t.Fatal(err)
+	}
+	if !deleted.OK || deleted.DayKey != "2026-10-20" || deleted.UndoURL != "/album/photos/1/restore" {
+		t.Fatalf("delete payload = %+v", deleted)
+	}
+
+	body := env.do(t, http.MethodGet, "/album", nil, false).Body.String()
+	if strings.Contains(body, `data-photo-id="1"`) {
+		t.Fatal("deleted photo still rendered")
+	}
+	if rec := env.do(t, http.MethodGet, "/album/photos/1/thumb", nil, false); rec.Code != http.StatusNotFound {
+		t.Fatalf("deleted thumb status = %d", rec.Code)
+	}
+
+	rec = env.do(t, http.MethodPost, "/album/photos/1/restore", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("restore status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	restored := rec.Body.String()
+	for _, want := range []string{
+		`id="album-day-2026-10-20"`,
+		`data-photo-id="1"`,
+		`data-photo-id="2"`,
+		`id="toast-region"`,
+		"Photo restored.",
+	} {
+		if !strings.Contains(restored, want) {
+			t.Fatalf("restore response missing %q:\n%s", want, restored)
+		}
+	}
+	body = env.do(t, http.MethodGet, "/album", nil, false).Body.String()
+	if !strings.Contains(body, `data-photo-id="1"`) {
+		t.Fatal("restored photo did not return")
+	}
+
+	rec = env.albumJSON(t, http.MethodDelete, "/album/photos/1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("second delete status = %d", rec.Code)
+	}
+	rec = env.do(t, http.MethodPost, "/album/photos/1/restore", nil, false)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("no-JS restore status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Location"); got != "/album?restored=1#album-day-2026-10-20" {
+		t.Fatalf("no-JS restore Location = %q", got)
+	}
+}
+
+func TestAlbumEditAndDeleteNoJSRedirect(t *testing.T) {
+	env := newTestEnv(t)
+	env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "upload",
+	})
+
+	rec := env.do(t, http.MethodPost, "/album/photos/1", url.Values{
+		"taken_at": {testNow.Format("2006-01-02T15:04:05")},
+		"caption":  {"No script"},
+	}, false)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("edit redirect = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Location"); got != "/album?edited=1#album-photo-1" {
+		t.Fatalf("edit Location = %q", got)
+	}
+
+	rec = env.do(t, http.MethodPost, "/album/photos/1/delete", nil, false)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("delete redirect = %d\n%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Location"); got != "/album?deleted=1" {
+		t.Fatalf("delete Location = %q", got)
+	}
+}
+
 func TestAlbumReadIsAccountScoped(t *testing.T) {
 	env := newTestEnv(t)
 	photo, _, err := env.store.CreateAlbumPhoto(store.WithAccount(context.Background(), 55), album.Photo{
@@ -492,9 +750,24 @@ func TestAlbumReadIsAccountScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed foreign photo: %v", err)
 	}
-	rec := env.do(t, http.MethodGet, "/album/photos/"+strconv.FormatInt(photo.ID, 10)+"/thumb", nil, false)
+	id := strconv.FormatInt(photo.ID, 10)
+	rec := env.do(t, http.MethodGet, "/album/photos/"+id+"/thumb", nil, false)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("foreign photo status = %d, want 404", rec.Code)
+	}
+	rec = env.albumJSON(t, http.MethodPatch, "/album/photos/"+id, url.Values{
+		"taken_at": {testNow.Format("2006-01-02T15:04:05")},
+	})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("foreign update status = %d, want 404", rec.Code)
+	}
+	rec = env.albumJSON(t, http.MethodDelete, "/album/photos/"+id, nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("foreign delete status = %d, want 404", rec.Code)
+	}
+	rec = env.do(t, http.MethodPost, "/album/photos/"+id+"/restore", nil, true)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("foreign restore status = %d, want 404", rec.Code)
 	}
 }
 
@@ -508,6 +781,22 @@ type albumUploadForm struct {
 	takenAt  string
 	source   string
 	extra    map[string]string
+}
+
+func (e *testEnv) albumJSON(t *testing.T, method, path string, form url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	var body io.Reader
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+	}
+	req := httptest.NewRequest(method, path, body)
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	e.handler.ServeHTTP(rec, req)
+	return rec
 }
 
 func seedAlbumPhoto(t *testing.T, st *store.Store, ctx context.Context, uploadID string, takenAt time.Time) album.Photo {

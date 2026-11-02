@@ -57,8 +57,15 @@ func (s *Server) handleAlbumPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Album = page
-	if r.URL.Query().Get("added") == "1" {
+	switch {
+	case r.URL.Query().Get("added") == "1":
 		data.Toast = &view.Toast{Message: "Photo added.", Kind: "success"}
+	case r.URL.Query().Get("edited") == "1":
+		data.Toast = &view.Toast{Message: "Photo saved.", Kind: "success"}
+	case r.URL.Query().Get("deleted") == "1":
+		data.Toast = &view.Toast{Message: "Photo deleted.", Kind: "success"}
+	case r.URL.Query().Get("restored") == "1":
+		data.Toast = &view.Toast{Message: "Photo restored.", Kind: "success"}
 	}
 	s.renderPage(w, r, http.StatusOK, data)
 }
@@ -167,6 +174,7 @@ func (s *Server) albumRow(photo album.Photo) view.AlbumRow {
 		ID:          photo.ID,
 		TakenAt:     photo.TakenAt,
 		TimeLabel:   timeLabel,
+		FullLabel:   view.PhotoDateTime(photo.TakenAt, s.clock.Now().UTC(), s.loc),
 		Alt:         alt,
 		ThumbURL:    fmt.Sprintf("/album/photos/%d/thumb", photo.ID),
 		FullURL:     fmt.Sprintf("/album/photos/%d/full", photo.ID),
@@ -635,4 +643,323 @@ func (s *Server) serveAlbumPhoto(w http.ResponseWriter, r *http.Request, variant
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, body)
+}
+
+/* ---------- View, correct, delete ---------- */
+
+type albumEditResponse struct {
+	OK         bool              `json:"ok"`
+	ID         int64             `json:"id,omitempty"`
+	TakenAt    string            `json:"taken_at,omitempty"`
+	TimeLabel  string            `json:"time_label,omitempty"`
+	FullLabel  string            `json:"full_label,omitempty"`
+	Caption    string            `json:"caption,omitempty"`
+	TileHTML   string            `json:"tile_html,omitempty"`
+	DayKey     string            `json:"day_key,omitempty"`
+	DayLabel   string            `json:"day_label,omitempty"`
+	DayDate    string            `json:"day_date,omitempty"`
+	DayStart   string            `json:"day_start,omitempty"`
+	OutOfRange bool              `json:"out_of_range,omitempty"`
+	DayURL     string            `json:"day_url,omitempty"`
+	Error      string            `json:"error,omitempty"`
+	Errors     map[string]string `json:"errors,omitempty"`
+}
+
+type albumDeleteResponse struct {
+	OK      bool   `json:"ok"`
+	ID      int64  `json:"id,omitempty"`
+	DayKey  string `json:"day_key,omitempty"`
+	UndoURL string `json:"undo_url,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+func wantsAlbumJSON(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Accept"), "application/json")
+}
+
+func writeAlbumMutationJSON(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func (s *Server) albumPhotoID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.notFound(w)
+		return 0, false
+	}
+	return id, true
+}
+
+func (s *Server) buildAlbumEdit(photo album.Photo) *view.AlbumEditView {
+	now := s.clock.Now().UTC()
+	return &view.AlbumEditView{
+		ID:         photo.ID,
+		TimeInput:  photo.TakenAt.In(s.loc).Format("2006-01-02T15:04:05"),
+		Caption:    photo.Caption,
+		CaptionMax: album.MaxCaption,
+		FullLabel:  view.PhotoDateTime(photo.TakenAt, now, s.loc),
+	}
+}
+
+func (s *Server) handleAlbumEditPage(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.albumPhotoID(w, r)
+	if !ok {
+		return
+	}
+	photo, err := s.store.GetAlbumPhoto(r.Context(), id)
+	if errors.Is(err, album.ErrNotFound) {
+		s.notFound(w)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	data, err := s.buildPage(r.Context(), nonceFrom(r.Context()), nil)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	data.View = "album"
+	data.AlbumEdit = s.buildAlbumEdit(photo)
+	if isHTMX(r) {
+		s.writeFragments(w, r, http.StatusOK, "album-edit", data, false, nil, "", false, "", "")
+		return
+	}
+	page, err := s.buildAlbum(r.Context(), time.Time{})
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	data.Album = page
+	data.Sheet = "album-edit"
+	data.SheetOpen = true
+	s.renderPage(w, r, http.StatusOK, data)
+}
+
+func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.albumPhotoID(w, r)
+	if !ok {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		if wantsAlbumJSON(r) {
+			writeAlbumMutationJSON(w, http.StatusBadRequest, albumEditResponse{Error: "Couldn't read that form. Try again."})
+			return
+		}
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+	now := s.clock.Now().UTC()
+	photo, err := s.store.GetAlbumPhoto(r.Context(), id)
+	if errors.Is(err, album.ErrNotFound) {
+		s.albumEditError(w, r, nil, http.StatusNotFound, "That photo isn't here anymore.", nil)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	edit := s.buildAlbumEdit(photo)
+	edit.TimeInput = strings.TrimSpace(r.FormValue("taken_at"))
+	edit.Caption = strings.TrimSpace(r.FormValue("caption"))
+
+	takenAt, err := parseLocalDateTime(edit.TimeInput, s.loc)
+	if err != nil {
+		edit.TimeErr = "Use a valid date and time."
+		s.albumEditError(w, r, edit, http.StatusUnprocessableEntity, "", map[string]string{"taken_at": edit.TimeErr})
+		return
+	}
+	if err := album.ValidateEdit(takenAt, edit.Caption, now); err != nil {
+		var validation *album.ValidationError
+		if errors.As(err, &validation) {
+			if validation.Field == "caption" {
+				edit.CaptionErr = validation.Message
+			} else {
+				edit.TimeErr = validation.Message
+			}
+			fields := map[string]string{validation.Field: validation.Message}
+			s.albumEditError(w, r, edit, http.StatusUnprocessableEntity, "", fields)
+			return
+		}
+		s.serverError(w, r, err)
+		return
+	}
+
+	updated, err := s.store.UpdateAlbumPhoto(r.Context(), id, takenAt, edit.Caption)
+	if errors.Is(err, album.ErrNotFound) {
+		s.albumEditError(w, r, nil, http.StatusNotFound, "That photo isn't here anymore.", nil)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	if !wantsAlbumJSON(r) {
+		http.Redirect(w, r, fmt.Sprintf("/album?edited=1#album-photo-%d", updated.ID), http.StatusSeeOther)
+		return
+	}
+
+	row := s.albumRow(updated)
+	var tile bytes.Buffer
+	if err := s.renderer.Execute(&tile, "album-tile", row); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	start, end := clock.DayBounds(updated.TakenAt, s.loc)
+	loadedFrom := strings.TrimSpace(r.FormValue("loaded_before"))
+	outOfRange := false
+	if oldest, err := time.Parse(time.RFC3339, loadedFrom); err == nil && !oldest.IsZero() {
+		outOfRange = start.Before(oldest.UTC())
+	}
+	writeAlbumMutationJSON(w, http.StatusOK, albumEditResponse{
+		OK:         true,
+		ID:         updated.ID,
+		TakenAt:    view.ISO(updated.TakenAt),
+		TimeLabel:  row.TimeLabel,
+		FullLabel:  row.FullLabel,
+		Caption:    updated.Caption,
+		TileHTML:   tile.String(),
+		DayKey:     s.albumDayKey(updated.TakenAt),
+		DayLabel:   s.albumDayLabel(updated.TakenAt),
+		DayDate:    view.DayLabelFull(start, now, s.loc),
+		DayStart:   start.UTC().Format(time.RFC3339),
+		OutOfRange: outOfRange,
+		DayURL:     "/album?before=" + url.QueryEscape(end.UTC().Format(time.RFC3339)) + "#album-day-" + s.albumDayKey(updated.TakenAt),
+	})
+}
+
+func (s *Server) albumEditError(w http.ResponseWriter, r *http.Request, edit *view.AlbumEditView, status int, message string, fields map[string]string) {
+	if wantsAlbumJSON(r) {
+		writeAlbumMutationJSON(w, status, albumEditResponse{Error: message, Errors: fields})
+		return
+	}
+	if edit == nil {
+		s.notFound(w)
+		return
+	}
+	if message == "" {
+		message = "Check the highlighted fields and try again."
+	}
+	data, err := s.buildPage(r.Context(), nonceFrom(r.Context()), nil)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	data.View = "album"
+	edit.TimeErr = fields["taken_at"]
+	edit.CaptionErr = fields["caption"]
+	data.AlbumEdit = edit
+	page, err := s.buildAlbum(r.Context(), time.Time{})
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	data.Album = page
+	data.Sheet = "album-edit"
+	data.SheetOpen = true
+	data.Toast = &view.Toast{Message: message, Kind: "error"}
+	s.renderPage(w, r, status, data)
+}
+
+func (s *Server) handleAlbumDelete(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.albumPhotoID(w, r)
+	if !ok {
+		return
+	}
+	photo, err := s.store.GetAlbumPhoto(r.Context(), id)
+	if errors.Is(err, album.ErrNotFound) {
+		if wantsAlbumJSON(r) {
+			writeAlbumMutationJSON(w, http.StatusNotFound, albumDeleteResponse{Error: "That photo isn't here anymore."})
+			return
+		}
+		s.notFound(w)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	err = s.store.SoftDeleteAlbumPhoto(r.Context(), id, s.clock.Now())
+	if err != nil && !errors.Is(err, album.ErrAlreadyDeleted) {
+		if errors.Is(err, album.ErrNotFound) {
+			if wantsAlbumJSON(r) {
+				writeAlbumMutationJSON(w, http.StatusNotFound, albumDeleteResponse{Error: "That photo isn't here anymore."})
+				return
+			}
+			s.notFound(w)
+			return
+		}
+		s.serverError(w, r, err)
+		return
+	}
+
+	if !wantsAlbumJSON(r) {
+		http.Redirect(w, r, "/album?deleted=1", http.StatusSeeOther)
+		return
+	}
+	writeAlbumMutationJSON(w, http.StatusOK, albumDeleteResponse{
+		OK:      true,
+		ID:      id,
+		DayKey:  s.albumDayKey(photo.TakenAt),
+		UndoURL: fmt.Sprintf("/album/photos/%d/restore", id),
+	})
+}
+
+func (s *Server) handleAlbumRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.albumPhotoID(w, r)
+	if !ok {
+		return
+	}
+	photo, restored, err := s.store.RestoreAlbumPhoto(r.Context(), id)
+	if errors.Is(err, album.ErrNotFound) {
+		if wantsAlbumJSON(r) {
+			writeAlbumMutationJSON(w, http.StatusNotFound, albumDeleteResponse{Error: "That photo isn't here anymore."})
+			return
+		}
+		s.notFound(w)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	dayKey := s.albumDayKey(photo.TakenAt)
+	if !isHTMX(r) {
+		http.Redirect(w, r, "/album?restored=1#album-day-"+dayKey, http.StatusSeeOther)
+		return
+	}
+
+	start, end := clock.DayBounds(photo.TakenAt, s.loc)
+	photos, err := s.store.ListAlbumPhotosBetween(r.Context(), start, end, albumDayLoadCap)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	day := view.AlbumDay{
+		Key:       dayKey,
+		Label:     s.albumDayLabel(photo.TakenAt),
+		DateLabel: view.DayLabelFull(start, s.clock.Now().UTC(), s.loc),
+		Start:     start,
+	}
+	for _, item := range photos {
+		day.Rows = append(day.Rows, s.albumRow(item))
+	}
+	toast := &view.Toast{Message: "Photo restored.", Kind: "success"}
+	if !restored {
+		toast = &view.Toast{Message: "That photo is already back.", Kind: "info"}
+	}
+	data := &view.PageData{
+		Album: &view.AlbumPageView{Days: []view.AlbumDay{day}, HasDays: true},
+		Toast: toast,
+	}
+	s.writeFragments(w, r, http.StatusOK, "album-day-fragment", data, false, []string{"toast-oob"}, "", false, "", "")
 }

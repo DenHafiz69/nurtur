@@ -19,6 +19,9 @@
 
   var active = 0;
   var queue = [];
+  var viewerItems = [];
+  var viewerIndex = -1;
+  var viewerReturnFocus = null;
 
   function find(id) {
     return document.getElementById(id);
@@ -84,8 +87,439 @@
     }
   });
 
+  /* ---------- Viewer ---------- */
+
+  document.addEventListener("click", function (event) {
+    if (!isAlbumPage() || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+
+    if (event.target.closest("[data-album-viewer-close]")) {
+      event.preventDefault();
+      closeViewer();
+      return;
+    }
+    if (event.target.closest("[data-album-viewer-prev]")) {
+      event.preventDefault();
+      stepViewer(-1);
+      return;
+    }
+    if (event.target.closest("[data-album-viewer-next]")) {
+      event.preventDefault();
+      stepViewer(1);
+      return;
+    }
+    var edit = event.target.closest("[data-album-viewer-edit]");
+    if (edit) {
+      event.preventDefault();
+      openEditSheet(edit.getAttribute("href"));
+      return;
+    }
+    if (event.target === find("album-viewer")) {
+      closeViewer();
+      return;
+    }
+    var tile = event.target.closest(".album-tile");
+    if (tile) {
+      event.preventDefault();
+      openViewer(tile);
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    var dialog = find("album-viewer");
+    if (!dialog || !dialog.open) return;
+    var sheet = find("action-dialog");
+    if (sheet && sheet.open) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      stepViewer(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      stepViewer(1);
+    }
+  });
+
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (form.matches && form.matches("[data-album-edit-form]")) {
+      event.preventDefault();
+      saveAlbumEdit(form);
+      return;
+    }
+    if (form.matches && form.matches("[data-album-viewer-delete-form]")) {
+      event.preventDefault();
+      deleteViewerPhoto(form);
+    }
+  });
+
+  function viewerItem(tile) {
+    var img = tile.querySelector("img");
+    return {
+      id: tile.getAttribute("data-photo-id"),
+      fullURL: tile.getAttribute("href"),
+      fullLabel: tile.getAttribute("data-full-label") || "",
+      caption: tile.getAttribute("data-caption") || "",
+      alt: (img && img.alt) || "",
+      editURL: tile.getAttribute("data-edit-url") || "",
+      downloadURL: tile.getAttribute("data-download-url") || tile.getAttribute("href")
+    };
+  }
+
+  function collectViewerItems() {
+    return Array.prototype.slice.call(document.querySelectorAll("#album-days .album-tile[data-photo-id]"));
+  }
+
+  function openEditSheet(url) {
+    if (!url || url === "#") return;
+    if (window.htmx && typeof window.htmx.ajax === "function") {
+      htmx.ajax("GET", url, { target: "#action-dialog", swap: "innerHTML" });
+      return;
+    }
+    window.location.assign(url);
+  }
+
+  function openViewer(tile) {
+    var dialog = find("album-viewer");
+    if (!dialog) {
+      window.location.assign(tile.href);
+      return;
+    }
+    viewerItems = collectViewerItems();
+    viewerIndex = viewerItems.indexOf(tile);
+    if (viewerIndex < 0) viewerIndex = 0;
+    viewerReturnFocus = tile;
+    if (!dialog.open) {
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+    }
+    renderViewer();
+  }
+
+  function closeViewer() {
+    var dialog = find("album-viewer");
+    if (!dialog || !dialog.open) return;
+    if (typeof dialog.close === "function") {
+      dialog.close();
+    } else {
+      dialog.removeAttribute("open");
+      afterViewerClosed();
+    }
+  }
+
+  function afterViewerClosed() {
+    document.body.classList.remove("album-viewer-open");
+    var focus = viewerReturnFocus;
+    viewerReturnFocus = null;
+    if (focus && focus.isConnected) {
+      focus.focus({ preventScroll: true });
+      return;
+    }
+    var main = find("main");
+    if (main) main.focus({ preventScroll: true });
+  }
+
+  function stepViewer(delta) {
+    if (viewerItems.length < 2) return;
+    viewerIndex = (viewerIndex + delta + viewerItems.length) % viewerItems.length;
+    renderViewer();
+  }
+
+  function renderViewer() {
+    var dialog = find("album-viewer");
+    if (!dialog || !dialog.open) return;
+    var tile = viewerItems[viewerIndex];
+    if (!tile) {
+      closeViewer();
+      return;
+    }
+    var item = viewerItem(tile);
+    var image = dialog.querySelector("[data-album-viewer-image]");
+    var date = dialog.querySelector("[data-album-viewer-date]");
+    var caption = dialog.querySelector("[data-album-viewer-caption]");
+    var download = dialog.querySelector("[data-album-viewer-download]");
+    var edit = dialog.querySelector("[data-album-viewer-edit]");
+    var form = dialog.querySelector("[data-album-viewer-delete-form]");
+    var prev = dialog.querySelector("[data-album-viewer-prev]");
+    var next = dialog.querySelector("[data-album-viewer-next]");
+
+    if (image) {
+      image.src = item.fullURL;
+      image.alt = item.alt;
+    }
+    if (date) date.textContent = item.fullLabel;
+    if (caption) {
+      caption.textContent = item.caption;
+      caption.hidden = !item.caption;
+    }
+    if (download) download.href = item.downloadURL;
+    if (edit) edit.href = item.editURL;
+    if (form) {
+      form.action = "/album/photos/" + item.id + "/delete";
+      form.setAttribute("data-photo-id", item.id);
+    }
+    if (prev) prev.hidden = viewerItems.length < 2;
+    if (next) next.hidden = viewerItems.length < 2;
+
+    document.body.classList.add("album-viewer-open");
+    prefetchViewerNeighbours();
+  }
+
+  function prefetchViewerNeighbours() {
+    if (viewerItems.length < 2) return;
+    [viewerIndex - 1, viewerIndex + 1].forEach(function (index) {
+      var tile = viewerItems[(index + viewerItems.length) % viewerItems.length];
+      if (!tile) return;
+      var item = viewerItem(tile);
+      if (!item.fullURL) return;
+      var image = new Image();
+      image.src = item.fullURL;
+    });
+  }
+
+  function syncViewerAfterEdit(id) {
+    var dialog = find("album-viewer");
+    if (!dialog || !dialog.open) return;
+    viewerItems = collectViewerItems();
+    var found = -1;
+    for (var i = 0; i < viewerItems.length; i++) {
+      if (viewerItems[i].getAttribute("data-photo-id") === String(id)) {
+        found = i;
+        break;
+      }
+    }
+    if (found < 0) {
+      closeViewer();
+      return;
+    }
+    viewerIndex = found;
+    renderViewer();
+  }
+
+  function initViewerDialog() {
+    var dialog = find("album-viewer");
+    if (!dialog || dialog.getAttribute("data-viewer-ready") === "1") return;
+    dialog.setAttribute("data-viewer-ready", "1");
+    dialog.addEventListener("close", afterViewerClosed);
+
+    var stage = dialog.querySelector("[data-album-viewer-stage]");
+    if (!stage) return;
+    var swipe = null;
+    stage.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0 || reducedMotion()) return;
+      if (event.target.closest("[data-album-viewer-prev], [data-album-viewer-next]")) return;
+      swipe = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      if (stage.setPointerCapture) {
+        try {
+          stage.setPointerCapture(event.pointerId);
+        } catch (e) {}
+      }
+    });
+    stage.addEventListener("pointerup", function (event) {
+      if (!swipe || event.pointerId !== swipe.id) return;
+      var dx = event.clientX - swipe.x;
+      var dy = event.clientY - swipe.y;
+      swipe = null;
+      if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      stepViewer(dx > 0 ? -1 : 1);
+    });
+    stage.addEventListener("pointercancel", function () {
+      swipe = null;
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initViewerDialog);
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  /* ---------- Edit and delete ---------- */
+
+  function saveAlbumEdit(form) {
+    var button = form.querySelector("button[type='submit']");
+    var general = form.querySelector('[data-album-edit-error="general"]');
+    clearEditErrors(form);
+    if (general) {
+      general.hidden = true;
+      general.textContent = "";
+    }
+    if (button) button.disabled = true;
+
+    var params = new URLSearchParams(new FormData(form));
+    params.set("loaded_before", oldestLoadedStart());
+
+    fetch(form.getAttribute("action"), {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params.toString()
+    })
+      .then(function (response) {
+        return response.json().catch(function () {
+          return { ok: false, error: "Couldn't save that. Try again." };
+        });
+      })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          showEditErrors(form, data || {});
+          return;
+        }
+        applyAlbumEdit(data);
+        closeEditSheet();
+      })
+      .catch(function () {
+        showEditErrors(form, { error: "Couldn't save that. Check the connection and try again." });
+      })
+      .then(function () {
+        if (button) button.disabled = false;
+      });
+  }
+
+  function clearEditErrors(form) {
+    form.querySelectorAll("[data-album-edit-error]").forEach(function (node) {
+      node.textContent = "";
+      if (node.getAttribute("data-album-edit-error") === "general") node.hidden = true;
+    });
+  }
+
+  function showEditErrors(form, data) {
+    var errors = data.errors || {};
+    setEditError(form, "taken_at", errors.taken_at);
+    setEditError(form, "caption", errors.caption);
+    var general = form.querySelector('[data-album-edit-error="general"]');
+    var message = data.error || "";
+    if (!message && (errors.taken_at || errors.caption)) {
+      message = "Check the highlighted fields and try again.";
+    }
+    if (!message) message = "Couldn't save that. Try again.";
+    if (general) {
+      general.textContent = message;
+      general.hidden = false;
+    }
+    var focus = form.querySelector("[aria-invalid='true']");
+    if (focus) focus.focus();
+  }
+
+  function setEditError(form, field, message) {
+    var node = form.querySelector('[data-album-edit-error="' + field + '"]');
+    if (node) node.textContent = message || "";
+    var input = form.querySelector('[name="' + field + '"]');
+    if (input) {
+      if (message) input.setAttribute("aria-invalid", "true");
+      else input.removeAttribute("aria-invalid");
+    }
+  }
+
+  function closeEditSheet() {
+    document.body.dispatchEvent(new Event("sheet-saved", { bubbles: true }));
+  }
+
+  function applyAlbumEdit(data) {
+    var tile = document.querySelector('.album-tile[data-photo-id="' + String(data.id) + '"]');
+    if (!tile) return;
+    var day = tile.closest(".album-day");
+    var oldKey = day ? day.getAttribute("data-day") : "";
+    var sameDay = oldKey === data.day_key;
+
+    if (sameDay) {
+      tile.outerHTML = data.tile_html;
+      var updated = document.querySelector('.album-tile[data-photo-id="' + String(data.id) + '"]');
+      if (viewerReturnFocus === tile && updated) viewerReturnFocus = updated;
+      syncViewerAfterEdit(data.id);
+      dispatchToast("Photo saved.", "success");
+      return;
+    }
+
+    viewerReturnFocus = null;
+    closeViewer();
+    removeAlbumTile(tile);
+    if (data.out_of_range) {
+      dispatchToast("Moved to " + (data.day_label || "another day") + ".", "success", "View that day", data.day_url);
+      return;
+    }
+    insertTile(data);
+    dispatchToast("Photo moved to " + (data.day_label || "another day") + ".", "success", "View that day", data.day_url);
+  }
+
+  function deleteViewerPhoto(form) {
+    var tile = viewerItems[viewerIndex];
+    var id = form.getAttribute("data-photo-id") || (tile && tile.getAttribute("data-photo-id"));
+    if (!id) return;
+    var button = form.querySelector("button[type='submit']");
+    if (button) button.disabled = true;
+
+    fetch("/album/photos/" + encodeURIComponent(id), {
+      method: "DELETE",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    })
+      .then(function (response) {
+        return response.json().catch(function () {
+          return { ok: false, error: "Couldn't delete that photo. Try again." };
+        });
+      })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          dispatchToast((data && data.error) || "Couldn't delete that photo. Try again.", "error");
+          return;
+        }
+        var dayKey = data.day_key || "";
+        viewerReturnFocus = null;
+        closeViewer();
+        var current = document.querySelector('.album-tile[data-photo-id="' + String(id) + '"]');
+        if (current) removeAlbumTile(current);
+        dispatchToast("Photo deleted.", "success", "Undo", data.undo_url, "post", "#album-day-" + dayKey, 8000);
+      })
+      .catch(function () {
+        dispatchToast("Couldn't delete that photo. Check the connection and try again.", "error");
+      })
+      .then(function () {
+        if (button && button.isConnected) button.disabled = false;
+      });
+  }
+
+  function removeAlbumTile(tile) {
+    var day = tile.closest(".album-day");
+    tile.remove();
+    if (day && !day.querySelector(".album-tile")) {
+      day.hidden = true;
+      window.setTimeout(function () {
+        if (day.hidden && day.isConnected) day.remove();
+      }, 20000);
+    }
+    updateCount();
+  }
+
+  function dispatchToast(message, kind, actionLabel, actionURL, actionMethod, actionTarget, duration) {
+    document.body.dispatchEvent(
+      new CustomEvent("nurtur:toast", {
+        bubbles: true,
+        detail: {
+          message: message,
+          kind: kind,
+          actionLabel: actionLabel || "",
+          actionURL: actionURL || "",
+          actionMethod: actionMethod || "",
+          actionTarget: actionTarget || "",
+          duration: duration || 0
+        }
+      })
+    );
+  }
+
   document.body.addEventListener("htmx:afterSwap", function () {
-    if (isAlbumPage()) updateCount();
+    if (isAlbumPage()) {
+      initViewerDialog();
+      updateCount();
+    } else {
+      document.body.classList.remove("album-viewer-open");
+      viewerReturnFocus = null;
+    }
   });
 
   document.body.addEventListener("htmx:beforeRequest", function (event) {

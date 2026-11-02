@@ -164,6 +164,19 @@ func TestDayLabelRelative(t *testing.T) {
 	}
 }
 
+func TestPhotoDateTime(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, loc)
+	taken := time.Date(2026, 10, 20, 15, 42, 0, 0, loc)
+	if got := PhotoDateTime(taken, now, loc); got != "Tuesday, October 20 at 3:42 PM" {
+		t.Errorf("same year = %q", got)
+	}
+	older := time.Date(2025, 8, 12, 15, 42, 0, 0, loc)
+	if got := PhotoDateTime(older, now, loc); got != "Tuesday, August 12, 2025 at 3:42 PM" {
+		t.Errorf("older year = %q", got)
+	}
+}
+
 func TestDayMetaLabel(t *testing.T) {
 	if got := DayMetaLabel(0, 0); got != "" {
 		t.Errorf("empty = %q", got)

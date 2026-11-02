@@ -1031,35 +1031,62 @@
     });
   }
 
-  function localToast(message, kind, actionLabel, actionURL) {
+  function localToast(message, kind, actionLabel, actionURL, actionMethod, actionTarget, duration) {
     var region = document.getElementById("toast-region");
     if (!region) return;
     region.innerHTML = "";
     var toast = document.createElement("div");
     toast.className = "toast toast-" + (kind || "error");
     toast.setAttribute("data-toast", "");
+    if (duration) toast.setAttribute("data-toast-duration", String(duration));
     toast.innerHTML = '<span class="toast-icon" aria-hidden="true">' + ALERT_ICON + "</span>";
     var text = document.createElement("p");
     text.className = "toast-text";
     text.textContent = message;
     toast.appendChild(text);
     if (actionLabel && actionURL) {
-      var action = document.createElement("a");
-      action.className = "toast-action";
-      action.href = actionURL;
-      action.textContent = actionLabel;
-      action.addEventListener("click", clearToast);
-      toast.appendChild(action);
+      if (actionMethod === "post") {
+        var form = document.createElement("form");
+        form.className = "toast-action-form";
+        form.method = "post";
+        form.action = actionURL;
+        form.setAttribute("hx-post", actionURL);
+        if (actionTarget) form.setAttribute("hx-target", actionTarget);
+        form.setAttribute("hx-swap", "outerHTML");
+        form.setAttribute("hx-disabled-elt", "find button[type='submit']");
+        var button = document.createElement("button");
+        button.type = "submit";
+        button.className = "toast-action";
+        button.textContent = actionLabel;
+        form.appendChild(button);
+        toast.appendChild(form);
+        if (window.htmx && typeof window.htmx.process === "function") htmx.process(form);
+      } else {
+        var action = document.createElement("a");
+        action.className = "toast-action";
+        action.href = actionURL;
+        action.textContent = actionLabel;
+        action.addEventListener("click", clearToast);
+        toast.appendChild(action);
+      }
     }
     region.appendChild(toast);
     armToast();
   }
 
-  // Album uploads report out-of-range dates without an htmx request. The
-  // event keeps the toast markup and timer in one place.
+  // Album uploads and mutations report toast results without an htmx form.
+  // The event keeps the toast markup and timer in one place.
   document.body.addEventListener("nurtur:toast", function (event) {
     var detail = event.detail || {};
-    localToast(detail.message, detail.kind, detail.actionLabel, detail.actionURL);
+    localToast(
+      detail.message,
+      detail.kind,
+      detail.actionLabel,
+      detail.actionURL,
+      detail.actionMethod,
+      detail.actionTarget,
+      detail.duration
+    );
   });
 
   /* ---------- HTMX lifecycle ---------- */

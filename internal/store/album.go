@@ -175,6 +175,34 @@ func (s *Store) HasAlbumPhotosBefore(ctx context.Context, before time.Time) (boo
 	return exists == 1, nil
 }
 
+// UpdateAlbumPhoto corrects the capture date and caption. A manual correction
+// always records taken_at_source='manual' so the UI can explain where the date
+// came from.
+func (s *Store) UpdateAlbumPhoto(ctx context.Context, id int64, takenAt time.Time, caption string) (album.Photo, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE album_photos
+		SET taken_at = ?, taken_at_source = ?, caption = ?
+		WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+		encodeTime(normalizeTime(takenAt)), string(album.SourceManual), nullableString(strings.TrimSpace(caption)),
+		id, AccountID(ctx))
+	if err != nil {
+		return album.Photo{}, fmt.Errorf("store: update album photo: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return album.Photo{}, fmt.Errorf("store: update album photo rows: %w", err)
+	}
+	if n == 0 {
+		return album.Photo{}, album.ErrNotFound
+	}
+	photo, err := s.GetAlbumPhoto(ctx, id)
+	if err != nil {
+		return album.Photo{}, err
+	}
+	s.notifyChange()
+	return photo, nil
+}
+
 // SoftDeleteAlbumPhoto hides a photo immediately. Objects stay in storage for
 // the 30-day sweep so the undo window is free and lossless.
 func (s *Store) SoftDeleteAlbumPhoto(ctx context.Context, id int64, now time.Time) error {

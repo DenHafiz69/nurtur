@@ -63,6 +63,37 @@ func TestPhotoValidate(t *testing.T) {
 	}
 }
 
+func TestValidateEdit(t *testing.T) {
+	if err := ValidateEdit(testNow.Add(-time.Hour), " First smile ", testNow); err != nil {
+		t.Fatalf("valid edit rejected: %v", err)
+	}
+	if err := ValidateEdit(testNow.AddDate(-20, 0, 0), "", testNow); err != nil {
+		t.Fatalf("manual correction may point far into the past: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		takenAt time.Time
+		caption string
+		field   string
+	}{
+		{"zero date", time.Time{}, "", "taken_at"},
+		{"future date", testNow.Add(25 * time.Hour), "", "taken_at"},
+		{"long caption", testNow, strings.Repeat("a", MaxCaption+1), "caption"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ve *ValidationError
+			if !errors.As(ValidateEdit(tt.takenAt, tt.caption, testNow), &ve) {
+				t.Fatal("error is not a ValidationError")
+			}
+			if ve.Field != tt.field {
+				t.Fatalf("field = %q, want %q", ve.Field, tt.field)
+			}
+		})
+	}
+}
+
 func TestValidUploadID(t *testing.T) {
 	valid := []string{
 		"0123456789abcdef0123456789abcdef",

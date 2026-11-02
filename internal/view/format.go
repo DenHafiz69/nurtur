@@ -225,6 +225,19 @@ func DayLabelRelative(day, now time.Time, loc *time.Location) string {
 	return local.Format("Monday, January 2, 2006")
 }
 
+// PhotoDateTime is the full local date and time shown in the album viewer.
+// The year appears only when it differs from the year of now.
+func PhotoDateTime(t, now time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	local := t.In(loc)
+	if local.Year() == now.In(loc).Year() {
+		return local.Format("Monday, January 2 at 3:04 PM")
+	}
+	return local.Format("Monday, January 2, 2006 at 3:04 PM")
+}
+
 // DayLabelFull writes the full local date for a day heading. The year appears
 // only when it differs from the year of now.
 func DayLabelFull(day, now time.Time, loc *time.Location) string {
