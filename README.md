@@ -216,8 +216,6 @@ reverse proxy.
 
 ## Documentation
 
-- [`FEATURES.md`](./FEATURES.md) — the product brief and the thinking behind the UX
-- [`PLANS.md`](./PLANS.md) — roadmap, domain rules, design system, and release gates
 - [`DEPLOYMENT.md`](./DEPLOYMENT.md) — VPS, Docker Compose, Caddy, and operations
 
 ---
