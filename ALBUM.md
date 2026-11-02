@@ -1,6 +1,6 @@
 # Nurtur — Album
 
-**Status:** planned
+**Status:** shipped
 **Branch:** `feat/album`
 **Goal:** a fourth bottom-nav page where the household can snap photos of the baby,
 scroll them newest-first, and see the local date and time for every photo.

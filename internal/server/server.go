@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"nurtur/internal/album"
 	"nurtur/internal/clock"
 	"nurtur/internal/store"
 	"nurtur/internal/view"
@@ -43,6 +44,7 @@ type Config struct {
 	SecureCookie  bool
 	AdminPassword string
 	PublicURL     string
+	Album         album.Storage
 }
 
 // Server holds the router and shared dependencies.
@@ -63,6 +65,8 @@ type Server struct {
 	auth       *auth
 	admin      *adminAuth
 	publicURL  string
+	album      album.Storage
+	albumRate  *albumUploadLimiter
 
 	defaultBabyName string
 }
@@ -134,6 +138,8 @@ func New(cfg Config) (*Server, error) {
 		auth:            newAuth(cfg.Passcode, cfg.SignupKey, cfg.SessionSecret, cfg.SecureCookie, accountCount > 0),
 		admin:           newAdminAuth(cfg.AdminPassword, cfg.SessionSecret, cfg.SecureCookie),
 		publicURL:       strings.TrimRight(cfg.PublicURL, "/"),
+		album:           cfg.Album,
+		albumRate:       newAlbumUploadLimiter(),
 	}, nil
 }
 
@@ -177,6 +183,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sleeps/{id}/restore", s.handleRestoreSleep) // undo
 
 	mux.HandleFunc("GET /album", s.handleAlbumPage)
+	mux.HandleFunc("GET /album/partial", s.handleAlbumPartial)
+	mux.HandleFunc("POST /album/photos", s.handleAlbumUpload)
+	mux.HandleFunc("GET /album/photos/{id}/thumb", s.handleAlbumThumb)
+	mux.HandleFunc("GET /album/photos/{id}/full", s.handleAlbumFull)
+	mux.HandleFunc("GET /album/photos/{id}/edit", s.handleAlbumEditPage)
+	mux.HandleFunc("PATCH /album/photos/{id}", s.handleAlbumUpdate)
+	mux.HandleFunc("POST /album/photos/{id}", s.handleAlbumUpdate) // no-JS fallback
+	mux.HandleFunc("DELETE /album/photos/{id}", s.handleAlbumDelete)
+	mux.HandleFunc("POST /album/photos/{id}/delete", s.handleAlbumDelete)   // no-JS fallback
+	mux.HandleFunc("POST /album/photos/{id}/restore", s.handleAlbumRestore) // undo
 
 	mux.HandleFunc("GET /timeline", s.handleTimelinePage)
 	mux.HandleFunc("GET /timeline/partial", s.handleTimelinePartial)
@@ -289,7 +305,11 @@ func (s *Server) recoverer(next http.Handler) http.Handler {
 func (s *Server) limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body != nil && r.Method != http.MethodGet && r.Method != http.MethodHead {
-			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+			limit := int64(1 << 20)
+			if r.URL.Path == "/album/photos" {
+				limit = album.MaxUploadBytes
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -309,7 +329,7 @@ func (s *Server) security(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		w.Header().Set("Content-Security-Policy", fmt.Sprintf(
-			"default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
+			"default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'",
 			nonce))
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")

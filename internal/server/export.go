@@ -62,22 +62,47 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 		CreatedAt string `json:"created_at"`
 		DeletedAt string `json:"deleted_at,omitempty"`
 	}
+	type albumJSON struct {
+		ID            int64  `json:"id"`
+		UploadID      string `json:"upload_id"`
+		TakenAt       string `json:"taken_at"`
+		TakenAtSource string `json:"taken_at_source"`
+		Caption       string `json:"caption,omitempty"`
+		Width         int    `json:"width"`
+		Height        int    `json:"height"`
+		Bytes         int64  `json:"bytes"`
+		ThumbBytes    int64  `json:"thumb_bytes"`
+		ContentType   string `json:"content_type"`
+		FullKey       string `json:"full_key"`
+		ThumbKey      string `json:"thumb_key"`
+		CreatedAt     string `json:"created_at"`
+		DeletedAt     string `json:"deleted_at,omitempty"`
+	}
+
+	albums, err := s.store.AllAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 
 	payload := struct {
-		ExportedAt string            `json:"exported_at"`
-		Version    string            `json:"version"`
-		BabyName   string            `json:"baby_name"`
-		Timezone   string            `json:"timezone"`
-		Feeds      []feedJSON        `json:"feeds"`
-		Diapers    []diaperJSON      `json:"diapers"`
-		Sleeps     []sleepJSON       `json:"sleeps"`
-		Settings   map[string]string `json:"settings"`
+		ExportedAt   string            `json:"exported_at"`
+		Version      string            `json:"version"`
+		BabyName     string            `json:"baby_name"`
+		Timezone     string            `json:"timezone"`
+		Feeds        []feedJSON        `json:"feeds"`
+		Diapers      []diaperJSON      `json:"diapers"`
+		Sleeps       []sleepJSON       `json:"sleeps"`
+		AlbumPhotos  []albumJSON       `json:"album_photos"`
+		Settings     map[string]string `json:"settings"`
+		PhotoStorage string            `json:"photo_storage"`
 	}{
-		ExportedAt: now.Format(time.RFC3339),
-		Version:    s.version,
-		BabyName:   s.currentBabyName(r.Context()),
-		Timezone:   s.loc.String(),
-		Settings:   settings,
+		ExportedAt:   now.Format(time.RFC3339),
+		Version:      s.version,
+		BabyName:     s.currentBabyName(r.Context()),
+		Timezone:     s.loc.String(),
+		Settings:     settings,
+		PhotoStorage: "external; this export has album metadata and object keys, not photo bytes",
 	}
 
 	for _, f := range feeds {
@@ -123,6 +148,24 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 			Notes:     session.Notes,
 			CreatedAt: view.ISO(session.CreatedAt),
 			DeletedAt: isoPtr(session.DeletedAt),
+		})
+	}
+	for _, photo := range albums {
+		payload.AlbumPhotos = append(payload.AlbumPhotos, albumJSON{
+			ID:            photo.ID,
+			UploadID:      photo.UploadID,
+			TakenAt:       view.ISO(photo.TakenAt),
+			TakenAtSource: string(photo.TakenAtSource),
+			Caption:       photo.Caption,
+			Width:         photo.Width,
+			Height:        photo.Height,
+			Bytes:         photo.Bytes,
+			ThumbBytes:    photo.ThumbBytes,
+			ContentType:   photo.ContentType,
+			FullKey:       photo.FullKey,
+			ThumbKey:      photo.ThumbKey,
+			CreatedAt:     view.ISO(photo.CreatedAt),
+			DeletedAt:     isoPtr(photo.DeletedAt),
 		})
 	}
 
@@ -182,6 +225,11 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	albums, err := s.store.AllAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	now := s.clock.Now().UTC()
 
 	w.Header().Set("Content-Type", "application/sql; charset=utf-8")
@@ -220,6 +268,13 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(&b, "INSERT INTO sleeps (id, account_id, started_at, ended_at, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %s);\n",
 			session.ID, sqlText(view.ISO(session.StartedAt)), sqlTimePtr(session.EndedAt),
 			sqlNullable(session.Notes), sqlText(view.ISO(session.CreatedAt)), sqlTimePtr(session.DeletedAt))
+	}
+	for _, photo := range albums {
+		fmt.Fprintf(&b, "INSERT INTO album_photos (id, account_id, upload_id, taken_at, taken_at_source, caption, width, height, bytes, thumb_bytes, content_type, full_key, thumb_key, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %d, %d, %d, %d, %s, %s, %s, %s, %s);\n",
+			photo.ID, sqlText(photo.UploadID), sqlText(view.ISO(photo.TakenAt)), sqlText(string(photo.TakenAtSource)),
+			sqlNullable(photo.Caption), photo.Width, photo.Height, photo.Bytes, photo.ThumbBytes,
+			sqlText(photo.ContentType), sqlText(photo.FullKey), sqlText(photo.ThumbKey),
+			sqlText(view.ISO(photo.CreatedAt)), sqlTimePtr(photo.DeletedAt))
 	}
 	keys := make([]string, 0, len(settings))
 	for key := range settings {

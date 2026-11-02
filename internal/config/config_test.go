@@ -27,6 +27,13 @@ func clearEnv(t *testing.T) {
 		"NURTUR_COOKIE_SECURE",
 		"NURTUR_ADMIN_PASSWORD",
 		"NURTUR_PUBLIC_URL",
+		"NURTUR_ALBUM_STORAGE",
+		"NURTUR_ALBUM_DIR",
+		"NURTUR_R2_ENDPOINT",
+		"NURTUR_R2_BUCKET",
+		"NURTUR_R2_ACCESS_KEY_ID",
+		"NURTUR_R2_SECRET_ACCESS_KEY",
+		"NURTUR_R2_REGION",
 	} {
 		t.Setenv(key, "")
 	}
@@ -51,6 +58,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.NightStart != 19*time.Hour || cfg.NightEnd != 7*time.Hour {
 		t.Fatalf("night window = %v–%v", cfg.NightStart, cfg.NightEnd)
+	}
+	if cfg.Album.Storage != "auto" || cfg.Album.Dir != "./data/album" || cfg.Album.R2Region != "auto" {
+		t.Fatalf("album defaults = %+v", cfg.Album)
 	}
 }
 
@@ -214,6 +224,62 @@ func TestLoadRejectsInvalidAdminValues(t *testing.T) {
 			t.Setenv(tt.key, tt.val)
 			if _, err := Load(); err == nil {
 				t.Fatalf("Load accepted %s=%q", tt.key, tt.val)
+			}
+		})
+	}
+}
+
+func TestLoadAlbumConfiguration(t *testing.T) {
+	clearEnv(t)
+	t.Setenv("NURTUR_LOCAL_ONLY", "true")
+	t.Setenv("NURTUR_ALBUM_STORAGE", "local")
+	t.Setenv("NURTUR_ALBUM_DIR", "/var/lib/nurtur/photos")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Album.Storage != "local" || cfg.Album.Dir != "/var/lib/nurtur/photos" {
+		t.Fatalf("album config = %+v", cfg.Album)
+	}
+
+	clearEnv(t)
+	t.Setenv("NURTUR_LOCAL_ONLY", "true")
+	t.Setenv("NURTUR_R2_ENDPOINT", "https://example.r2.cloudflarestorage.com")
+	t.Setenv("NURTUR_R2_BUCKET", "nurtur-album")
+	t.Setenv("NURTUR_R2_ACCESS_KEY_ID", "key")
+	t.Setenv("NURTUR_R2_SECRET_ACCESS_KEY", "secret")
+
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("R2 Load: %v", err)
+	}
+	if !cfg.Album.R2Complete() {
+		t.Fatalf("album R2 config incomplete: %+v", cfg.Album)
+	}
+}
+
+func TestLoadRejectsInvalidAlbumStorage(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+	}{
+		{"unknown driver", map[string]string{"NURTUR_ALBUM_STORAGE": "s3"}},
+		{"r2 without credentials", map[string]string{"NURTUR_ALBUM_STORAGE": "r2"}},
+		{"partial r2 block", map[string]string{
+			"NURTUR_R2_ENDPOINT": "https://example.r2.cloudflarestorage.com",
+			"NURTUR_R2_BUCKET":   "nurtur-album",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("NURTUR_LOCAL_ONLY", "true")
+			for key, value := range tt.env {
+				t.Setenv(key, value)
+			}
+			if _, err := Load(); err == nil {
+				t.Fatal("Load accepted an invalid album configuration")
 			}
 		})
 	}

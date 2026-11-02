@@ -4,7 +4,7 @@
  *   - ticks the running clock from server timestamps,
  *   - mirrors the active timer in localStorage for fast recovery,
  *   - reconciles with /partials/feed/timer on resume,
- *   - handles the theme toggle, the quick-log drawer, <dialog>, toasts, and
+ *   - handles the theme toggle, the quick-log sheet, <dialog>, toasts, and
  *     relative labels.
  *
  * No inline handlers: the CSP allows only this file plus the tiny theme
@@ -108,14 +108,18 @@
 
   /* ---------- Quick-log dock ---------- */
 
-  // Home renders the drawer open and every other page renders it collapsed.
-  // Once the user chooses, keep that choice instead of letting the next server
-  // render reopen (or close) it.
-  var DOCK_KEY = "nurtur.dock";
+  // The quick log is a sheet above the tab bar. It starts closed and closing
+  // is never persisted: a reload or tab change always returns to the button.
   var dockDrawer = document.querySelector(".dock-drawer");
+  var dockScrim = document.querySelector(".dock-scrim");
 
-  // Keep the running activity row and the centered nav button in step with the
-  // drawer, even after an OOB swap replaces the row or a boosted tab swaps the
+  function focusQuickLog() {
+    var quick = document.querySelector("[data-quick-log-toggle]");
+    if (quick) quick.focus({ preventScroll: true });
+  }
+
+  // Keep the running activity row and the quick-log button in step with the
+  // sheet, even after an OOB swap replaces the row or a boosted tab swaps the
   // page body.
   function syncDockExpanded() {
     var expanded = !!(dockDrawer && dockDrawer.open);
@@ -128,67 +132,65 @@
       quick.setAttribute("aria-expanded", expanded ? "true" : "false");
       quick.setAttribute("aria-label", expanded ? "Close quick log" : "Open quick log");
     }
+    if (dockScrim) dockScrim.hidden = !expanded;
+    document.body.classList.toggle("dock-open", expanded);
   }
-
-  var dockSyncing = false;
 
   function setDockOpen(open) {
     if (!dockDrawer || dockDrawer.open === open) return;
-    // Do not record a preference for a change the app made on its own.
-    dockSyncing = true;
     dockDrawer.open = open;
   }
 
   if (dockDrawer) {
-    var dockPreference = null;
-    try { dockPreference = localStorage.getItem(DOCK_KEY); } catch (e) {}
-    if (dockPreference === "open" || dockPreference === "closed") {
-      dockDrawer.open = dockPreference === "open";
-    }
-    dockDrawer.addEventListener("toggle", function () {
-      if (dockSyncing) {
-        dockSyncing = false;
-        syncDockExpanded();
-        return;
-      }
-      try { localStorage.setItem(DOCK_KEY, dockDrawer.open ? "open" : "closed"); } catch (e) {}
-      syncDockExpanded();
-    });
+    dockDrawer.addEventListener("toggle", syncDockExpanded);
     syncDockExpanded();
   }
 
-  // Home opens the drawer; History, Album, Settings, and the changelog start
-  // it collapsed. Boosted tab swaps keep the old drawer state otherwise.
-  function syncDockDefault(path) {
-    if (!dockDrawer || !path) return;
-    var preference = null;
-    try { preference = localStorage.getItem(DOCK_KEY); } catch (e) {}
-    if (preference === "open" || preference === "closed") return;
-    setDockOpen(path === "/");
+  // Tabs and reloads always return quick logging to its closed button.
+  function syncDockView() {
+    setDockOpen(false);
   }
 
-  function syncDockView(path) {
-    syncDockDefault(path);
-  }
-
-  // Tapping the running activity's row opens the same quick-log drawer as the
-  // centered nav button, so the actions for that activity stay one tap away.
+  // Tapping the running activity's row opens the same quick-log sheet as the
+  // floating button, so the actions for that activity stay one tap away.
   document.addEventListener("click", function (event) {
     var row = event.target.closest ? event.target.closest("[data-open-dock]") : null;
     if (!row || !dockDrawer) return;
     event.preventDefault();
     dockDrawer.open = true;
-    var toggle = dockDrawer.querySelector(".dock-toggle");
-    if (toggle) toggle.focus({ preventScroll: true });
+    var close = dockDrawer.querySelector("[data-dock-close]") || dockDrawer.querySelector(".dock-toggle");
+    if (close) close.focus({ preventScroll: true });
   });
 
-  // The centered + stays put on every page. When the drawer is open it reads as
-  // an X and the same tap collapses the quick log.
+  // The + stays put above the tab bar. When the sheet is open it reads as an
+  // X and the same tap collapses quick logging.
   document.addEventListener("click", function (event) {
     var button = event.target.closest ? event.target.closest("[data-quick-log-toggle]") : null;
     if (!button || !dockDrawer) return;
     event.preventDefault();
-    dockDrawer.open = !dockDrawer.open;
+    var opening = !dockDrawer.open;
+    dockDrawer.open = opening;
+    if (opening) {
+      var close = dockDrawer.querySelector("[data-dock-close]");
+      if (close) close.focus({ preventScroll: true });
+    }
+  });
+
+  // The sheet's close button and the dimmed background both collapse it.
+  document.addEventListener("click", function (event) {
+    var closer = event.target.closest ? event.target.closest("[data-dock-close]") : null;
+    if (!closer || !dockDrawer || !dockDrawer.open) return;
+    event.preventDefault();
+    dockDrawer.open = false;
+    focusQuickLog();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || !dockDrawer || !dockDrawer.open) return;
+    if (document.querySelector("dialog.sheet[open]")) return;
+    event.preventDefault();
+    dockDrawer.open = false;
+    focusQuickLog();
   });
 
   /* ---------- Tab navigation ---------- */
@@ -226,10 +228,33 @@
     });
   }
 
+  // Keep the body's view in step with the URL. The page body arrives from the
+  // server with the same value, but a boosted tab swap only replaces <main>,
+  // so the old value would otherwise keep the Home-only quick-log button
+  // visible on History and Settings.
+  function viewForPath(path) {
+    switch (currentPath(path)) {
+      case "/album":
+        return "album";
+      case "/timeline":
+        return "timeline";
+      case "/settings":
+        return "settings";
+      case "/changelog":
+        return "changelog";
+      case "/":
+        return "";
+      default:
+        return "";
+    }
+  }
+
   // After the body has swapped, bring the rest of the shell in step.
   function syncPageChrome(path) {
+    var here = currentPath(path);
+    document.body.dataset.view = viewForPath(here);
     syncTabHighlight(path);
-    syncDockView(currentPath(path));
+    syncDockView(here);
   }
 
   document.addEventListener("click", function (event) {
@@ -877,7 +902,7 @@
     } else {
       dialog.removeAttribute("open");
     }
-    dialog.innerHTML = "";
+    if (!dialog.hasAttribute("data-keep-content")) dialog.innerHTML = "";
     if (!document.activeElement || document.activeElement === document.body) {
       var fallback = document.querySelector(".timer-adjust") || document.querySelector("[data-theme-toggle]");
       if (fallback) fallback.focus({ preventScroll: true });
@@ -892,7 +917,9 @@
 
   document.querySelectorAll("dialog.sheet").forEach(function (dialog) {
     var dragStart = null;
-    dialog.addEventListener("close", function () { dialog.innerHTML = ""; });
+    dialog.addEventListener("close", function () {
+      if (!dialog.hasAttribute("data-keep-content")) dialog.innerHTML = "";
+    });
     dialog.addEventListener("click", function (event) {
       if (event.target === dialog) closeDialog(dialog);
     });
@@ -1025,21 +1052,63 @@
     });
   }
 
-  function localToast(message, kind) {
+  function localToast(message, kind, actionLabel, actionURL, actionMethod, actionTarget, duration) {
     var region = document.getElementById("toast-region");
     if (!region) return;
     region.innerHTML = "";
     var toast = document.createElement("div");
     toast.className = "toast toast-" + (kind || "error");
     toast.setAttribute("data-toast", "");
+    if (duration) toast.setAttribute("data-toast-duration", String(duration));
     toast.innerHTML = '<span class="toast-icon" aria-hidden="true">' + ALERT_ICON + "</span>";
     var text = document.createElement("p");
     text.className = "toast-text";
     text.textContent = message;
     toast.appendChild(text);
+    if (actionLabel && actionURL) {
+      if (actionMethod === "post") {
+        var form = document.createElement("form");
+        form.className = "toast-action-form";
+        form.method = "post";
+        form.action = actionURL;
+        form.setAttribute("hx-post", actionURL);
+        if (actionTarget) form.setAttribute("hx-target", actionTarget);
+        form.setAttribute("hx-swap", "outerHTML");
+        form.setAttribute("hx-disabled-elt", "find button[type='submit']");
+        var button = document.createElement("button");
+        button.type = "submit";
+        button.className = "toast-action";
+        button.textContent = actionLabel;
+        form.appendChild(button);
+        toast.appendChild(form);
+        if (window.htmx && typeof window.htmx.process === "function") htmx.process(form);
+      } else {
+        var action = document.createElement("a");
+        action.className = "toast-action";
+        action.href = actionURL;
+        action.textContent = actionLabel;
+        action.addEventListener("click", clearToast);
+        toast.appendChild(action);
+      }
+    }
     region.appendChild(toast);
     armToast();
   }
+
+  // Album uploads and mutations report toast results without an htmx form.
+  // The event keeps the toast markup and timer in one place.
+  document.body.addEventListener("nurtur:toast", function (event) {
+    var detail = event.detail || {};
+    localToast(
+      detail.message,
+      detail.kind,
+      detail.actionLabel,
+      detail.actionURL,
+      detail.actionMethod,
+      detail.actionTarget,
+      detail.duration
+    );
+  });
 
   /* ---------- HTMX lifecycle ---------- */
 
@@ -1059,6 +1128,7 @@
       }
     }
     if (target.tagName === "DIALOG" && target.classList.contains("sheet")) {
+      setDockOpen(false);
       document.querySelectorAll("dialog.sheet[open]").forEach(function (other) {
         if (other !== target) closeDialog(other);
       });
@@ -1095,6 +1165,12 @@
     syncPageChrome();
   });
 
+  function isAlbumPagingRequest(event) {
+    var detail = event && event.detail;
+    var path = detail && detail.pathInfo && detail.pathInfo.requestPath;
+    return typeof path === "string" && path.indexOf("/album/partial") === 0;
+  }
+
   document.body.addEventListener("htmx:responseError", function (event) {
     var status = event.detail && event.detail.xhr ? event.detail.xhr.status : 0;
     if (tabNavigationPending) {
@@ -1104,10 +1180,12 @@
       syncPageChrome();
     }
     if (status === 422) return;
+    // The album shows its own inline retry beside "Load earlier days".
+    if (isAlbumPagingRequest(event)) return;
     localToast("Couldn't save that. Check the connection and try again.", "error");
   });
 
-  document.body.addEventListener("htmx:sendError", function () {
+  document.body.addEventListener("htmx:sendError", function (event) {
     if (tabNavigationPending && tabNavigationTarget) {
       // A boosted tab cannot load; fall back to a normal navigation so the
       // service worker can serve its offline page.
@@ -1120,6 +1198,7 @@
     }
     isOffline = true;
     updateOfflineHint();
+    if (isAlbumPagingRequest(event)) return;
     localToast("Can't reach the server. Your timer is still running.", "warn");
   });
 
@@ -1193,6 +1272,7 @@
   armToast();
   updateConnectivity();
   refreshNotificationUI();
+  syncDockView(location.pathname);
   tick();
   window.setInterval(tick, 250);
   window.setInterval(updateRelativeLabels, 30000);

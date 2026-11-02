@@ -29,6 +29,14 @@ services:
       NURTUR_ADMIN_PASSWORD: "${NURTUR_ADMIN_PASSWORD:-}"
       # Public origin used in generated invite links.
       NURTUR_PUBLIC_URL: "${NURTUR_PUBLIC_URL:-}"
+      # Album photo bytes. Empty R2 values keep photos under /data/album.
+      NURTUR_ALBUM_STORAGE: "${NURTUR_ALBUM_STORAGE:-auto}"
+      NURTUR_ALBUM_DIR: "${NURTUR_ALBUM_DIR:-/data/album}"
+      NURTUR_R2_ENDPOINT: "${NURTUR_R2_ENDPOINT:-}"
+      NURTUR_R2_BUCKET: "${NURTUR_R2_BUCKET:-}"
+      NURTUR_R2_ACCESS_KEY_ID: "${NURTUR_R2_ACCESS_KEY_ID:-}"
+      NURTUR_R2_SECRET_ACCESS_KEY: "${NURTUR_R2_SECRET_ACCESS_KEY:-}"
+      NURTUR_R2_REGION: "${NURTUR_R2_REGION:-auto}"
     volumes:
       - nurtur-data:/data
     restart: unless-stopped

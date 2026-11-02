@@ -16,6 +16,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"nurtur/internal/album"
 	"nurtur/internal/clock"
 	"nurtur/internal/feed"
 	"nurtur/internal/store"
@@ -25,7 +26,9 @@ var testNow = time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 
 type testEnv struct {
 	handler http.Handler
+	server  *Server
 	store   *store.Store
+	album   album.Storage
 	clock   *clock.Fake
 }
 
@@ -71,6 +74,14 @@ func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool)
 	}
 
 	fakeClock := clock.NewFake(testNow)
+	photos, err := album.NewStorage(album.StorageConfig{
+		Driver: "local",
+		Dir:    filepath.Join(t.TempDir(), "album"),
+		Logger: logger,
+	})
+	if err != nil {
+		t.Fatalf("album.NewStorage: %v", err)
+	}
 	cfg := Config{
 		Store:      st,
 		Clock:      fakeClock,
@@ -81,6 +92,7 @@ func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool)
 		Migrations: os.DirFS("../../migrations"),
 		Logger:     logger,
 		LocalOnly:  true,
+		Album:      photos,
 	}
 	if mutate != nil {
 		mutate(&cfg)
@@ -89,7 +101,7 @@ func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
-	return &testEnv{handler: srv.Handler(), store: st, clock: fakeClock}
+	return &testEnv{handler: srv.Handler(), server: srv, store: st, album: photos, clock: fakeClock}
 }
 
 func (e *testEnv) do(t *testing.T, method, path string, form url.Values, htmx bool) *httptest.ResponseRecorder {
@@ -214,7 +226,7 @@ func TestRunningActivityRowOpensQuickLogDock(t *testing.T) {
 	body := rec.Body.String()
 
 	live := feedRowMarkup(t, body, "event-feed is-active live-row")
-	for _, want := range []string{`class="live-row-main"`, "data-open-dock", `aria-controls="quick-log"`, `aria-expanded="true"`, "Open quick log"} {
+	for _, want := range []string{`class="live-row-main"`, "data-open-dock", `aria-controls="quick-log"`, `aria-expanded="false"`, "Open quick log"} {
 		if !strings.Contains(live, want) {
 			t.Errorf("running feed row missing %q\n%s", want, live)
 		}

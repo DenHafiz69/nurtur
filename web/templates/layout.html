@@ -39,7 +39,7 @@
   <link rel="preload" href="/static/fonts/nunito-sans-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{asset "/static/app.css"}}">
 </head>
-<body class="app-body" data-server-now="{{iso .Now}}" data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-active-feed-id="{{.ID}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{if .Paused}} data-feed-paused="true"{{end}}{{end}}{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
+<body class="app-body" data-view="{{.View}}" data-server-now="{{iso .Now}}" data-alert-minutes="{{.FeedAlertMinutes}}"{{with .Active}} data-active-feed-id="{{.ID}}" data-feed-total-ms="{{.TotalElapsed.Milliseconds}}"{{if .Paused}} data-feed-paused="true"{{end}}{{end}}{{if .CSRF}} hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'{{end}}>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="app">
     <header class="app-header">
@@ -64,7 +64,8 @@
 
     <footer class="dock" aria-label="Quick logging">
       <div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true">{{if .Toast}}{{template "toast" .Toast}}{{end}}</div>
-      <details id="quick-log" class="dock-drawer"{{if eq .View ""}} open{{end}}{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
+      <div class="dock-scrim" data-dock-close hidden></div>
+      <details id="quick-log" class="dock-drawer"{{if .TimelineHasToday}} hx-vals='{"timeline_today":"1"}'{{end}}>
         <summary class="dock-toggle" title="Show or hide quick logging">
           <span class="dock-toggle-grip" aria-hidden="true"></span>
           <span class="dock-toggle-label sr-only">Quick log</span>
@@ -72,6 +73,10 @@
           <span class="dock-toggle-icon dock-toggle-plus" aria-hidden="true">{{icon "plus"}}</span>
         </summary>
         <div class="dock-panel">
+          <div class="sheet-head">
+            <h2 id="quick-log-title">Quick log</h2>
+            <button type="button" class="icon-btn dock-close" data-dock-close aria-label="Close quick log">{{icon "close"}}</button>
+          </div>
           <div class="dock-stack">
             {{template "timer" .}}
             {{template "diaper-row" .}}
@@ -93,6 +98,7 @@
       {{if eq .Sheet "diaper-edit"}}{{template "diaper-edit" .}}{{end}}
       {{if eq .Sheet "sleep-sheet"}}{{template "sleep-sheet" .}}{{end}}
       {{if eq .Sheet "sleep-edit"}}{{template "sleep-edit" .}}{{end}}
+      {{if eq .Sheet "album-edit"}}{{template "album-edit" .}}{{end}}
     </dialog>
 
     {{if .ChangelogOpen}}
@@ -104,6 +110,7 @@
 
   <script src="{{asset "/static/htmx.min.js"}}"></script>
   <script src="{{asset "/static/js/timer.js"}}"></script>
+  <script src="{{asset "/static/js/album.js"}}"></script>
 </body>
 </html>{{end}}
 

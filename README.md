@@ -89,8 +89,8 @@ The header also shows your baby's current age, derived from their birth date.
 Enough context to decide what to do next without reading a log.
 
 The status cards open their detail sheets. When something is running, its row
-in Today opens the same quick-log dock as the floating `+`, so pause, switch,
-wake, or log a diaper straight from the row.
+in Today opens the same quick-log sheet as Home's floating `+`, so pause,
+switch, wake, or log a diaper straight from the row.
 
 ### A timeline you can actually fix
 
@@ -102,8 +102,27 @@ wake, or log a diaper straight from the row.
 - **Real undo.** Deleting a row replaces it with a hidden placeholder; Undo puts
   it back in the exact same spot for eight seconds. Restores are re-validated,
   so you can't accidentally create two open feeds or overlapping sleeps.
-- **Log without leaving.** The floating `+` dock inserts new events into today's
-  group and refreshes the header totals in place.
+- **Log without leaving.** Home's floating `+` sheet inserts new events into
+  today's group and refreshes the header totals in place.
+
+### An album for the small moments
+
+- **A fourth tab, not a replacement.** Home, History, and Settings keep working
+  exactly as before; the Album tab sits beside them.
+- **Camera first.** Take one photo or pick several from the library. The browser
+  orients, resizes, and re-encodes each photo before upload, so camera originals
+  and GPS metadata never leave the phone.
+- **Private by default.** Photo bytes live on local disk or in a private R2
+  bucket. Every read is proxied by Nurtur and scoped to the signed-in account;
+  the bucket is never public.
+- **Dates stay first-class.** Photos are grouped by the local day they were
+  taken, every tile shows its time, and the viewer shows the full date and time.
+- **Fix a wrong clock, add a caption, undo a delete.** Date and caption edits
+  update the tile and viewer in place, and deleted photos stay recoverable for
+  thirty days before the retention sweep removes their bytes.
+- **Back up both halves.** Database exports include album metadata and storage
+  keys; photo bytes need their own R2 versioning or bucket backup. The
+  deployment guide covers the restore order.
 
 ### Night mode and one-thumb ergonomics
 
@@ -112,8 +131,9 @@ wake, or log a diaper straight from the row.
 - The night window is adjustable in **Settings**, and sleep totals use the same
   window.
 - Touch targets are at least 48 × 48 px; primary actions are 56–64 px.
-- The dock is a native drawer that works without JavaScript and remembers
-  whether you left it open or closed.
+- Quick logging is a bottom sheet that starts closed, has its own close button,
+  and also collapses when you tap the dimmed background. The native `<details>`
+  fallback still works without JavaScript.
 - `prefers-reduced-motion` removes the glow, blink, and transitions.
 
 ### Installable, offline-tolerant, local-first
@@ -130,8 +150,9 @@ wake, or log a diaper straight from the row.
 - **No account required** for a solo parent on a trusted network.
 - **No analytics, no CDN, no third-party font or script requests.** Everything is
   served by the same binary.
-- **One-click exports:** a structured JSON copy, a one-row-per-event CSV, and a
-  replayable SQL dump that includes migrations and soft-deleted rows.
+- **One-click exports:** a structured JSON copy with album metadata and storage
+  keys, a one-row-per-event CSV, and a replayable SQL dump that includes
+  migrations and soft-deleted rows.
 - **A documented restore drill**, because a backup you've never restored is just
   a hope.
 - **Optional local accounts** for a shared phone or an internet-facing install:

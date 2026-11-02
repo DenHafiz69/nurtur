@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"nurtur"
+	"nurtur/internal/album"
 	"nurtur/internal/clock"
 	"nurtur/internal/config"
 	"nurtur/internal/server"
@@ -37,6 +38,22 @@ func run() error {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
+
+	photos, err := album.NewStorage(album.StorageConfig{
+		Driver: cfg.Album.Storage,
+		Dir:    cfg.Album.Dir,
+		R2: album.R2Config{
+			Endpoint:        cfg.Album.R2Endpoint,
+			Bucket:          cfg.Album.R2Bucket,
+			AccessKeyID:     cfg.Album.R2AccessKeyID,
+			SecretAccessKey: cfg.Album.R2SecretKey,
+			Region:          cfg.Album.R2Region,
+		},
+		Logger: logger,
+	})
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -101,18 +118,23 @@ func run() error {
 		SecureCookie:  cfg.SecureCookie,
 		AdminPassword: cfg.AdminPassword,
 		PublicURL:     cfg.PublicURL,
+		Album:         photos,
 	})
 	if err != nil {
 		return err
 	}
+	srv.StartAlbumSweep(ctx, 24*time.Hour)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// A phone on weak data can spend a while sending one photo. The album
+		// route enforces a 12 MiB body; the timeout keeps slow uploads alive
+		// without leaving every other route open indefinitely.
+		ReadTimeout:  2 * time.Minute,
+		WriteTimeout: 2 * time.Minute,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	mode := "sync"

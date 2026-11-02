@@ -31,7 +31,7 @@
       {{range .Events}}
         <li class="feed-row {{.KindClass}}{{if .Active}} is-active live-row{{end}}">
           {{if .Active}}
-            <a class="live-row-main" href="{{.EditURL}}" data-open-dock aria-controls="quick-log" aria-expanded="true">
+            <a class="live-row-main" href="{{.EditURL}}" data-open-dock aria-controls="quick-log" aria-expanded="false">
               {{template "event-row-copy" .}}
               <span class="sr-only">Open quick log</span>
             </a>

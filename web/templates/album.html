@@ -1,14 +1,162 @@
 {{define "album-page"}}
-<section class="page-head">
-  <div class="page-head-row">
-    <h2 class="page-title">Album</h2>
+<section class="page-head album-head">
+  <div class="page-head-row album-head-row">
+    <div class="album-heading">
+      <h2 class="page-title">Album</h2>
+      <p class="page-sub">Photos of the small moments.</p>
+      {{if .Album.HasDays}}<p class="album-count">{{.Album.Count}} photo{{if ne .Album.Count 1}}s{{end}}</p>{{end}}
+    </div>
+    <button type="button" class="btn album-add-btn" data-album-add>
+      {{icon "camera"}}<span>Add photos</span>
+    </button>
   </div>
-  <p class="page-sub">Photos of the small moments.</p>
 </section>
 
-<div class="empty">
-  <span class="pip pip-empty">{{.Mascot "empty"}}</span>
-  <p class="empty-title">No photos yet.</p>
-  <p class="empty-copy">Photos will show up here, newest first.</p>
+<div id="album-upload-previews" class="album-upload-previews" hidden></div>
+
+<form class="album-nojs album-nojs-inline" method="post" action="/album/photos" enctype="multipart/form-data">
+  <label class="field">
+    <span class="field-label">Add a photo</span>
+    <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required>
+  </label>
+  <p class="sheet-copy">Without JavaScript, the photo is stored as-is. Date and time come from the upload.</p>
+  <button type="submit" class="btn btn-primary">Upload photo</button>
+</form>
+
+<div id="album-days" class="album-days">
+  {{if .Album.HasDays}}
+    {{template "album-days" .}}
+  {{else if .Album.HasMore}}
+    {{template "album-days" .}}
+  {{else}}
+    <div class="empty album-empty">
+      <span class="pip pip-empty">{{.Mascot "empty"}}</span>
+      <p class="empty-title">No photos yet.</p>
+      <p class="empty-copy">Snap the first one.</p>
+    </div>
+  {{end}}
 </div>
+
+<button type="button" class="album-capture" data-album-add aria-label="Add photos">
+  {{icon "camera"}}
+  <span class="sr-only">Add photos</span>
+</button>
+
+<dialog id="album-chooser" class="sheet" data-keep-content aria-labelledby="album-chooser-title">
+  <div class="sheet-inner">
+    <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+    <div class="sheet-head">
+      <h2 id="album-chooser-title">Add photos</h2>
+      <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+    </div>
+    <p class="sheet-copy">Take one now, or pick a few from your library.</p>
+    <div class="album-chooser-actions">
+      <button type="button" class="btn btn-primary" data-album-source="camera">
+        {{icon "camera"}}<span>Take photo</span>
+      </button>
+      <button type="button" class="btn btn-ghost" data-album-source="library">
+        {{icon "plus"}}<span>Choose photos</span>
+      </button>
+    </div>
+  </div>
+</dialog>
+
+<input id="album-camera-input" type="file" accept="image/*" capture="environment" hidden>
+<input id="album-library-input" type="file" accept="image/*" multiple hidden>
+
+<dialog id="album-viewer" class="album-viewer" aria-labelledby="album-viewer-date">
+  <div class="album-viewer-inner" data-album-viewer>
+    <header class="album-viewer-head">
+      <div class="album-viewer-copy">
+        <p id="album-viewer-date" class="album-viewer-date" data-album-viewer-date></p>
+        <p class="album-viewer-caption" data-album-viewer-caption hidden></p>
+      </div>
+      <button type="button" class="icon-btn album-viewer-close" data-album-viewer-close aria-label="Close photo">{{icon "close"}}</button>
+    </header>
+    <div class="album-viewer-stage" data-album-viewer-stage>
+      <button type="button" class="album-viewer-nav is-prev" data-album-viewer-prev aria-label="Previous photo">{{icon "arrow-left"}}</button>
+      <img class="album-viewer-image" data-album-viewer-image alt="" decoding="async">
+      <button type="button" class="album-viewer-nav is-next" data-album-viewer-next aria-label="Next photo">{{icon "arrow-right"}}</button>
+    </div>
+    <footer class="album-viewer-actions">
+      <a class="btn btn-ghost" data-album-viewer-download href="#">{{icon "download"}}<span>Save</span></a>
+      <a class="btn btn-ghost" data-album-viewer-edit href="#">{{icon "pencil"}}<span>Date &amp; caption</span></a>
+      <form class="album-viewer-delete-form" method="post" action="" data-album-viewer-delete-form>
+        <button type="submit" class="btn btn-ghost album-viewer-delete" data-album-viewer-delete>{{icon "trash"}}<span>Delete</span></button>
+      </form>
+    </footer>
+  </div>
+</dialog>
+{{end}}
+
+{{define "album-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Date &amp; caption</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <p class="sheet-copy">{{.AlbumEdit.FullLabel}}</p>
+  <form class="sheet-form" method="post" action="/album/photos/{{.AlbumEdit.ID}}" data-album-edit-form
+    data-photo-id="{{.AlbumEdit.ID}}">
+    <label class="field">
+      <span class="field-label">Date and time</span>
+      <input type="datetime-local" step="1" name="taken_at" value="{{.AlbumEdit.TimeInput}}" required>
+      <span class="field-error" role="alert" data-album-edit-error="taken_at">{{.AlbumEdit.TimeErr}}</span>
+    </label>
+    <label class="field">
+      <span class="field-label">Caption</span>
+      <textarea name="caption" rows="3" maxlength="{{.AlbumEdit.CaptionMax}}" placeholder="A little note about this moment">{{.AlbumEdit.Caption}}</textarea>
+      <span class="field-error" role="alert" data-album-edit-error="caption">{{.AlbumEdit.CaptionErr}}</span>
+    </label>
+    <p class="field-error" role="alert" data-album-edit-error="general" hidden></p>
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "album-days"}}
+  {{range .Album.Days}}{{template "album-day" .}}{{end}}
+  {{if .Album.HasMore}}
+    <div id="album-more" class="album-more">
+      <a class="btn btn-ghost album-more-btn" data-album-more
+        href="/album?before={{.Album.NextCursor}}"
+        hx-get="/album/partial?before={{.Album.NextCursor}}"
+        hx-target="#album-more"
+        hx-swap="outerHTML"
+        hx-indicator="#album-loading">Load earlier days</a>
+      <p class="album-more-error" data-album-more-error role="alert" hidden>Couldn't load earlier days. Check the connection and try again.</p>
+      <div id="album-loading" class="album-loading htmx-indicator" role="status">
+        <p class="album-loading-text">Loading earlier days…</p>
+        <div class="album-skeleton" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  {{end}}
+{{end}}
+
+{{define "album-day"}}
+<section id="album-day-{{.Key}}" class="album-day" data-day="{{.Key}}" data-start="{{iso .Start}}">
+  <h3 class="album-day-title">
+    <span class="album-day-label">{{.Label}}</span>{{if and .DateLabel (ne .DateLabel .Label)}}<span class="album-day-date"> · {{.DateLabel}}</span>{{end}}
+  </h3>
+  <div class="album-grid">
+    {{range .Rows}}{{template "album-tile" .}}{{end}}
+  </div>
+</section>
+{{end}}
+
+{{define "album-day-fragment"}}{{range .Album.Days}}{{template "album-day" .}}{{end}}{{end}}
+
+{{define "album-tile"}}
+<a id="album-photo-{{.ID}}" class="album-tile" href="{{.FullURL}}" data-photo-id="{{.ID}}" data-taken-at="{{iso .TakenAt}}" data-full-label="{{.FullLabel}}" data-caption="{{.Caption}}" data-edit-url="/album/photos/{{.ID}}/edit" data-download-url="{{.FullURL}}?download=1" aria-label="{{.Alt}}">
+  <span class="album-tile-frame is-{{.AspectRatio}}">
+    <img src="{{.ThumbURL}}" alt="{{.Alt}}" width="{{.Width}}" height="{{.Height}}" loading="lazy" decoding="async">
+  </span>
+  <time class="album-tile-time" datetime="{{iso .TakenAt}}">{{.TimeLabel}}</time>
+</a>
 {{end}}
