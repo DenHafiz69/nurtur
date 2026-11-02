@@ -2778,6 +2778,12 @@ textarea {
   letter-spacing: -0.01em;
 }
 
+.album-day-date {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .album-grid,
 .album-upload-previews {
   display: grid;
@@ -2972,6 +2978,55 @@ html:not(.js) [data-album-add] {
   font-size: 15px;
 }
 
+.album-more-error {
+  margin: 0 0 8px;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.album-loading {
+  display: none;
+  margin-top: 10px;
+}
+
+.album-loading.htmx-request {
+  display: block;
+}
+
+.album-loading-text {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.album-skeleton {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+}
+
+.album-skeleton span {
+  aspect-ratio: 1 / 1;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(100deg, var(--surface-soft) 30%, var(--surface) 50%, var(--surface-soft) 70%);
+  background-size: 220% 100%;
+  animation: album-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes album-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
 @media (max-width: 359px) {
   .album-head-row {
     flex-wrap: wrap;
@@ -2982,7 +3037,8 @@ html:not(.js) [data-album-add] {
   }
 
   .album-grid,
-  .album-upload-previews {
+  .album-upload-previews,
+  .album-skeleton {
     grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   }
 }
@@ -2991,6 +3047,10 @@ html:not(.js) [data-album-add] {
   .album-capture,
   .album-preview-progress span {
     transition: none;
+  }
+
+  .album-skeleton span {
+    animation: none;
   }
 }
 

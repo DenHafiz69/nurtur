@@ -495,6 +495,32 @@ test.describe("Album capture dates", () => {
     await page.getByRole("link", { name: "View that day" }).click();
     await expect(page.locator(`#album-day-${second.key} .album-tile-time`)).toHaveText("2:07 PM");
   });
+
+  test("earlier days load in place with their date and time", async ({ page }) => {
+    const older = albumExifDate(9);
+
+    await page.goto("/album");
+    await uploadAlbumJpeg(
+      page,
+      exifJpeg(Buffer.from(ALBUM_JPEG_BASE64, "base64"), older.exif, "")
+    );
+    await expect(page.getByText(/Saved to /)).toBeVisible({ timeout: 15_000 });
+
+    // The old day is outside the first page's seven-day budget, so the paging
+    // control is present but the tile is not loaded yet.
+    await page.goto("/album");
+    const tile = page.locator(`#album-day-${older.key} .album-tile`);
+    await expect(page.getByRole("link", { name: "Load earlier days" })).toBeVisible();
+    await expect(tile).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Load earlier days" }).click();
+    await expect(tile).toHaveCount(1);
+    await expect(page.locator(`#album-day-${older.key} .album-tile-time`)).toHaveText("2:07 PM");
+    await expect(page.locator(`#album-day-${older.key} .album-day-title`)).toContainText(
+      older.heading
+    );
+    await expect(page.locator("#album-loading")).toBeHidden();
+  });
 });
 
 async function uploadAlbumJpeg(page, buffer) {
@@ -528,7 +554,13 @@ function albumExifDate(daysAgo) {
     });
   return {
     key: `${parts.year}-${parts.month}-${parts.day}`,
-    exif: `${parts.year}:${parts.month}:${parts.day} 14:07:00`
+    exif: `${parts.year}:${parts.month}:${parts.day} 14:07:00`,
+    heading: new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kuala_Lumpur",
+      weekday: "long",
+      month: "long",
+      day: "numeric"
+    }).format(date)
   };
 }
 

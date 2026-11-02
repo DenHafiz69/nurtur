@@ -69,14 +69,28 @@
   {{range .Album.Days}}{{template "album-day" .}}{{end}}
   {{if .Album.HasMore}}
     <div id="album-more" class="album-more">
-      <a class="btn btn-ghost" href="/album?before={{.Album.NextCursor}}" hx-get="/album/partial?before={{.Album.NextCursor}}" hx-target="#album-more" hx-swap="outerHTML">Load earlier days</a>
+      <a class="btn btn-ghost album-more-btn" data-album-more
+        href="/album?before={{.Album.NextCursor}}"
+        hx-get="/album/partial?before={{.Album.NextCursor}}"
+        hx-target="#album-more"
+        hx-swap="outerHTML"
+        hx-indicator="#album-loading">Load earlier days</a>
+      <p class="album-more-error" data-album-more-error role="alert" hidden>Couldn't load earlier days. Check the connection and try again.</p>
+      <div id="album-loading" class="album-loading htmx-indicator" role="status">
+        <p class="album-loading-text">Loading earlier days…</p>
+        <div class="album-skeleton" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
     </div>
   {{end}}
 {{end}}
 
 {{define "album-day"}}
 <section id="album-day-{{.Key}}" class="album-day" data-day="{{.Key}}" data-start="{{iso .Start}}">
-  <h3 class="album-day-title">{{.Label}}</h3>
+  <h3 class="album-day-title">
+    <span class="album-day-label">{{.Label}}</span>{{if and .DateLabel (ne .DateLabel .Label)}}<span class="album-day-date"> · {{.DateLabel}}</span>{{end}}
+  </h3>
   <div class="album-grid">
     {{range .Rows}}{{template "album-tile" .}}{{end}}
   </div>
@@ -85,9 +99,9 @@
 
 {{define "album-tile"}}
 <a class="album-tile" href="{{.FullURL}}" data-photo-id="{{.ID}}" data-taken-at="{{iso .TakenAt}}" aria-label="{{.Alt}}">
-  <span class="album-tile-frame {{.RatioClass}}">
+  <span class="album-tile-frame is-{{.AspectRatio}}">
     <img src="{{.ThumbURL}}" alt="{{.Alt}}" width="{{.Width}}" height="{{.Height}}" loading="lazy" decoding="async">
   </span>
-  <span class="album-tile-time">{{.TimeLabel}}</span>
+  <time class="album-tile-time" datetime="{{iso .TakenAt}}">{{.TimeLabel}}</time>
 </a>
 {{end}}

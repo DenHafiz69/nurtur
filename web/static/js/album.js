@@ -88,6 +88,29 @@
     if (isAlbumPage()) updateCount();
   });
 
+  document.body.addEventListener("htmx:beforeRequest", function (event) {
+    if (isPagingRequest(event)) setPagingError(false);
+  });
+
+  document.body.addEventListener("htmx:responseError", function (event) {
+    if (isPagingRequest(event)) setPagingError(true);
+  });
+
+  document.body.addEventListener("htmx:sendError", function (event) {
+    if (isPagingRequest(event)) setPagingError(true);
+  });
+
+  function isPagingRequest(event) {
+    var detail = event && event.detail;
+    var path = detail && detail.pathInfo && detail.pathInfo.requestPath;
+    return typeof path === "string" && path.indexOf("/album/partial") === 0;
+  }
+
+  function setPagingError(show) {
+    var error = document.querySelector("[data-album-more-error]");
+    if (error) error.hidden = !show;
+  }
+
   /* ---------- Queue ---------- */
 
   function enqueue(file) {
@@ -644,7 +667,16 @@
       day.setAttribute("data-start", data.day_start || "");
       var heading = document.createElement("h3");
       heading.className = "album-day-title";
-      heading.textContent = data.day_label || "";
+      var label = document.createElement("span");
+      label.className = "album-day-label";
+      label.textContent = data.day_label || "";
+      heading.appendChild(label);
+      if (data.day_date && data.day_date !== data.day_label) {
+        var date = document.createElement("span");
+        date.className = "album-day-date";
+        date.textContent = " · " + data.day_date;
+        heading.appendChild(date);
+      }
       var grid = document.createElement("div");
       grid.className = "album-grid";
       day.appendChild(heading);

@@ -230,30 +230,34 @@ type AlbumPageView struct {
 	HasDays    bool
 	HasMore    bool
 	NextCursor string
-	Oldest     string
 	Count      int
 }
 
-// AlbumDay is one local-date group in the album.
+// AlbumDay is one local-date group in the album. Label is the calm relative
+// name (Today, Yesterday, weekday); DateLabel is the full local date shown
+// beside it.
 type AlbumDay struct {
-	Key   string
-	Label string
-	Start time.Time
-	Rows  []AlbumRow
+	Key       string
+	Label     string
+	DateLabel string
+	Start     time.Time
+	Rows      []AlbumRow
 }
 
 // AlbumRow is one photo tile. URLs are Nurtur routes, never object keys.
+// AspectRatio is "portrait", "landscape", or "square" and drives the stable
+// frame shape before the thumbnail finishes loading.
 type AlbumRow struct {
-	ID         int64
-	TakenAt    time.Time
-	TimeLabel  string
-	Alt        string
-	ThumbURL   string
-	FullURL    string
-	Width      int
-	Height     int
-	RatioClass string
-	Caption    string
+	ID          int64
+	TakenAt     time.Time
+	TimeLabel   string
+	Alt         string
+	ThumbURL    string
+	FullURL     string
+	Width       int
+	Height      int
+	AspectRatio string
+	Caption     string
 }
 
 // SettingsView backs the settings page.

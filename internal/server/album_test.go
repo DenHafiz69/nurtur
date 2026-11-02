@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -383,6 +384,120 @@ func TestAlbumPagingReachesOlderDays(t *testing.T) {
 	}
 }
 
+func TestAlbumGridShowsDateTimesAndStableFrames(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Add(-time.Hour).Format(time.RFC3339),
+		source:   "exif",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	rec = env.do(t, http.MethodGet, "/album", nil, false)
+	body := rec.Body.String()
+	for _, want := range []string{
+		`class="album-grid"`,
+		`class="album-day-label">Today</span>`,
+		`class="album-day-date"> · ` + testNow.Format("Monday, January 2") + `</span>`,
+		`<time class="album-tile-time" datetime="2026-10-20T11:00:00Z">11:00 AM</time>`,
+		`class="album-tile-frame is-square"`,
+		`width="1"`,
+		`height="1"`,
+		`loading="lazy"`,
+		`decoding="async"`,
+		`1 photo`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("album grid missing %q:\n%s", want, body)
+		}
+	}
+}
+
+func TestAlbumPagingNeverSplitsADay(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+
+	// A full page's budget is spent on today, so yesterday must wait for the
+	// next request even though the day boundary is right after it.
+	for i := 0; i < defaultAlbumLimit; i++ {
+		seedAlbumPhoto(t, env.store, ctx, fmt.Sprintf("%032x", i+1), testNow.Add(-time.Duration(i+1)*time.Minute))
+	}
+	old := seedAlbumPhoto(t, env.store, ctx, fmt.Sprintf("%032x", 1000), testNow.AddDate(0, 0, -1))
+
+	rec := env.do(t, http.MethodGet, "/album", nil, false)
+	body := rec.Body.String()
+	if got := strings.Count(body, "data-photo-id="); got != defaultAlbumLimit {
+		t.Fatalf("first page tiles = %d, want %d", got, defaultAlbumLimit)
+	}
+	if strings.Contains(body, fmt.Sprintf(`data-photo-id="%d"`, old.ID)) {
+		t.Fatal("yesterday's photo leaked into a day that was already full")
+	}
+	if !strings.Contains(body, "Load earlier days") {
+		t.Fatalf("first page has no paging control:\n%s", body)
+	}
+
+	dayStart := time.Date(testNow.Year(), testNow.Month(), testNow.Day(), 0, 0, 0, 0, time.UTC)
+	cursor := url.QueryEscape(dayStart.Format(time.RFC3339))
+	rec = env.do(t, http.MethodGet, "/album/partial?before="+cursor, nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("partial status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	partial := rec.Body.String()
+	if !strings.Contains(partial, fmt.Sprintf(`data-photo-id="%d"`, old.ID)) {
+		t.Fatalf("yesterday's photo did not load on the next page:\n%s", partial)
+	}
+	if got := strings.Count(partial, "album-day-title"); got != 1 {
+		t.Fatalf("partial rendered %d day headings, want only the day with photos:\n%s", got, partial)
+	}
+	if strings.Contains(partial, "Load earlier days") {
+		t.Fatalf("partial offered another page with no older photos:\n%s", partial)
+	}
+}
+
+func TestAlbumDeletedPhotoReturns404(t *testing.T) {
+	env := newTestEnv(t)
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "upload",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	var payload albumUploadResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := env.store.SoftDeleteAlbumPhoto(context.Background(), payload.ID, testNow); err != nil {
+		t.Fatalf("soft delete: %v", err)
+	}
+
+	for _, path := range []string{
+		fmt.Sprintf("/album/photos/%d/thumb", payload.ID),
+		fmt.Sprintf("/album/photos/%d/full", payload.ID),
+	} {
+		rec := env.do(t, http.MethodGet, path, nil, false)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s status = %d, want 404", path, rec.Code)
+		}
+	}
+	rec = env.do(t, http.MethodGet, "/album", nil, false)
+	if strings.Contains(rec.Body.String(), fmt.Sprintf(`data-photo-id="%d"`, payload.ID)) {
+		t.Fatal("deleted photo still rendered in the album")
+	}
+	if !strings.Contains(rec.Body.String(), "No photos yet.") {
+		t.Fatal("empty state did not return after deleting the only photo")
+	}
+}
+
 func TestAlbumReadIsAccountScoped(t *testing.T) {
 	env := newTestEnv(t)
 	photo, _, err := env.store.CreateAlbumPhoto(store.WithAccount(context.Background(), 55), album.Photo{
@@ -417,6 +532,27 @@ type albumUploadForm struct {
 	takenAt  string
 	source   string
 	extra    map[string]string
+}
+
+func seedAlbumPhoto(t *testing.T, st *store.Store, ctx context.Context, uploadID string, takenAt time.Time) album.Photo {
+	t.Helper()
+	photo, _, err := st.CreateAlbumPhoto(ctx, album.Photo{
+		UploadID:      uploadID,
+		TakenAt:       takenAt,
+		TakenAtSource: album.SourceEXIF,
+		Width:         1,
+		Height:        1,
+		Bytes:         42,
+		ThumbBytes:    42,
+		ContentType:   "image/webp",
+		FullKey:       "accounts/0/album/" + uploadID + "/full.webp",
+		ThumbKey:      "accounts/0/album/" + uploadID + "/thumb.webp",
+		CreatedAt:     testNow,
+	})
+	if err != nil {
+		t.Fatalf("seed album photo %s: %v", uploadID, err)
+	}
+	return photo
 }
 
 func (e *testEnv) uploadPhoto(t *testing.T, form albumUploadForm) *httptest.ResponseRecorder {

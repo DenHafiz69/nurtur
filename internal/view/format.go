@@ -225,6 +225,19 @@ func DayLabelRelative(day, now time.Time, loc *time.Location) string {
 	return local.Format("Monday, January 2, 2006")
 }
 
+// DayLabelFull writes the full local date for a day heading. The year appears
+// only when it differs from the year of now.
+func DayLabelFull(day, now time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	local := day.In(loc)
+	if local.Year() == now.In(loc).Year() {
+		return local.Format("Monday, January 2")
+	}
+	return local.Format("Monday, January 2, 2006")
+}
+
 // DateKey is a stable DOM id fragment for a local date.
 func DateKey(day time.Time, loc *time.Location) string {
 	if loc == nil {

@@ -1117,6 +1117,12 @@
     syncPageChrome();
   });
 
+  function isAlbumPagingRequest(event) {
+    var detail = event && event.detail;
+    var path = detail && detail.pathInfo && detail.pathInfo.requestPath;
+    return typeof path === "string" && path.indexOf("/album/partial") === 0;
+  }
+
   document.body.addEventListener("htmx:responseError", function (event) {
     var status = event.detail && event.detail.xhr ? event.detail.xhr.status : 0;
     if (tabNavigationPending) {
@@ -1126,10 +1132,12 @@
       syncPageChrome();
     }
     if (status === 422) return;
+    // The album shows its own inline retry beside "Load earlier days".
+    if (isAlbumPagingRequest(event)) return;
     localToast("Couldn't save that. Check the connection and try again.", "error");
   });
 
-  document.body.addEventListener("htmx:sendError", function () {
+  document.body.addEventListener("htmx:sendError", function (event) {
     if (tabNavigationPending && tabNavigationTarget) {
       // A boosted tab cannot load; fall back to a normal navigation so the
       // service worker can serve its offline page.
@@ -1142,6 +1150,7 @@
     }
     isOffline = true;
     updateOfflineHint();
+    if (isAlbumPagingRequest(event)) return;
     localToast("Can't reach the server. Your timer is still running.", "warn");
   });
 

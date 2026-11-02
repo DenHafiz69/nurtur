@@ -110,9 +110,10 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 		}
 		if len(photos) > 0 {
 			group := view.AlbumDay{
-				Key:   view.DateKey(dayStart, s.loc),
-				Label: view.DayLabelRelative(dayStart, now, s.loc),
-				Start: dayStart,
+				Key:       view.DateKey(dayStart, s.loc),
+				Label:     view.DayLabelRelative(dayStart, now, s.loc),
+				DateLabel: view.DayLabelFull(dayStart, now, s.loc),
+				Start:     dayStart,
 			}
 			for _, photo := range photos {
 				group.Rows = append(group.Rows, s.albumRow(photo))
@@ -135,8 +136,9 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 	}
 	page.HasMore = hasMore
 	page.HasDays = len(page.Days) > 0
-	page.NextCursor = nextBoundary.UTC().Format(time.RFC3339)
-	page.Oldest = page.NextCursor
+	if hasMore {
+		page.NextCursor = nextBoundary.UTC().Format(time.RFC3339)
+	}
 	return page, nil
 }
 
@@ -147,31 +149,31 @@ func (s *Server) albumRow(photo album.Photo) view.AlbumRow {
 		alt = "Photo from " + timeLabel
 	}
 	return view.AlbumRow{
-		ID:         photo.ID,
-		TakenAt:    photo.TakenAt,
-		TimeLabel:  timeLabel,
-		Alt:        alt,
-		ThumbURL:   fmt.Sprintf("/album/photos/%d/thumb", photo.ID),
-		FullURL:    fmt.Sprintf("/album/photos/%d/full", photo.ID),
-		Width:      photo.Width,
-		Height:     photo.Height,
-		RatioClass: albumRatioClass(photo.Width, photo.Height),
-		Caption:    photo.Caption,
+		ID:          photo.ID,
+		TakenAt:     photo.TakenAt,
+		TimeLabel:   timeLabel,
+		Alt:         alt,
+		ThumbURL:    fmt.Sprintf("/album/photos/%d/thumb", photo.ID),
+		FullURL:     fmt.Sprintf("/album/photos/%d/full", photo.ID),
+		Width:       photo.Width,
+		Height:      photo.Height,
+		AspectRatio: albumAspect(photo.Width, photo.Height),
+		Caption:     photo.Caption,
 	}
 }
 
-func albumRatioClass(width, height int) string {
+func albumAspect(width, height int) string {
 	if width <= 0 || height <= 0 {
-		return "is-square"
+		return "square"
 	}
 	ratio := float64(width) / float64(height)
 	switch {
 	case ratio < 0.9:
-		return "is-portrait"
+		return "portrait"
 	case ratio > 1.1:
-		return "is-landscape"
+		return "landscape"
 	default:
-		return "is-square"
+		return "square"
 	}
 }
 
@@ -204,6 +206,7 @@ type albumUploadResponse struct {
 	TileHTML   string `json:"tile_html,omitempty"`
 	DayKey     string `json:"day_key,omitempty"`
 	DayLabel   string `json:"day_label,omitempty"`
+	DayDate    string `json:"day_date,omitempty"`
 	DayStart   string `json:"day_start,omitempty"`
 	OutOfRange bool   `json:"out_of_range,omitempty"`
 	DayURL     string `json:"day_url,omitempty"`
@@ -338,6 +341,7 @@ func (s *Server) albumUploadSuccess(w http.ResponseWriter, r *http.Request, want
 	dayKey := s.albumDayKey(photo.TakenAt)
 	dayLabel := s.albumDayLabel(photo.TakenAt)
 	start, end := clock.DayBounds(photo.TakenAt, s.loc)
+	dayDate := view.DayLabelFull(start, s.clock.Now().UTC(), s.loc)
 	outOfRange := false
 	if oldest, err := time.Parse(time.RFC3339, strings.TrimSpace(loadedFrom)); err == nil && !oldest.IsZero() {
 		outOfRange = start.Before(oldest.UTC())
@@ -351,6 +355,7 @@ func (s *Server) albumUploadSuccess(w http.ResponseWriter, r *http.Request, want
 		TileHTML:   tile.String(),
 		DayKey:     dayKey,
 		DayLabel:   dayLabel,
+		DayDate:    dayDate,
 		DayStart:   start.UTC().Format(time.RFC3339),
 		OutOfRange: outOfRange,
 		DayURL:     dayURL,
