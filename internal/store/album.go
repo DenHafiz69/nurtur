@@ -70,6 +70,78 @@ func (s *Store) CreateAlbumPhoto(ctx context.Context, photo album.Photo) (album.
 	return photo, true, nil
 }
 
+// AllAlbumPhotos returns every photo for the current account, including
+// soft-deleted rows, oldest first. It is used by the logical export.
+func (s *Store) AllAlbumPhotos(ctx context.Context) ([]album.Photo, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+albumColumns+` FROM album_photos
+		WHERE account_id = ? ORDER BY taken_at ASC, id ASC`,
+		AccountID(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("store: export album photos: %w", err)
+	}
+	defer rows.Close()
+
+	var out []album.Photo
+	for rows.Next() {
+		photo, err := scanAlbumPhoto(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, photo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: export album photos: %w", err)
+	}
+	return out, nil
+}
+
+// ExpiredAlbumPhotos returns soft-deleted photos across every account whose
+// undo window has passed. The retention sweep is system-wide, not user-scoped.
+func (s *Store) ExpiredAlbumPhotos(ctx context.Context, before time.Time) ([]album.Photo, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+albumColumns+` FROM album_photos
+		WHERE deleted_at IS NOT NULL AND deleted_at < ?
+		ORDER BY deleted_at ASC, id ASC`,
+		encodeTime(before))
+	if err != nil {
+		return nil, fmt.Errorf("store: expired album photos: %w", err)
+	}
+	defer rows.Close()
+
+	var out []album.Photo
+	for rows.Next() {
+		photo, err := scanAlbumPhoto(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, photo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: expired album photos: %w", err)
+	}
+	return out, nil
+}
+
+// HardDeleteAlbumPhoto removes one already-deleted row after its objects have
+// been removed. Restored rows are left alone.
+func (s *Store) HardDeleteAlbumPhoto(ctx context.Context, id int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		DELETE FROM album_photos WHERE id = ? AND deleted_at IS NOT NULL`, id)
+	if err != nil {
+		return false, fmt.Errorf("store: hard delete album photo: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("store: hard delete album photo rows: %w", err)
+	}
+	if n == 1 {
+		s.notifyChange()
+		return true, nil
+	}
+	return false, nil
+}
+
 // GetAlbumPhoto returns one live photo owned by the current account.
 func (s *Store) GetAlbumPhoto(ctx context.Context, id int64) (album.Photo, error) {
 	row := s.db.QueryRowContext(ctx,

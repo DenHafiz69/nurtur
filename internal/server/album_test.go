@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -729,6 +730,123 @@ func TestAlbumEditAndDeleteNoJSRedirect(t *testing.T) {
 	}
 	if got := rec.Header().Get("Location"); got != "/album?deleted=1" {
 		t.Fatalf("delete Location = %q", got)
+	}
+}
+
+func TestAlbumUploadLimiter(t *testing.T) {
+	limiter := newAlbumUploadLimiter()
+	for i := 0; i < albumUploadLimit; i++ {
+		if !limiter.allow(7, testNow) {
+			t.Fatalf("upload %d was blocked", i+1)
+		}
+	}
+	if limiter.allow(7, testNow) {
+		t.Fatal("limiter allowed an upload over the window budget")
+	}
+	if !limiter.allow(8, testNow) {
+		t.Fatal("another account shared the first account's window")
+	}
+	if !limiter.allow(7, testNow.Add(albumUploadWindow)) {
+		t.Fatal("limiter did not reset after the window")
+	}
+}
+
+func TestAlbumUploadReturns429WhenThrottled(t *testing.T) {
+	env := newTestEnv(t)
+	for i := 0; i < albumUploadLimit; i++ {
+		env.server.albumRate.allow(0, testNow)
+	}
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "0123456789abcdef0123456789abcdef",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "upload",
+	})
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429\n%s", rec.Code, rec.Body.String())
+	}
+	var payload albumUploadResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Error == "" {
+		t.Fatal("throttle response has no message")
+	}
+}
+
+func TestAlbumRetentionSweep(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	old := seedAlbumPhoto(t, env.store, ctx, "0123456789abcdef0123456789abcdef", testNow.AddDate(0, 0, -40))
+	recent := seedAlbumPhoto(t, env.store, ctx, "fedcba9876543210fedcba9876543210", testNow.AddDate(0, 0, -5))
+	for _, photo := range []album.Photo{old, recent} {
+		for _, key := range []string{photo.FullKey, photo.ThumbKey} {
+			if err := env.album.Put(ctx, key, strings.NewReader("bytes"), 5, "image/webp"); err != nil {
+				t.Fatalf("put %s: %v", key, err)
+			}
+		}
+	}
+	if err := env.store.SoftDeleteAlbumPhoto(ctx, old.ID, testNow.AddDate(0, 0, -40)); err != nil {
+		t.Fatal(err)
+	}
+	if err := env.store.SoftDeleteAlbumPhoto(ctx, recent.ID, testNow.AddDate(0, 0, -5)); err != nil {
+		t.Fatal(err)
+	}
+
+	removed, kept, err := env.server.sweepExpiredAlbums(ctx, testNow)
+	if err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	if removed != 1 || kept != 0 {
+		t.Fatalf("sweep removed=%d kept=%d", removed, kept)
+	}
+	for _, key := range []string{old.FullKey, old.ThumbKey} {
+		if _, _, err := env.album.Stat(ctx, key); !errors.Is(err, album.ErrNotFound) {
+			t.Fatalf("old object %s still present: %v", key, err)
+		}
+	}
+	expired, err := env.store.ExpiredAlbumPhotos(ctx, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expired) != 1 || expired[0].ID != recent.ID {
+		t.Fatalf("expired rows = %+v", expired)
+	}
+}
+
+func TestExportIncludesAlbumMetadata(t *testing.T) {
+	env := newTestEnv(t)
+	photo := seedAlbumPhoto(t, env.store, context.Background(), "0123456789abcdef0123456789abcdef", testNow)
+	photo.Caption = "First smile"
+	if _, err := env.store.UpdateAlbumPhoto(context.Background(), photo.ID, photo.TakenAt, photo.Caption); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := env.do(t, http.MethodGet, "/export.json", nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("json status = %d", rec.Code)
+	}
+	for _, want := range []string{
+		`"album_photos"`,
+		`"full_key"`,
+		`"thumb_key"`,
+		`"taken_at_source": "manual"`,
+		`"caption": "First smile"`,
+		`"photo_storage": "external`,
+	} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Fatalf("json export missing %q\n%s", want, rec.Body.String())
+		}
+	}
+
+	rec = env.do(t, http.MethodGet, "/export.sql", nil, false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("sql status = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "INSERT INTO album_photos") {
+		t.Fatalf("sql export missing album rows:\n%s", rec.Body.String())
 	}
 }
 

@@ -26,7 +26,9 @@ var testNow = time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
 
 type testEnv struct {
 	handler http.Handler
+	server  *Server
 	store   *store.Store
+	album   album.Storage
 	clock   *clock.Fake
 }
 
@@ -99,7 +101,7 @@ func newTestEnvWithProfile(t *testing.T, mutate func(*Config), seedProfile bool)
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
 	}
-	return &testEnv{handler: srv.Handler(), store: st, clock: fakeClock}
+	return &testEnv{handler: srv.Handler(), server: srv, store: st, album: photos, clock: fakeClock}
 }
 
 func (e *testEnv) do(t *testing.T, method, path string, form url.Values, htmx bool) *httptest.ResponseRecorder {

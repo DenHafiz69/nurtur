@@ -136,6 +136,55 @@ func TestAlbumPhotoUpdateDateAndCaption(t *testing.T) {
 	}
 }
 
+func TestAlbumPhotoExportExpiryAndHardDelete(t *testing.T) {
+	st := newTestStore(t)
+	ctx := WithAccount(context.Background(), 1)
+	live, _, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, _, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recent, _, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	all, err := st.AllAlbumPhotos(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 3 || all[len(all)-1].ID != live.ID {
+		t.Fatalf("AllAlbumPhotos = %+v", all)
+	}
+
+	if err := st.SoftDeleteAlbumPhoto(ctx, old.ID, testNow.AddDate(0, 0, -40)); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SoftDeleteAlbumPhoto(ctx, recent.ID, testNow.AddDate(0, 0, -5)); err != nil {
+		t.Fatal(err)
+	}
+	expired, err := st.ExpiredAlbumPhotos(ctx, testNow.AddDate(0, 0, -30))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expired) != 1 || expired[0].ID != old.ID {
+		t.Fatalf("ExpiredAlbumPhotos = %+v", expired)
+	}
+
+	if deleted, err := st.HardDeleteAlbumPhoto(ctx, old.ID); err != nil || !deleted {
+		t.Fatalf("hard delete = %v, %v", deleted, err)
+	}
+	if _, err := st.GetAlbumPhoto(ctx, old.ID); !errors.Is(err, album.ErrNotFound) {
+		t.Fatalf("hard-deleted Get = %v", err)
+	}
+	if deleted, err := st.HardDeleteAlbumPhoto(ctx, live.ID); err != nil || deleted {
+		t.Fatalf("live hard delete = %v, %v", deleted, err)
+	}
+}
+
 func TestAlbumPhotoSoftDeleteAndRestore(t *testing.T) {
 	st := newTestStore(t)
 	ctx := WithAccount(context.Background(), 1)

@@ -14,6 +14,7 @@
   var FULL_QUALITY = 0.82;
   var THUMB_QUALITY = 0.78;
   var MAX_ACTIVE = 2;
+  var MAX_PENDING = 60;
   var TEN_YEARS_MS = 10 * 365 * 24 * 60 * 60 * 1000;
   var DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -550,6 +551,10 @@
   function enqueue(file) {
     if (!file) return;
     if (!isAlbumPage()) return;
+    if (pendingUploads() >= MAX_PENDING) {
+      dispatchToast("Add up to " + MAX_PENDING + " photos at a time.", "warn");
+      return;
+    }
     var job = {
       file: file,
       uploadID: newUploadID(),
@@ -565,6 +570,15 @@
     job.preview = createPreview(job);
     queue.push(job);
     pump();
+  }
+
+  function pendingUploads() {
+    var count = 0;
+    for (var i = 0; i < queue.length; i++) {
+      var state = queue[i].state;
+      if (state === "queued" || state === "preparing" || state === "uploading") count++;
+    }
+    return count;
   }
 
   function pump() {

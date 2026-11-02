@@ -66,6 +66,7 @@ type Server struct {
 	admin      *adminAuth
 	publicURL  string
 	album      album.Storage
+	albumRate  *albumUploadLimiter
 
 	defaultBabyName string
 }
@@ -138,6 +139,7 @@ func New(cfg Config) (*Server, error) {
 		admin:           newAdminAuth(cfg.AdminPassword, cfg.SessionSecret, cfg.SecureCookie),
 		publicURL:       strings.TrimRight(cfg.PublicURL, "/"),
 		album:           cfg.Album,
+		albumRate:       newAlbumUploadLimiter(),
 	}, nil
 }
 

@@ -123,6 +123,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	srv.StartAlbumSweep(ctx, 24*time.Hour)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,

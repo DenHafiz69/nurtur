@@ -31,6 +31,7 @@ const (
 	maxAlbumDays      = 7
 	albumDayLoadCap   = 500
 	albumFieldLimit   = 4 << 10
+	maxAlbumParts     = 8
 )
 
 var (
@@ -238,6 +239,12 @@ type albumUploadResponse struct {
 
 func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 	wantsJSON := strings.Contains(r.Header.Get("Accept"), "application/json")
+	account := store.AccountID(r.Context())
+	if s.albumRate != nil && !s.albumRate.allow(account, s.clock.Now().UTC()) {
+		s.albumUploadError(w, r, wantsJSON, http.StatusTooManyRequests,
+			"Too many photos at once. Wait a minute and try again.")
+		return
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, album.MaxUploadBytes)
 
 	input, err := parseAlbumUpload(r)
@@ -281,7 +288,6 @@ func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account := store.AccountID(r.Context())
 	ext := albumFileExtension(fullType)
 	fullKey := fmt.Sprintf("accounts/%d/album/%s/full.%s", account, input.uploadID, ext)
 	thumbKey := fmt.Sprintf("accounts/%d/album/%s/thumb.%s", account, input.uploadID, ext)
@@ -301,7 +307,7 @@ func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	if !single {
 		if err := storage.Put(r.Context(), thumbKey, bytes.NewReader(input.thumb), int64(len(input.thumb)), fullType); err != nil {
-			_ = storage.Remove(r.Context(), fullKey)
+			s.cleanupAlbumObjects(r.Context(), storage, fullKey)
 			s.albumUploadError(w, r, wantsJSON, http.StatusBadGateway,
 				"Couldn't save that photo. Check the connection and try again.")
 			return
@@ -326,10 +332,7 @@ func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	stored, created, err := s.store.CreateAlbumPhoto(r.Context(), photo)
 	if err != nil {
-		_ = storage.Remove(r.Context(), fullKey)
-		if thumbKey != fullKey {
-			_ = storage.Remove(r.Context(), thumbKey)
-		}
+		s.cleanupAlbumObjects(r.Context(), storage, fullKey, thumbKey)
 		s.albumUploadError(w, r, wantsJSON, http.StatusInternalServerError,
 			"Couldn't save that photo. Try again.")
 		return
@@ -338,10 +341,10 @@ func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 		// A retry can arrive with the same keys (normal) or a different
 		// fallback format (rare). Keep only the objects the stored row uses.
 		if fullKey != stored.FullKey {
-			_ = storage.Remove(r.Context(), fullKey)
+			s.cleanupAlbumObjects(r.Context(), storage, fullKey)
 		}
 		if thumbKey != stored.ThumbKey {
-			_ = storage.Remove(r.Context(), thumbKey)
+			s.cleanupAlbumObjects(r.Context(), storage, thumbKey)
 		}
 	}
 
@@ -424,6 +427,7 @@ func parseAlbumUpload(r *http.Request) (*albumUploadInput, error) {
 	}
 	input := &albumUploadInput{}
 	var single []byte
+	parts := 0
 
 	for {
 		part, err := reader.NextPart()
@@ -432,6 +436,11 @@ func parseAlbumUpload(r *http.Request) (*albumUploadInput, error) {
 		}
 		if err != nil {
 			return nil, err
+		}
+		parts++
+		if parts > maxAlbumParts {
+			_ = part.Close()
+			return nil, fmt.Errorf("album: too many multipart fields")
 		}
 		name := part.FormName()
 		switch name {

@@ -114,6 +114,13 @@ The bucket needs no CORS policy and no public hostname: the browser uploads to
 Nurtur, and Nurtur proxies every read. Credentials stay in the environment and
 are never written to HTML or logs.
 
+Deleted photos are soft-deleted first and keep their objects for **30 days** so
+Undo is lossless. A daily retention sweep then removes the full and thumbnail
+objects before hard-deleting the metadata row. Keep the bucket private and do
+not add a lifecycle rule that expires objects sooner: the sweep, not R2, owns
+the deletion order. Uploads are capped at **60 photos per account per minute**;
+the browser also refuses to queue more than 60 at once.
+
 ## 2. Add Nurtur to your Compose stack
 
 Add this service to the **existing** `docker-compose.yml` that already runs your
@@ -536,6 +543,27 @@ without making anything fresher.
 
 Startup fails loudly if sync is enabled with only one of the two Turso values.
 Check `/healthz?verbose=1` for the last push/pull and pending-sync age.
+
+### Album backups: database and bytes
+
+Album metadata (dates, captions, dimensions, and object keys) lives in the
+database, while the photo bytes live in `NURTUR_ALBUM_DIR` or R2. A database
+backup or Turso sync therefore carries **no photo bytes**.
+
+- Enable **R2 versioning** and keep a second bucket copy with rclone or
+  Cloudflare's own tooling. Treat the bucket as a separate backup target.
+- The JSON and SQL exports include `album_photos` with `full_key`, `thumb_key`,
+  dates, and captions. The JSON export states that photo bytes are external.
+- To restore, restore the database first, then the bucket. Keep the original
+  keys; restoring a bucket with the same `accounts/<id>/album/<upload-id>/…`
+  keys makes every metadata row readable without remapping.
+- If the bucket is lost but the database survives, the export still tells you
+  which keys are missing. If the database is lost but the bucket survives, the
+  storage keys are the only remaining index.
+
+The local `NURTUR_ALBUM_DIR` is inside `/data`, so the snapshot script above
+already includes local photo bytes. R2 deployments must back up the bucket
+separately.
 
 ## What the VPS agent needs to do
 

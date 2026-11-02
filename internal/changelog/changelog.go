@@ -30,6 +30,37 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.0",
+		Date:    "Nov 2, 2026",
+		Title:   "A home for the small moments",
+		Summary: "The album arrives as a fourth tab: take or choose photos, browse them by day, open a calm full-screen viewer, fix a date or caption, and undo a delete.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"A fourth Album tab with camera-first capture and multi-select from the photo library.",
+					"Browser-side resizing to a WebP display copy and a small WebP thumbnail, with a JPEG fallback for older browsers.",
+					"Private photo storage on local disk or a private Cloudflare R2 bucket, proxied through Nurtur and scoped to the signed-in account.",
+					"Whole-day browsing with sticky date headings, tile times, lazy loading, and earlier days loaded in place.",
+					"A full-screen viewer with keyboard, buttons, and swipe navigation, plus a Save action for the full copy.",
+					"Date and caption corrections, soft delete with Undo, and a 30-day retention sweep for deleted photo bytes.",
+				},
+			},
+			{
+				Title: "Fixed",
+				Items: []string{
+					"The Home-only quick-log button no longer reappears on History or Settings after a tab switch.",
+				},
+			},
+			{
+				Title: "Backups",
+				Items: []string{
+					"JSON and SQL exports now include album metadata, dates, and object keys. Photo bytes are backed up separately from the database.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.4.17",
 		Date:    "Nov 1, 2026",
 		Title:   "The bottom edge, the browser's way",
