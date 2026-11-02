@@ -1,12 +1,15 @@
 # Nurtur — Android First
 
 **Status:** proposal, not a build log. This is the decision document for turning
-Nurtur into a native Android app, with iOS deliberately deferred.
+Nurtur into a native Android app, with iOS deliberately deferred. Updated
+against the v0.5.0 web app (November 2, 2026).
 
-**Current product:** a self-hosted Go + Turso + HTMX web app. One binary, one
-database, one family. The phone is a thin client; the server is the source of
-truth. The nursing alert only works while the page is open, and the README says
-so plainly.
+**Current product:** a self-hosted Go 1.24 + Turso + HTMX web app with an
+optional local-account layer, a four-tab mobile shell, and a private photo
+album. One binary, one database, and either one shared family or one independent
+profile per account. The phone is still a thin client; the server is the source
+of truth. Logging needs the server process reachable, and the nursing alert only
+fires while the page is open, as the README says plainly.
 
 **What changes with native:** the phone stops being a thin client. It owns the
 data, writes offline, wakes you when the feed passes your threshold, and lives
@@ -20,11 +23,11 @@ and a real reason to charge money.
 | Decision | Recommendation |
 |---|---|
 | Product shape | **Standalone, local-first Android app** with optional Nurtur Cloud. Self-hosted server is a free power-user mode. |
-| Rewrite approach | **Kotlin + Jetpack Compose + Room.** Pure-Kotlin domain module, no Android imports, ready to become KMP for iOS later. |
-| Free tier | **The whole tracker, forever, offline, no account, no ads.** Nursing, diapers, sleep, timeline, night mode, background alert, widgets, export, import, local backup. |
-| Paid tier | **Nurtur Plus:** cloud backup + multi-device sync, caregiver sharing, unlimited babies, long-range insights, Wear OS, priority support. |
+| Rewrite approach | **Kotlin + Jetpack Compose + Room**, with a pure-Kotlin domain module and app-private files for photo bytes. No Android imports in `core`, ready to become KMP for iOS later. |
+| Free tier | **The whole tracker, forever, offline, no account, no ads.** Nursing, diapers, sleep, timeline, album, night mode, background alert, widgets, export, import, local backup. |
+| Paid tier | **Nurtur Plus:** cloud backup (database and photos) + multi-device sync, caregiver sharing, unlimited babies, long-range insights, Wear OS, priority support. |
 | Price | **$2.99/month, $19.99/year, $69.99 founder lifetime** (capped). Cosmetic supporter pack one-time. |
-| The line we never cross | Never paywall logging, the nursing alert, night mode, export, import, undo, accessibility, or security updates. |
+| The line we never cross | Never paywall logging, the nursing alert, album capture or local photo storage, night mode, export, import, undo, accessibility, or security updates. |
 | Launch path | Closed test with 12+ testers for 14 days (new personal Play accounts), then staged production rollout. |
 | iOS | Not now. Share the domain layer, not the UI. Revisit only after Android retention and paid conversion are proven. |
 | Do not build | An ad-supported app, a Trusted Web Activity wrapper, or a per-seat family plan. |
@@ -74,6 +77,38 @@ Make the **schema and export format the contract**, not the pixels.
 model. If the web app can't read a native export, the promise of "your data
 stays yours" is broken.
 
+### What the web app already ships (v0.5.0)
+
+Use this as the parity baseline. The native app must not regress any of it.
+
+- **Nursing:** left/right switch, pause/resume, manual ±5-minute and start/end
+  corrections, last side, last nursed, and a threshold alert with ping,
+  vibration, and an optional system notification while the page is open.
+- **Diapers:** wet/dirty/both with optional colour, consistency, and notes, plus
+  edit, delete, and undo.
+- **Sleep:** start/wake, retroactive naps, day/night split using the night
+  window, wake windows, and overlap refusal.
+- **Dashboard and timeline:** status cards, baby age, today totals, one merged
+  timeline with day grouping, day totals, whole-day paging, undo, and restore.
+- **Quick logging:** a Home-only bottom sheet that logs a feed, diaper, or sleep
+  without leaving the timeline.
+- **Album:** a fourth tab with camera-first capture and multi-select, browser
+  EXIF/resize/WebP encoding, private local or R2 storage, day-grouped browsing,
+  a full-screen viewer, date/caption edits, soft delete with undo, and a 30-day
+  retention sweep.
+- **Accounts:** optional local accounts with PBKDF2 passwords, a shared signup
+  key, single-use admin magic-link invites, and per-account data scoping.
+- **Settings and data:** baby name and birth date, night window, nursing alert
+  threshold, mascot, night mode, JSON/CSV/SQL export (JSON and SQL include
+  album metadata, not photo bytes), and an in-app changelog with per-account
+  seen-version dismissal.
+- **Delivery:** one embeddable binary, Docker Compose or systemd, local Turso
+  with optional Cloud sync, PWA install, and an offline shell that never caches
+  HTML.
+
+What it still does not have: import/restore, multi-baby, cloud accounts or sync
+for the native app, PDF reports, and notifications while the phone is locked.
+
 ---
 
 ## 2. What native actually buys you
@@ -84,18 +119,20 @@ This is the justification for the rewrite. If these do not matter, keep the PWA.
 |---|---|---|
 | Nursing alert while the phone is locked | No. Documented limit. | Yes. Exact alarm plus a high-importance notification. |
 | Timer survives the app being closed | Server keeps counting, but the page must be open for the alert. | Yes. The start time is in the database; a notification chronometer keeps counting with zero wakeups. |
-| Logging with no network | Writes need the local server. | Yes. Room is the write path. |
+| Logging with no network | Writes need the local server process, even when it runs on the same machine. | Yes. Room is the write path. |
+| Photo album | Fourth tab, but every photo uploads to the server or R2 and every read is proxied back. | Camera-first local capture, app-private files, instant browsing, optional encrypted cloud backup. |
+| Multiple profiles | Optional local accounts and invites on the server, one baby per account. | Local profiles on the device; no password or signup key needed. |
 | Home screen widget | No. | Yes. Glance widget with quick-log actions. |
 | Quick Settings tile and long-press shortcuts | No. | Yes. |
 | Notification actions (switch side, pause, done) | No. | Yes. |
 | Share sheet for export and doctor report | Clunky download links. | Yes. Native share sheet. |
 | Haptics, edge-to-edge, predictive back | Partial. | Yes. |
-| Background sync | Server-side only. | Optional, batched, battery-aware. |
-| Cloud backup for people without a server | No. | Yes, paid. |
+| Background sync | Turso Cloud sync when configured; no multi-device app sync. | Optional, batched, battery-aware. |
+| Cloud backup for people without a server | No. | Yes, paid, including album photos. |
 
 The rewrite is justified mainly by **the locked-screen alert, offline writes,
-and widgets**. Everything else is polish. Build those three first and put them
-in front of a real parent before building anything else.
+local photos, and widgets**. Everything else is polish. Build those first and
+put them in front of a real parent before building anything else.
 
 ---
 
@@ -140,13 +177,14 @@ first paywall.
 | Dashboard | Status cards, baby age, today totals | Context, not a feature. |
 | Timeline | Full history, day grouping, day totals, paging, search/filter | Your data. Free. |
 | Corrections | Edit, delete, undo, restore | Trust. Free. |
+| Album | Camera-first capture, multi-select, day grouping, full-screen viewer, date/caption edits, delete with undo, 30-day recovery | Photos are your data. Free. |
 | Night mode | Auto night window, manual theme, no white flash | A safety/comfort feature. Free. |
 | Nursing alert | Threshold 0–120 min, sound, vibration, notification, repeats until Done | The single best reason to go native. Free. |
 | Ongoing notification | Chronometer, switch, pause, done actions, survives reboot | Free. |
 | Widgets | 2×2 status/quick log, 4×1 status, Quick Settings tile, app shortcuts | Native basics. Free. |
 | Baby profiles | Up to **two** babies (twins are not an upsell) | Ethical call. See 4.4. |
 | History retention | Unlimited, local | Data hostage is unacceptable. |
-| Export | JSON, CSV, SQL, and a formatted PDF doctor report | Portability is a right, not a feature. |
+| Export | JSON, CSV, SQL, and a formatted PDF doctor report. JSON and SQL include album metadata and object keys; photo bytes travel with the encrypted backup. | Portability is a right, not a feature. |
 | Import | Nurtur JSON/CSV/SQL, plus common CSV formats from other trackers | Switching friction should be zero. |
 | Local backup | Encrypted file to a location you choose, restore from file | Free safety net. |
 | Privacy | No account, no ads, no analytics, no third-party SDKs | The promise. |
@@ -158,8 +196,8 @@ first paywall.
 
 | Feature | Why it is paid | Notes |
 |---|---|---|
-| Automatic encrypted cloud backup | Ongoing storage and bandwidth | Restore to a new phone in one flow. |
-| Multi-device sync | Ongoing sync infrastructure | Phone + tablet; same household. |
+| Automatic encrypted cloud backup | Ongoing storage and bandwidth; album photos are the largest part | Database and photo bytes restore to a new phone in one flow. Store display and thumbnail WebPs only, never camera originals. |
+| Multi-device sync | Ongoing sync infrastructure | Phone + tablet; same household. Album metadata syncs; photo bytes arrive on Wi-Fi by default. |
 | Caregiver sharing | The strongest recurring value; requires accounts, invites, presence, attribution | Up to 5 caregivers, roles: owner, editor, viewer. One payer. |
 | Unlimited baby profiles | Extra data modelling and sharing complexity | Two free; more with Plus. |
 | Long-range insights | Development cost; 30/90-day trends, averages, wake-window patterns | Factual only. No predictions, no "your baby is behind" language. |
@@ -191,6 +229,7 @@ per-baby sharing," not "you may not track your second baby."
 
 - Logging any event, including corrections and undo.
 - The nursing alert, notification actions, and widget quick-log.
+- Album capture, browsing, edits, local photo storage, or the recovery window.
 - Night mode or any accessibility setting.
 - Export, import, or local backup.
 - Deleting your data.
@@ -282,10 +321,11 @@ sustain. The single Plus plan is simpler. Pick one and do not run both.
 android/
   app/        Compose UI, navigation, DI, notifications, widgets, billing
   core/       Pure Kotlin: feed state machine, sleep rules, diaper rules,
-              timeline grouping, day/night split, formatting, export models.
-              No Android imports. This is the future KMP module.
-  data/       Room database, DAOs, repositories, migrations, import/export,
-              encrypted backup.
+              timeline grouping, day/night split, album date rules,
+              formatting, export models. No Android imports. This is the future
+              KMP module.
+  data/       Room database, DAOs, repositories, migrations, app-private photo
+              file store, import/export, encrypted backup.
   sync/       Optional API client, change queue, conflict resolution,
               WorkManager jobs, entitlement cache.
   wear/       Later. Separate module, same core.
@@ -306,18 +346,33 @@ writing UI:
 - `internal/status` — last event, elapsed time, current state.
 - `internal/timeline` — merged ordering, day grouping, paging, soft delete and
   restore.
+- `internal/album` and `internal/server/album_sweep.go` —
+  upload-idempotency, taken-at source precedence (EXIF, file, upload, manual),
+  plausibility bounds, content-type allowlist, caption limits, soft delete, and
+  the 30-day retention rule.
+- `internal/changelog` — version normalization, unseen-release calculation, and
+  the per-account seen marker.
 - `internal/view/format.go` — durations, relative time, age, date headers.
+
+Do not port `internal/account` password hashing, sessions, signup keys, or
+invites into the local app. Port only its scoping intent: a profile's data must
+never leak into another profile. Cloud accounts reuse those tables server-side
+(see 6.5).
 
 Use the same test cases and edge cases: DST, midnight boundaries, a feed that
 crosses the night window, a paused segment, a restored deleted row that would
-overlap, a double tap that must not create two open feeds.
+overlap, a double tap that must not create two open feeds, a photo whose EXIF
+date is in the future, and a deleted photo restored after the sweep ran.
 
 The UI may diverge. The rules must not.
 
 ### 6.4 Data model
 
-Keep the existing SQLite schema as the base. It is already good: UTC RFC3339
-text timestamps, `feed_segments`, soft delete, settings as key/value.
+Keep the existing SQLite schema as the base. As of v0.5.0 it has six
+migrations: events and settings (0001–0002), local accounts (0003), per-account
+scoping (0004), invites (0005), and album metadata (0006). The event tables and
+`album_photos` are a good foundation: UTC RFC3339 text timestamps, durations
+derived from `feed_segments`, soft delete, and settings as key/value.
 
 Add, do not rename:
 
@@ -340,11 +395,30 @@ CREATE TABLE babies (
 ALTER TABLE feeds ADD COLUMN baby_id INTEGER;
 -- ...same for diapers and sleeps
 
+-- Album metadata and sync (bytes stay outside the database)
+ALTER TABLE album_photos ADD COLUMN uuid TEXT;
+ALTER TABLE album_photos ADD COLUMN updated_at TEXT;
+ALTER TABLE album_photos ADD COLUMN device_id TEXT;
+
 -- Cloud metadata (only used in cloud mode)
 CREATE TABLE households (...);
 CREATE TABLE devices (...);
 CREATE TABLE sync_state (cursor TEXT, last_pull_at TEXT, last_push_at TEXT);
 ```
+
+Do not port the server's account tables as-is. A local-first app has one
+implicit profile, or a small set of local profiles, and no passwords, sessions,
+signup keys, or invites until cloud sharing exists. Keep `account_id` only as a
+migration seam if you support profiles; otherwise stamp `0`.
+
+Album photos need one extra decision the web app does not have: where the bytes
+live. Keep `album_photos` metadata in Room (including `upload_id` for idempotent
+retries and `full_key`/`thumb_key` for backups), but store the WebP files in
+app-private storage with a stable relative path. Never put blobs in Room. On
+delete, keep the row as a tombstone for 30 days and sweep only after the sync
+cursor has passed it. Add `uuid`, `updated_at`, and `device_id` to
+`album_photos` like the event tables so metadata can sync; photo bytes sync
+separately (Plus) or restore from the encrypted backup.
 
 Room specifics:
 
@@ -369,7 +443,13 @@ GET  /api/v1/changes?since=<cursor>
 POST /api/v1/changes              batch upsert, idempotency key per mutation
 POST /api/v1/billing/verify       Play purchase token
 POST /api/v1/households/{id}/invites
+POST /api/v1/album/presign        short-lived upload or download URL for photo bytes
 ```
+
+The web app already has local accounts, a signup key, single-use magic-link
+invites, and an admin screen. Reuse the `accounts` and `invites` tables and the
+same per-account scoping for cloud, but replace cookie sessions with device
+tokens for the app. Do not scrape the HTML routes or reuse session cookies.
 
 Rules:
 
@@ -382,6 +462,9 @@ Rules:
   billing check. Cloud features simply stop when the entitlement lapses.
 - Do not ship Turso database credentials to the client. The Go service is the
   authority and the only holder of database credentials.
+- Photo bytes never travel through the JSON change feed. Use short-lived
+  pre-signed URLs, keep the bucket private, and scope every key to the
+  household.
 
 ### 6.6 Cloud topology
 
@@ -398,14 +481,22 @@ per-household databases only if a customer, a regulator, or a scaling problem
 demands it. Do not build a control plane you do not need.
 
 If you keep the current Go + Turso code, the existing `account_id` scoping is
-most of the work. The hard part is that the current unique partial indexes
-(`one_active_feed`, `one_open_sleep`) are **global**. They must become
-household-scoped, and even then they cannot prevent two offline devices from
-each opening a feed.
+most of the work. Since migration 0004 the active-row unique indexes
+(`one_active_feed`, `one_open_sleep`) are already **per account**, and settings,
+invites, and album rows are scoped the same way. Map or rename that seam to
+`household_id` and keep the existing isolation tests. Even then a database index
+cannot prevent two offline devices from each opening a feed; that needs the
+merge rules in 7.1. The same applies to `album_photos`: scope rows and object
+keys by household, and make every signed URL short-lived and entitlement-checked.
 
 ### 6.7 Background execution: the part that decides whether this app is good
 
 The nursing alert is the reason to go native. Get it right.
+
+The web app's alert semantics are the specification: threshold 0–120 minutes,
+ping, vibration, an optional system notification, repeat until **Done**, and no
+reset when switching sides or pausing. Port those rules first, then add
+locked-screen delivery.
 
 - **Do not run a countdown.** Store `started_at`; render the elapsed time from
   the clock. A timer that ticks in a service is a battery bug and a drift bug.
@@ -443,7 +534,7 @@ The nursing alert is the reason to go native. Get it right.
 - **Glance widget, 4×1:** status strip for nursing, diaper, and sleep.
 - **Quick Settings tile:** "Log diaper" or "Start feed." Long-press to choose.
 - **Static shortcuts:** Start feed left, start feed right, log wet, log dirty,
-  start sleep.
+  start sleep, take photo.
 - Widgets write through the same repository and transaction path as the app.
   Never open a second database connection or duplicate the validation rules.
 - Update on database change, on `ACTION_APPWIDGET_UPDATE`, and via WorkManager
@@ -457,8 +548,18 @@ The nursing alert is the reason to go native. Get it right.
 - Optional biometric app lock. Off by default. Do not block the app at 3 a.m.
   unless the user asked for it.
 - `android:allowBackup="false"` and explicit `dataExtractionRules`. Android Auto
-  Backup can send the database to Google Drive, which contradicts "your data
-  stays yours." Offer a free, explicit encrypted backup file instead.
+  Backup can send the database and album photos to Google Drive, which
+  contradicts "your data stays yours." Offer a free, explicit encrypted backup
+  file instead.
+- Album photos are app-private files, not MediaStore entries. Strip EXIF during
+  re-encode, exactly as the web app does, so GPS and camera metadata never enter
+  a backup. Store only the WebP display copy and thumbnail, not the camera
+  original.
+- A deleted photo keeps its metadata as a tombstone for 30 days, then the bytes
+  and row are removed by a sweep on launch and once a day. Restore must verify
+  the file still exists before it re-links the row.
+- If cloud photo backup is enabled, encrypt the bytes as well as the database.
+  The bucket stays private, and every read uses a short-lived signed URL.
 - No `FLAG_SECURE` by default. Parents share screenshots. Offer it as an
   optional privacy setting.
 - No analytics SDK, no advertising ID, no Firebase by default. Play Console
@@ -472,6 +573,8 @@ The nursing alert is the reason to go native. Get it right.
 | Cold start to interactive | under 1.5 s on a mid-range phone |
 | Log a diaper, tap to confirmation | under 150 ms p95 |
 | Timer render after resume | under 100 ms |
+| Encode one photo (display + thumbnail) | under 400 ms on a mid-range phone, off the main thread |
+| Album grid scroll | no dropped frames on a mid-range phone |
 | APK/AAB download size | under 25 MB |
 | Crash-free sessions | at least 99.5% |
 | ANR rate | under 0.5% |
@@ -512,6 +615,11 @@ Treat this as the riskiest engineering work in the project.
    refresh, and via WorkManager every 15–60 minutes. Never every second.
 9. **Offline is normal.** The queue is durable. The app never shows a blocking
    spinner for a log.
+10. **Album metadata syncs; photo bytes are optional.** `album_photos` follows
+    the same row rules and is keyed by `upload_id`, so a retried upload cannot
+    create a second photo. Bytes upload on Wi-Fi by default, never inside the
+    change feed. A deleted photo's tombstone keeps its file until the 30-day
+    retention window passes.
 
 ### 7.2 Conflict UI
 
@@ -534,8 +642,12 @@ validation errors:
 - Device clock set five minutes fast, then correct.
 - Server rollback and replay.
 - Delete on one device, edit on the other, restore, delete again.
+- A photo upload retried after a timeout creates one row, not two, and a
+  restored photo still has readable bytes.
+- Photo delete on one device and restore on the other converges without losing
+  the file before the retention window ends.
 - Tenant isolation: household A must never see household B, including in error
-  messages and exports.
+  messages, signed URLs, and exports.
 
 ---
 
@@ -570,7 +682,9 @@ validation errors:
 - Request only `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`,
   `RECEIVE_BOOT_COMPLETED`, `VIBRATE`, `INTERNET`,
   `ACCESS_NETWORK_STATE`, and optionally `USE_BIOMETRIC`. No location, contacts,
-  SMS, or broad storage permissions.
+  SMS, or broad storage permissions. Use the Android Photo Picker and the system
+  camera intent so you do not need `READ_MEDIA_IMAGES` or a declared `CAMERA`
+  permission for the album.
 
 ### 8.3 Billing
 
@@ -593,11 +707,11 @@ validation errors:
 - **Category:** Parenting. Not Medical, not Health & Fitness. Those categories
   invite scrutiny you do not need for a logbook.
 - **Title:** `Nurtur: Baby Tracker` (under 30 characters).
-- **Short description:** something like "Nursing, diapers and sleep. Private,
-  offline, one-handed."
-- **Screenshots:** show the 3 a.m. palette, the one-thumb dock, the widget, and
-  the timeline. Use fake data, never a real baby's log. Include a night and a
-  day screenshot.
+- **Short description:** something like "Nursing, diapers, sleep and photos.
+  Private, offline, one-handed."
+- **Screenshots:** show the 3 a.m. palette, the one-thumb dock, the widget, the
+  timeline, and the album grid and viewer. Use fake data, never a real baby's
+  log or a real baby photo. Include a night and a day screenshot.
 - **Video:** 20–30 seconds, one hand, dark room, one tap.
 - **Privacy policy URL and data safety form** must match reality. If the free
   app is local-only, "no data collected" is a powerful and honest claim.
@@ -616,8 +730,9 @@ validation errors:
   that does not require a database downgrade.
 - Use the Play pre-launch report. It catches layout and API-level issues on
   devices you do not own.
-- In-app "What's new" already exists in the web app. Keep it, and add a
-  `platforms` field to changelog entries so mobile shows mobile notes.
+- In-app "What's new" already exists in the web app, with releases kept in the
+  binary and a per-account seen-version marker. Keep it, and add a `platforms`
+  field to changelog entries so mobile shows mobile notes.
 - Ask for a rating after a completed feed in daylight, using the In-App Review
   API. Never at night, never after an error, never after a paywall.
 - CI: Gradle lint, unit tests, screenshot tests, managed-device tests, signed
@@ -642,11 +757,11 @@ This is the brand. Treat it as a feature with an owner.
 |---|---|---|
 | Free, local-only | Nothing leaves the device | No data collected |
 | Self-hosted | Nothing leaves the user's server | No data collected by you |
-| Plus cloud | Account email, household and baby profile, care events, device and purchase metadata | Account info, health and fitness info, app activity, purchase history; encrypted in transit; deletable |
+| Plus cloud | Account email, household and baby profile, care events, album metadata and (if enabled) photo bytes, device and purchase metadata | Account info, health and fitness info, photos, app activity, purchase history; encrypted in transit; deletable |
 
-Be conservative. Baby feeding, diaper, and sleep records are health-adjacent and
-should be declared as health information, even if the app is not a medical
-device.
+Be conservative. Baby feeding, diaper, sleep, and photo records are
+health-adjacent and should be declared as health information, even if the app is
+not a medical device.
 
 ### 9.2 Health and children
 
@@ -685,7 +800,12 @@ device.
 - Encrypt cloud data at rest. Encrypt local backups with a user passphrase or a
   Keystore-wrapped key, and warn that a lost passphrase means a lost backup.
 - Nightly cloud backups, tested restore, 30-day retention after cancellation,
-  then deletion. Publish the retention window.
+  then deletion. Publish the retention window, including how long album photos
+  stay after a subscription lapses.
+- A backup contains two halves: the database (events, settings, album metadata)
+  and the photo bytes. Restore must relink `album_photos` rows to files and
+  verify every file before it reports success. A restored row with a missing
+  file should stay visible and say so, not disappear silently.
 - Do not log care notes, baby names, or email addresses in plaintext. Redact
   diagnostics before the user sends them.
 
@@ -698,7 +818,8 @@ device.
 - A "What Nurtur stores" screen: local database, cloud status, last backup,
   what is shared with whom.
 - A "Delete everything" button that actually deletes everything, including the
-  local database, after a typed confirmation. Export first, always.
+  local database, album files, and app-owned backups, after a typed
+  confirmation. Export first, always.
 
 ---
 
@@ -745,9 +866,10 @@ Other brand work:
 | Icon, screenshots, video | $200–1,500 one-time |
 | Contingency | 20% |
 
-A lean launch is a few thousand dollars plus your time. The native rewrite is
-the real cost: expect 3–4 months of focused work for a quality MVP, not 3–4
-weeks.
+A lean launch is a few thousand dollars plus your time. Album photo backup adds
+object-storage cost, but the WebP display and thumbnail copies keep it small;
+price Plus with that growth in mind. The native rewrite is the real cost: expect
+3–4 months of focused work for a quality MVP, not 3–4 weeks.
 
 ### 11.2 Unit economics
 
@@ -825,6 +947,10 @@ them into a dashboard.
   black. Keep the lifted plum-charcoal palette and muted amber accents.
 - **Timer:** ongoing notification with a chronometer, actions, and a tap that
   opens the app on the timer. Survives reboot and timezone change.
+- **Album:** capture in two taps from the tab, multi-select without blocking the
+  UI, day-grouped grid with tile times, full-screen viewer with swipe,
+  in-place date/caption edits, and the same 8-second undo. Deleted photos stay
+  recoverable for 30 days; say so once, not on every delete.
 - **Undo:** snackbar for 8 seconds, exactly like the web app. Restores are
   re-validated.
 - **Errors:** plain language, no codes, no blame. "That nap overlaps one you
@@ -847,15 +973,23 @@ them into a dashboard.
 
 The data promise is the product. Make moving in and out boring.
 
-- **Import the existing web export.** The JSON format is already stable. Match
-  field names exactly, including `left_minutes`, `right_minutes`, `segments`,
-  `deleted_at`, and RFC3339 timestamps.
+- **Import the existing web export.** The JSON format is stable and, since
+  v0.5.0, includes `album_photos`, a `photo_storage` note, and `settings`.
+  Match field names exactly, including `left_minutes`, `right_minutes`,
+  `segments`, `deleted_at`, `upload_id`, `full_key`, `thumb_key`, and RFC3339
+  timestamps.
 - **Import CSV and SQL** as well, for people who have a backup but not a server.
+  CSV stays event-only; JSON and SQL are the complete formats.
 - **Import from other trackers.** A CSV importer for the common apps
   (Huckleberry, Baby Tracker, Nara) removes the biggest switching barrier. Make
   it free.
-- **Export the same formats** plus an encrypted native backup. Never invent a
-  proprietary format that the web app cannot read.
+- **Export the same formats** plus an encrypted native backup. JSON and SQL
+  carry album metadata and object keys; the backup bundles the database and the
+  photo bytes so restore is one flow. Never invent a proprietary format that
+  the web app cannot read.
+- **Photo bytes are a second stream.** Importing a web export without bytes
+  restores the timeline and leaves photo tiles marked "missing file" until the
+  bytes are supplied. Say that in the import summary rather than dropping rows.
 - **Connect to a self-hosted server** with a URL and a device token. The app
   should tell the user clearly which mode it is in: "On this phone" vs
   "Synced with your server" vs "Nurtur Cloud."
@@ -878,6 +1012,7 @@ The data promise is the product. Make moving in and out boring.
 | Subscription churn is high | Revenue below plan | Annual default, 30-day welcome, one household plan, lifetime for founders, no per-seat fees. |
 | Lifetime buyers become a permanent cost | Unfunded liability | Cap at 1,000, define the term, reserve the revenue, and do not repeat the offer. |
 | A user loses data on uninstall | One-star reviews and real harm | Free local backup, backup reminder, 30-day cloud welcome, export always free. |
+| Album bytes are lost, orphaned, or duplicated | Photos are irreplaceable | App-private files, upload-idempotency, verified restore, sweep only after retention, and one backup flow for database plus bytes. |
 | A privacy breach destroys the brand | Existential | Collect little, encrypt, no ad SDKs, tenant isolation tests, incident plan, breach notification. |
 | Someone clones the app or bypasses billing | Revenue loss | AGPL server, proprietary app, trademark, and compete on cloud quality and support. Do not rely on DRM. |
 | Web and native drift | Incompatible data | Schema and export are the contract. Shared test vectors. Feature freeze on the web UI. |
@@ -895,7 +1030,8 @@ The data promise is the product. Make moving in and out boring.
 - Register the Play account, check the name, reserve the package.
 - Recruit 12+ closed testers.
 - Port the Go domain tests to Kotlin as a specification.
-- Write the schema delta and the import/export contract.
+- Write the schema delta, the album byte-storage plan, and the import/export
+  contract (metadata and bytes as separate streams).
 - Build a clickable prototype of the timer and the widget.
 
 **Gate:** a signed debug build runs on three real phones, and the domain tests
@@ -906,7 +1042,8 @@ pass against the same fixtures as Go.
 - Feed timer: left/right, pause/resume, switch, edit, last side.
 - Locked-screen alert with exact alarm and ongoing notification.
 - Home screen widget with Left/Right/Done.
-- Local database, export/import of the existing JSON.
+- Local database, export/import of the existing event JSON (album metadata and
+  bytes follow in N2).
 - Night palette, one-thumb layout.
 
 **Gate:** 10 real feeds logged by a real parent, the alert fires within one
@@ -917,9 +1054,11 @@ Do not add diapers, sleep, accounts, or billing until this gate passes.
 
 ### N2 — The rest of the tracker (4 weeks)
 
-- Diapers, sleep, timeline, undo, settings.
+- Diapers, sleep, timeline, album, undo, settings.
+- Album capture, WebP encode, app-private files, viewer, edits, delete/restore,
+  and the 30-day sweep, at parity with the v0.5.0 web app.
 - Onboarding, accessibility, font scaling, timezone tests.
-- Local encrypted backup, import from CSV.
+- Local encrypted backup (database plus photo bytes), import from CSV.
 - Quick Settings tile, shortcuts, notification actions.
 - Closed beta with 12+ testers for 14 days.
 
@@ -937,7 +1076,8 @@ a support load you can handle alone.
 
 ### N4 — Nurtur Plus (4–6 weeks)
 
-- Cloud accounts, device tokens, encrypted backup, sync.
+- Cloud accounts, device tokens, encrypted backup (database and album photos),
+  sync.
 - Caregiver invites, roles, attribution, presence.
 - Play Billing, server-side verification, entitlements, restore.
 - 30-day Cloud welcome, then Plus.
@@ -996,6 +1136,9 @@ Answer these before N1. Each one changes the build.
    actual users; a lower floor costs testing time for little reach.
 10. **What is the one metric that decides success?** Recommendation: days with
     at least three logs, not installs or revenue.
+11. **Does Plus back up album photos, and for how long?** Recommendation: yes,
+    encrypted, with the same retention as the database. Photos are the largest
+    storage cost; measure real usage before promising unlimited backups.
 
 ---
 
@@ -1019,22 +1162,23 @@ Answer these before N1. Each one changes the build.
 ## 18. One-page summary
 
 **Free, forever:** the whole tracker on your phone. Nursing, diapers, sleep,
-timeline, corrections, night mode, the locked-screen alert, widgets, shortcuts,
-two babies, unlimited local history, JSON/CSV/SQL/PDF export, import, encrypted
-local backup, no account, no ads, no analytics.
+timeline, album, corrections, night mode, the locked-screen alert, widgets,
+shortcuts, two babies, unlimited local history, JSON/CSV/SQL/PDF export, import,
+encrypted local backup (database and photos), no account, no ads, no analytics.
 
-**Nurtur Plus, $19.99/year:** encrypted cloud backup, multi-device sync,
-caregiver sharing for the household, unlimited babies, 30/90-day insights, Wear
-OS, priority support. 30-day welcome, no card. Cancel and keep your data.
+**Nurtur Plus, $19.99/year:** encrypted cloud backup for the database and album,
+multi-device sync, caregiver sharing for the household, unlimited babies,
+30/90-day insights, Wear OS, priority support. 30-day welcome, no card. Cancel
+and keep your data.
 
 **One-time:** cosmetic themes and icons, tip jar.
 
-**Never paid:** logging, the alert, night mode, export, import, undo, security,
-accessibility, deleting your data.
+**Never paid:** logging, the alert, album capture or local storage, night mode,
+export, import, undo, security, accessibility, deleting your data.
 
 **The build:** Kotlin + Compose + Room, a pure-Kotlin `core`, the existing schema
-and export formats, a thin Go JSON API for cloud, exact alarms for the alert,
-and a vertical slice before anything else.
+and export formats, app-private photo files, a thin Go JSON API for cloud, exact
+alarms for the alert, and a vertical slice before anything else.
 
 **The test:** a real parent, one hand, a dark room, a locked phone, and a feed
 that has run long enough to matter. If the alert fires and the log is still
