@@ -228,10 +228,31 @@
     });
   }
 
+  // Keep the body's view in step with the URL. The page body arrives from the
+  // server with the same value, but a boosted tab swap only replaces <main>,
+  // so the old value would otherwise keep the Home-only quick-log button
+  // visible on History and Settings.
+  function viewForPath(path) {
+    switch (currentPath(path)) {
+      case "/album":
+        return "album";
+      case "/timeline":
+        return "timeline";
+      case "/settings":
+        return "settings";
+      case "/changelog":
+        return "changelog";
+      case "/":
+        return "";
+      default:
+        return "";
+    }
+  }
+
   // After the body has swapped, bring the rest of the shell in step.
   function syncPageChrome(path) {
     var here = currentPath(path);
-    document.body.dataset.view = here === "/album" ? "album" : "";
+    document.body.dataset.view = viewForPath(here);
     syncTabHighlight(path);
     syncDockView(here);
   }

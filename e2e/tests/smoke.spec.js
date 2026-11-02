@@ -246,6 +246,29 @@ test.describe("Nurtur smoke path at 390×844", () => {
     await expect(quick).toBeVisible();
   });
 
+  test("the quick-log button stays hidden after tab navigation", async ({ page }) => {
+    const quick = page.locator("[data-quick-log-toggle]");
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(quick).toBeVisible();
+
+    await page.getByRole("link", { name: "History", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-view", "timeline");
+    await expect(quick).toBeHidden();
+
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-view", "settings");
+    await expect(quick).toBeHidden();
+
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-view", "");
+    await expect(quick).toBeVisible();
+  });
+
   test("theme toggle flips on a single click in both directions", async ({ page }) => {
     await page.goto("/");
     await page.evaluate(() => localStorage.setItem("nurtur.theme", "day"));
