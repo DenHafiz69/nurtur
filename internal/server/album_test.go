@@ -346,41 +346,17 @@ func TestAlbumNoJSRejectsHEIC(t *testing.T) {
 	}
 }
 
-func TestAlbumPagingReachesOlderDays(t *testing.T) {
+func TestAlbumPageJumpsOverEmptyDays(t *testing.T) {
 	env := newTestEnv(t)
-	photo := album.Photo{
-		UploadID:      "0123456789abcdef0123456789abcdef",
-		TakenAt:       testNow.AddDate(0, 0, -8),
-		TakenAtSource: album.SourceEXIF,
-		Width:         1,
-		Height:        1,
-		Bytes:         42,
-		ThumbBytes:    42,
-		ContentType:   "image/webp",
-		FullKey:       "accounts/0/album/0123456789abcdef0123456789abcdef/full.webp",
-		ThumbKey:      "accounts/0/album/0123456789abcdef0123456789abcdef/thumb.webp",
-		CreatedAt:     testNow,
-	}
-	if _, _, err := env.store.CreateAlbumPhoto(context.Background(), photo); err != nil {
-		t.Fatalf("seed old photo: %v", err)
-	}
+	old := seedAlbumPhoto(t, env.store, context.Background(), "0123456789abcdef0123456789abcdef", testNow.AddDate(0, 0, -8))
 
 	rec := env.do(t, http.MethodGet, "/album", nil, false)
 	body := rec.Body.String()
-	if strings.Contains(body, `data-photo-id="1"`) {
-		t.Fatal("an eight-day-old photo appeared in the first seven days")
+	if !strings.Contains(body, fmt.Sprintf(`data-photo-id="%d"`, old.ID)) {
+		t.Fatalf("eight-day-old photo was hidden behind empty days:\n%s", body)
 	}
-	if !strings.Contains(body, "Load earlier days") {
-		t.Fatalf("first page has no link to older days:\n%s", body)
-	}
-
-	cursor := url.QueryEscape(testNow.AddDate(0, 0, -7).Format("2006-01-02") + "T00:00:00Z")
-	rec = env.do(t, http.MethodGet, "/album/partial?before="+cursor, nil, true)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("partial status = %d\n%s", rec.Code, rec.Body.String())
-	}
-	if !strings.Contains(rec.Body.String(), `data-photo-id="1"`) {
-		t.Fatalf("older photo did not load:\n%s", rec.Body.String())
+	if strings.Contains(body, "Load earlier days") {
+		t.Fatalf("single old photo should not need a second page:\n%s", body)
 	}
 }
 

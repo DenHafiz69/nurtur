@@ -1,3 +1,4 @@
+const { randomUUID } = require("crypto");
 const { test, expect } = require("@playwright/test");
 
 const ALBUM_JPEG_BASE64 =
@@ -496,7 +497,7 @@ test.describe("Album capture dates", () => {
     await expect(page.locator(`#album-day-${second.key} .album-tile-time`)).toHaveText("2:07 PM");
   });
 
-  test("earlier days load in place with their date and time", async ({ page }) => {
+  test("an older photo survives refresh and lands on its own day", async ({ page }) => {
     const older = albumExifDate(9);
 
     await page.goto("/album");
@@ -506,18 +507,36 @@ test.describe("Album capture dates", () => {
     );
     await expect(page.getByText(/Saved to /)).toBeVisible({ timeout: 15_000 });
 
-    // The old day is outside the first page's seven-day budget, so the paging
-    // control is present but the tile is not loaded yet.
-    await page.goto("/album");
+    await page.reload();
     const tile = page.locator(`#album-day-${older.key} .album-tile`);
+    await expect(tile).toHaveCount(1);
+    await expect(page.locator(`#album-day-${older.key} .album-tile-time`)).toHaveText("2:07 PM");
+    await expect(page.locator(`#album-day-${older.key} .album-day-title`)).toContainText(
+      older.heading
+    );
+    await expect(page.getByRole("link", { name: "Load earlier days" })).toHaveCount(0);
+  });
+
+  test("earlier photo-bearing days load in place", async ({ page }) => {
+    const jpeg = Buffer.from(ALBUM_JPEG_BASE64, "base64");
+    const oldDays = [];
+    for (let daysAgo = 20; daysAgo <= 27; daysAgo++) {
+      const day = albumExifDate(daysAgo);
+      await seedAlbumJpeg(page, jpeg, day.iso);
+      oldDays.push(day);
+    }
+    const target = oldDays[oldDays.length - 1];
+
+    await page.goto("/album");
+    const tile = page.locator(`#album-day-${target.key} .album-tile`);
     await expect(page.getByRole("link", { name: "Load earlier days" })).toBeVisible();
     await expect(tile).toHaveCount(0);
 
     await page.getByRole("link", { name: "Load earlier days" }).click();
     await expect(tile).toHaveCount(1);
-    await expect(page.locator(`#album-day-${older.key} .album-tile-time`)).toHaveText("2:07 PM");
-    await expect(page.locator(`#album-day-${older.key} .album-day-title`)).toContainText(
-      older.heading
+    await expect(page.locator(`#album-day-${target.key} .album-tile-time`)).toHaveText("2:07 PM");
+    await expect(page.locator(`#album-day-${target.key} .album-day-title`)).toContainText(
+      target.heading
     );
     await expect(page.locator("#album-loading")).toBeHidden();
   });
@@ -535,6 +554,22 @@ async function uploadAlbumJpeg(page, buffer) {
     mimeType: "image/jpeg",
     buffer
   });
+}
+
+// seedAlbumJpeg posts directly to the album API so a browsing test can build
+// a few photo-bearing days without walking the capture sheet each time.
+async function seedAlbumJpeg(page, buffer, takenAt) {
+  const response = await page.request.post("/album/photos", {
+    headers: { Accept: "application/json" },
+    multipart: {
+      upload_id: randomUUID(),
+      taken_at: takenAt,
+      taken_at_source: "exif",
+      full: { name: "full.jpg", mimeType: "image/jpeg", buffer },
+      thumb: { name: "thumb.jpg", mimeType: "image/jpeg", buffer }
+    }
+  });
+  expect(response.status()).toBe(201);
 }
 
 // albumExifDate returns an EXIF date at 14:07 in the household timezone, a few
@@ -555,6 +590,7 @@ function albumExifDate(daysAgo) {
   return {
     key: `${parts.year}-${parts.month}-${parts.day}`,
     exif: `${parts.year}:${parts.month}:${parts.day} 14:07:00`,
+    iso: new Date(`${parts.year}-${parts.month}-${parts.day}T14:07:00+08:00`).toISOString(),
     heading: new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Kuala_Lumpur",
       weekday: "long",

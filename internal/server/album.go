@@ -86,7 +86,9 @@ func (s *Server) handleAlbumPartial(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildAlbum loads whole local days, newest first, until the photo budget is
-// met. Paginating by day means a date heading never splits across pages.
+// met. It jumps straight to the next day that actually has photos, so an old
+// capture date never traps the reader behind pages of empty calendar days.
+// Paginating by day means a date heading never splits across pages.
 func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumPageView, error) {
 	now := s.clock.Now().UTC()
 
@@ -101,10 +103,24 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 		dayEnd = now
 	}
 
-	dayStart := previousLocalDayStart(dayEnd, s.loc)
 	nextBoundary := dayEnd
 	for days := 0; days < maxAlbumDays; days++ {
-		photos, err := s.store.ListAlbumPhotosBetween(ctx, dayStart, dayEnd, albumDayLoadCap)
+		// Find the newest photo before this page's boundary. Its local day is
+		// the next day to render; empty days in between are skipped in one
+		// query instead of one request per week.
+		newest, err := s.store.ListAlbumPhotos(ctx, dayEnd, 1)
+		if err != nil {
+			return nil, err
+		}
+		if len(newest) == 0 {
+			break
+		}
+		dayStart, dayEndOfDay := clock.DayBounds(newest[0].TakenAt, s.loc)
+		if !before.IsZero() && dayEndOfDay.After(before.UTC()) {
+			dayEndOfDay = before.UTC()
+		}
+
+		photos, err := s.store.ListAlbumPhotosBetween(ctx, dayStart, dayEndOfDay, albumDayLoadCap)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +143,6 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 			break
 		}
 		dayEnd = dayStart
-		dayStart = previousLocalDayStart(dayEnd, s.loc)
 	}
 
 	hasMore, err := s.store.HasAlbumPhotosBefore(ctx, nextBoundary)
