@@ -159,6 +159,9 @@ func TestSameSideTapIsNoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if active == nil {
+		t.Fatal("ActiveFeed = nil after a same-side tap")
+	}
 	if len(active.Segments) != 1 {
 		t.Fatalf("segments = %d, want 1 after same-side tap", len(active.Segments))
 	}
