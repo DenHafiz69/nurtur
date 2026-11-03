@@ -32,7 +32,7 @@ func TestAlbumPhotoInsertListAndPaging(t *testing.T) {
 	st := newTestStore(t)
 	ctx := WithAccount(context.Background(), 1)
 
-	var ids []int64
+	ids := make([]int64, 0, 5)
 	for i := 1; i <= 5; i++ {
 		photo, created, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(i))
 		if err != nil {

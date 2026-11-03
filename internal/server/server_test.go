@@ -421,6 +421,9 @@ func TestSameSideSwitchIsNoOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if active == nil {
+		t.Fatal("ActiveFeed = nil after a same-side switch")
+	}
 	if len(active.Segments) != 1 {
 		t.Fatalf("segments = %d, want 1", len(active.Segments))
 	}
@@ -536,6 +539,9 @@ func TestActiveAdjustAndFutureRejection(t *testing.T) {
 	active, err := env.store.ActiveFeed(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if active == nil {
+		t.Fatal("ActiveFeed = nil after an adjust")
 	}
 	if !active.StartedAt.Equal(time.Date(2026, 10, 20, 11, 55, 0, 0, time.UTC)) {
 		t.Fatalf("feed start = %v", active.StartedAt)

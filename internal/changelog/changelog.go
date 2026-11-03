@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.1",
+		Date:    "Nov 3, 2026",
+		Title:   "Quieter checks, safer paths",
+		Summary: "Behind-the-scenes hardening for photo storage and the feed tests. Nothing changes in daily use.",
+		Sections: []Section{
+			{
+				Title: "Improved",
+				Items: []string{
+					"Photo storage reads now document and enforce the check that keeps object keys inside the storage root.",
+					"The feed and album tests guard against missing values, so a regression fails the suite instead of panicking.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.0",
 		Date:    "Nov 2, 2026",
 		Title:   "A home for the small moments",
