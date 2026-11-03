@@ -157,6 +157,8 @@ func (l *localStorage) Get(ctx context.Context, key string) (io.ReadCloser, int6
 	if err != nil {
 		return nil, 0, err
 	}
+	// #nosec G304 -- l.path has already resolved the key beneath the storage
+	// root and rejected absolute or escaping paths.
 	f, err := os.Open(full)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
