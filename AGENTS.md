@@ -4,6 +4,7 @@
 - Never create a git tag unless the user explicitly asks for one.
 - Never `git push` commits or tags unless the user explicitly asks you to push.
 - Do not assume a commit should be published just because it was requested.
+- Before merging to `main`, run `gosec ./...`, `nilaway ./...`, and `staticcheck ./...`, and fix every reported issue first.
 - Before tagging or pushing to `main`, run every check in `.github/workflows/ci.yml` locally (gofmt, `go vet ./...`, `go test -p 1 ./...`).
 - Versioning: a minor change bumps the last digit (`0.3.4` → `0.3.5`). A major change bumps the second digit and resets the last digit to zero (`0.3.5` → `0.4.0`).
 - When bumping the version, add a matching release at the top of `internal/changelog/changelog.go`. Each account is shown the unread notes once after it updates.
