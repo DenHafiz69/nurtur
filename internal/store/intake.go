@@ -164,6 +164,7 @@ func (s *Store) bottlesByIDs(ctx context.Context, ids []int64) (map[int64]*intak
 		return out, nil
 	}
 	placeholders, args := idPlaceholders(AccountID(ctx), ids)
+	// #nosec G202 -- columns are compile-time constants and placeholders are generated '?' tokens.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+bottleColumns+` FROM bottles
 		WHERE account_id = ? AND deleted_at IS NULL AND id IN (`+placeholders+`)`, args...)
@@ -349,6 +350,7 @@ func (s *Store) pumpsByIDs(ctx context.Context, ids []int64) (map[int64]*intake.
 		return out, nil
 	}
 	placeholders, args := idPlaceholders(AccountID(ctx), ids)
+	// #nosec G202 -- columns are compile-time constants and placeholders are generated '?' tokens.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+pumpColumns+` FROM pumps
 		WHERE account_id = ? AND deleted_at IS NULL AND id IN (`+placeholders+`)`, args...)
@@ -536,6 +538,7 @@ func (s *Store) solidsByIDs(ctx context.Context, ids []int64) (map[int64]*intake
 		return out, nil
 	}
 	placeholders, args := idPlaceholders(AccountID(ctx), ids)
+	// #nosec G202 -- columns are compile-time constants and placeholders are generated '?' tokens.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+solidColumns+` FROM solids
 		WHERE account_id = ? AND deleted_at IS NULL AND id IN (`+placeholders+`)`, args...)
