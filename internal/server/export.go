@@ -78,8 +78,52 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 		CreatedAt     string `json:"created_at"`
 		DeletedAt     string `json:"deleted_at,omitempty"`
 	}
+	type bottleJSON struct {
+		ID        int64  `json:"id"`
+		LoggedAt  string `json:"logged_at"`
+		MilkType  string `json:"milk_type"`
+		AmountML  int    `json:"amount_ml"`
+		Notes     string `json:"notes,omitempty"`
+		CreatedAt string `json:"created_at"`
+		DeletedAt string `json:"deleted_at,omitempty"`
+	}
+	type pumpJSON struct {
+		ID              int64  `json:"id"`
+		LoggedAt        string `json:"logged_at"`
+		Side            string `json:"side"`
+		AmountML        int    `json:"amount_ml"`
+		DurationMinutes int    `json:"duration_minutes"`
+		Notes           string `json:"notes,omitempty"`
+		CreatedAt       string `json:"created_at"`
+		DeletedAt       string `json:"deleted_at,omitempty"`
+	}
+	type solidJSON struct {
+		ID        int64  `json:"id"`
+		LoggedAt  string `json:"logged_at"`
+		Food      string `json:"food"`
+		Portion   string `json:"portion,omitempty"`
+		Reaction  string `json:"reaction,omitempty"`
+		Notes     string `json:"notes,omitempty"`
+		CreatedAt string `json:"created_at"`
+		DeletedAt string `json:"deleted_at,omitempty"`
+	}
 
 	albums, err := s.store.AllAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	bottles, err := s.store.AllBottles(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	pumps, err := s.store.AllPumps(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	solids, err := s.store.AllSolids(r.Context())
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -93,6 +137,9 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 		Feeds        []feedJSON        `json:"feeds"`
 		Diapers      []diaperJSON      `json:"diapers"`
 		Sleeps       []sleepJSON       `json:"sleeps"`
+		Bottles      []bottleJSON      `json:"bottles"`
+		Pumps        []pumpJSON        `json:"pumps"`
+		Solids       []solidJSON       `json:"solids"`
 		AlbumPhotos  []albumJSON       `json:"album_photos"`
 		Settings     map[string]string `json:"settings"`
 		PhotoStorage string            `json:"photo_storage"`
@@ -168,6 +215,41 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 			DeletedAt:     isoPtr(photo.DeletedAt),
 		})
 	}
+	for _, b := range bottles {
+		payload.Bottles = append(payload.Bottles, bottleJSON{
+			ID:        b.ID,
+			LoggedAt:  view.ISO(b.LoggedAt),
+			MilkType:  string(b.MilkType),
+			AmountML:  b.AmountML,
+			Notes:     b.Notes,
+			CreatedAt: view.ISO(b.CreatedAt),
+			DeletedAt: isoPtr(b.DeletedAt),
+		})
+	}
+	for _, p := range pumps {
+		payload.Pumps = append(payload.Pumps, pumpJSON{
+			ID:              p.ID,
+			LoggedAt:        view.ISO(p.LoggedAt),
+			Side:            string(p.Side),
+			AmountML:        p.AmountML,
+			DurationMinutes: p.DurationMinutes,
+			Notes:           p.Notes,
+			CreatedAt:       view.ISO(p.CreatedAt),
+			DeletedAt:       isoPtr(p.DeletedAt),
+		})
+	}
+	for _, sol := range solids {
+		payload.Solids = append(payload.Solids, solidJSON{
+			ID:        sol.ID,
+			LoggedAt:  view.ISO(sol.LoggedAt),
+			Food:      sol.Food,
+			Portion:   string(sol.Portion),
+			Reaction:  string(sol.Reaction),
+			Notes:     sol.Notes,
+			CreatedAt: view.ISO(sol.CreatedAt),
+			DeletedAt: isoPtr(sol.DeletedAt),
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="nurtur-%s.json"`, now.In(s.loc).Format("2006-01-02")))
@@ -185,6 +267,22 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	now := s.clock.Now().UTC()
 
+	bottles, err := s.store.AllBottles(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	pumps, err := s.store.AllPumps(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	solids, err := s.store.AllSolids(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="nurtur-%s.csv"`, now.In(s.loc).Format("2006-01-02")))
 	w.Header().Set("Cache-Control", "no-store")
@@ -193,6 +291,7 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	_ = out.Write([]string{
 		"kind", "id", "started_at", "ended_at", "left_minutes", "right_minutes",
 		"last_side", "type", "color", "consistency", "notes", "created_at", "deleted_at",
+		"amount_ml", "duration_minutes", "food", "portion", "reaction",
 	})
 
 	for _, f := range feeds {
@@ -201,6 +300,7 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			"feed", strconv.FormatInt(f.ID, 10), view.ISO(f.StartedAt), isoPtr(f.EndedAt),
 			strconv.FormatInt(int64(left/time.Minute), 10), strconv.FormatInt(int64(right/time.Minute), 10),
 			string(f.LastSide), "", "", "", f.Notes, view.ISO(f.CreatedAt), isoPtr(f.DeletedAt),
+			"", "", "", "", "",
 		})
 	}
 	for _, d := range diapers {
@@ -208,12 +308,35 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			"diaper", strconv.FormatInt(d.ID, 10), view.ISO(d.LoggedAt), "",
 			"", "", "", string(d.Kind), string(d.Color), string(d.Consistency), d.Notes,
 			view.ISO(d.CreatedAt), isoPtr(d.DeletedAt),
+			"", "", "", "", "",
 		})
 	}
 	for _, session := range sleeps {
 		_ = out.Write([]string{
 			"sleep", strconv.FormatInt(session.ID, 10), view.ISO(session.StartedAt), isoPtr(session.EndedAt),
 			"", "", "", "", "", "", session.Notes, view.ISO(session.CreatedAt), isoPtr(session.DeletedAt),
+			"", "", "", "", "",
+		})
+	}
+	for _, bt := range bottles {
+		_ = out.Write([]string{
+			"bottle", strconv.FormatInt(bt.ID, 10), view.ISO(bt.LoggedAt), "",
+			"", "", "", string(bt.MilkType), "", "", bt.Notes, view.ISO(bt.CreatedAt), isoPtr(bt.DeletedAt),
+			strconv.Itoa(bt.AmountML), "", "", "", "",
+		})
+	}
+	for _, p := range pumps {
+		_ = out.Write([]string{
+			"pump", strconv.FormatInt(p.ID, 10), view.ISO(p.LoggedAt), "",
+			"", "", string(p.Side), "", "", "", p.Notes, view.ISO(p.CreatedAt), isoPtr(p.DeletedAt),
+			strconv.Itoa(p.AmountML), strconv.Itoa(p.DurationMinutes), "", "", "",
+		})
+	}
+	for _, sol := range solids {
+		_ = out.Write([]string{
+			"solid", strconv.FormatInt(sol.ID, 10), view.ISO(sol.LoggedAt), "",
+			"", "", "", "", "", "", sol.Notes, view.ISO(sol.CreatedAt), isoPtr(sol.DeletedAt),
+			"", "", sol.Food, string(sol.Portion), string(sol.Reaction),
 		})
 	}
 	out.Flush()
@@ -226,6 +349,21 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	albums, err := s.store.AllAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	bottles, err := s.store.AllBottles(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	pumps, err := s.store.AllPumps(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	solids, err := s.store.AllSolids(r.Context())
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -268,6 +406,21 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(&b, "INSERT INTO sleeps (id, account_id, started_at, ended_at, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %s);\n",
 			session.ID, sqlText(view.ISO(session.StartedAt)), sqlTimePtr(session.EndedAt),
 			sqlNullable(session.Notes), sqlText(view.ISO(session.CreatedAt)), sqlTimePtr(session.DeletedAt))
+	}
+	for _, bt := range bottles {
+		fmt.Fprintf(&b, "INSERT INTO bottles (id, account_id, logged_at, milk_type, amount_ml, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %d, %s, %s, %s);\n",
+			bt.ID, sqlText(view.ISO(bt.LoggedAt)), sqlText(string(bt.MilkType)), bt.AmountML,
+			sqlNullable(bt.Notes), sqlText(view.ISO(bt.CreatedAt)), sqlTimePtr(bt.DeletedAt))
+	}
+	for _, p := range pumps {
+		fmt.Fprintf(&b, "INSERT INTO pumps (id, account_id, logged_at, side, amount_ml, duration_minutes, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %d, %d, %s, %s, %s);\n",
+			p.ID, sqlText(view.ISO(p.LoggedAt)), sqlText(string(p.Side)), p.AmountML, p.DurationMinutes,
+			sqlNullable(p.Notes), sqlText(view.ISO(p.CreatedAt)), sqlTimePtr(p.DeletedAt))
+	}
+	for _, sol := range solids {
+		fmt.Fprintf(&b, "INSERT INTO solids (id, account_id, logged_at, food, portion, reaction, notes, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %s, %s, %s);\n",
+			sol.ID, sqlText(view.ISO(sol.LoggedAt)), sqlText(sol.Food), sqlText(string(sol.Portion)),
+			sqlText(string(sol.Reaction)), sqlNullable(sol.Notes), sqlText(view.ISO(sol.CreatedAt)), sqlTimePtr(sol.DeletedAt))
 	}
 	for _, photo := range albums {
 		fmt.Fprintf(&b, "INSERT INTO album_photos (id, account_id, upload_id, taken_at, taken_at_source, caption, width, height, bytes, thumb_bytes, content_type, full_key, thumb_key, created_at, deleted_at) VALUES (%d, 0, %s, %s, %s, %s, %d, %d, %d, %d, %s, %s, %s, %s, %s);\n",

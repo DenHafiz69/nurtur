@@ -1,0 +1,285 @@
+{{define "intake-dock-rows"}}
+  {{if .Trackers.Bottles}}
+  <section class="intake-dock-row" aria-label="Log a bottle">
+    <span class="intake-dock-label">{{icon "bottle"}}<span>Bottle</span></span>
+    <div class="intake-dock-actions">
+      {{range .Trackers.BottlePresets}}
+      <form method="post" action="/bottles" hx-post="/bottles" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <input type="hidden" name="milk_type" value="breast_milk">
+        <input type="hidden" name="amount_ml" value="{{.AmountML}}">
+        <input type="hidden" name="quick" value="1">
+        <button type="submit" class="diaper-pill intake-pill">{{.Label}}</button>
+      </form>
+      {{end}}
+      <a class="diaper-pill intake-pill intake-pill-more" href="/bottles/sheet" hx-get="/bottles/sheet" hx-target="#action-dialog" hx-swap="innerHTML">Custom</a>
+    </div>
+  </section>
+  {{end}}
+  {{if .Trackers.Pumps}}
+  <section class="intake-dock-row" aria-label="Log pumping">
+    <span class="intake-dock-label">{{icon "pump"}}<span>Pump</span></span>
+    <div class="intake-dock-actions">
+      <a class="diaper-pill intake-pill" href="/pumps/sheet?side=left" hx-get="/pumps/sheet?side=left" hx-target="#action-dialog" hx-swap="innerHTML">Left</a>
+      <a class="diaper-pill intake-pill" href="/pumps/sheet?side=right" hx-get="/pumps/sheet?side=right" hx-target="#action-dialog" hx-swap="innerHTML">Right</a>
+      <a class="diaper-pill intake-pill" href="/pumps/sheet?side=both" hx-get="/pumps/sheet?side=both" hx-target="#action-dialog" hx-swap="innerHTML">Both</a>
+    </div>
+  </section>
+  {{end}}
+  {{if .Trackers.Solids}}
+  <section class="intake-dock-row" aria-label="Log solids">
+    <a class="diaper-pill intake-pill intake-pill-wide" href="/solids/sheet" hx-get="/solids/sheet" hx-target="#action-dialog" hx-swap="innerHTML">{{icon "solid"}}<span>Log solid meal</span></a>
+  </section>
+  {{end}}
+{{end}}
+
+{{define "bottle-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Log bottle</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/bottles" hx-post="/bottles" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field">
+      <span class="field-label">Milk</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="milk_type" value="breast_milk"{{if ne .BottleSheet.MilkType "formula"}} checked{{end}}><span>Breast milk</span></label>
+        <label class="chip-option"><input type="radio" name="milk_type" value="formula"{{if eq .BottleSheet.MilkType "formula"}} checked{{end}}><span>Formula</span></label>
+      </div>
+    </div>
+    <label class="field">
+      <span class="field-label">Amount ({{.BottleSheet.Unit}})</span>
+      <input type="number" name="amount" value="{{.BottleSheet.Amount}}" min="0.1" step="{{if eq .BottleSheet.Unit "oz"}}0.5{{else}}5{{end}}" inputmode="decimal" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.BottleSheet.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional note">{{.BottleSheet.Notes}}</textarea>
+    </label>
+    {{if .BottleSheet.Error}}<p class="field-error" role="alert">{{.BottleSheet.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save bottle</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "bottle-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Edit bottle</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/bottles/{{.BottleEdit.ID}}" hx-patch="/bottles/{{.BottleEdit.ID}}" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field">
+      <span class="field-label">Milk</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="milk_type" value="breast_milk"{{if ne .BottleEdit.MilkType "formula"}} checked{{end}}><span>Breast milk</span></label>
+        <label class="chip-option"><input type="radio" name="milk_type" value="formula"{{if eq .BottleEdit.MilkType "formula"}} checked{{end}}><span>Formula</span></label>
+      </div>
+    </div>
+    <label class="field">
+      <span class="field-label">Amount ({{.BottleEdit.Unit}})</span>
+      <input type="number" name="amount" value="{{.BottleEdit.Amount}}" min="0.1" step="{{if eq .BottleEdit.Unit "oz"}}0.5{{else}}1{{end}}" inputmode="decimal" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.BottleEdit.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional note">{{.BottleEdit.Notes}}</textarea>
+    </label>
+    {{if .BottleEdit.Error}}<p class="field-error" role="alert">{{.BottleEdit.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "pump-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Log pump</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/pumps" hx-post="/pumps" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field">
+      <span class="field-label">Side</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="side" value="left"{{if eq .PumpSheet.Side "left"}} checked{{end}}><span>Left</span></label>
+        <label class="chip-option"><input type="radio" name="side" value="right"{{if eq .PumpSheet.Side "right"}} checked{{end}}><span>Right</span></label>
+        <label class="chip-option"><input type="radio" name="side" value="both"{{if eq .PumpSheet.Side "both"}} checked{{end}}><span>Both</span></label>
+      </div>
+    </div>
+    <div class="field-pair">
+      <label class="field">
+        <span class="field-label">Amount ({{.PumpSheet.Unit}})</span>
+        <input type="number" name="amount" value="{{.PumpSheet.Amount}}" min="0" step="{{if eq .PumpSheet.Unit "oz"}}0.5{{else}}5{{end}}" inputmode="decimal" placeholder="Optional">
+      </label>
+      <label class="field">
+        <span class="field-label">Minutes</span>
+        <input type="number" name="duration_minutes" value="{{.PumpSheet.Duration}}" min="0" max="180" step="1" inputmode="numeric" placeholder="Optional">
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.PumpSheet.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional note">{{.PumpSheet.Notes}}</textarea>
+    </label>
+    {{if .PumpSheet.Error}}<p class="field-error" role="alert">{{.PumpSheet.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save pump</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "pump-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Edit pump</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/pumps/{{.PumpEdit.ID}}" hx-patch="/pumps/{{.PumpEdit.ID}}" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field">
+      <span class="field-label">Side</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="side" value="left"{{if eq .PumpEdit.Side "left"}} checked{{end}}><span>Left</span></label>
+        <label class="chip-option"><input type="radio" name="side" value="right"{{if eq .PumpEdit.Side "right"}} checked{{end}}><span>Right</span></label>
+        <label class="chip-option"><input type="radio" name="side" value="both"{{if eq .PumpEdit.Side "both"}} checked{{end}}><span>Both</span></label>
+      </div>
+    </div>
+    <div class="field-pair">
+      <label class="field">
+        <span class="field-label">Amount ({{.PumpEdit.Unit}})</span>
+        <input type="number" name="amount" value="{{.PumpEdit.Amount}}" min="0" step="{{if eq .PumpEdit.Unit "oz"}}0.5{{else}}1{{end}}" inputmode="decimal" placeholder="Optional">
+      </label>
+      <label class="field">
+        <span class="field-label">Minutes</span>
+        <input type="number" name="duration_minutes" value="{{.PumpEdit.Duration}}" min="0" max="180" step="1" inputmode="numeric" placeholder="Optional">
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.PumpEdit.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional note">{{.PumpEdit.Notes}}</textarea>
+    </label>
+    {{if .PumpEdit.Error}}<p class="field-error" role="alert">{{.PumpEdit.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "solid-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Log solid meal</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/solids" hx-post="/solids" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <label class="field">
+      <span class="field-label">Food</span>
+      <input type="text" name="food" value="{{.SolidSheet.Food}}" maxlength="120" placeholder="e.g. Avocado puree, oat cereal" required>
+    </label>
+    <div class="field">
+      <span class="field-label">Portion (optional)</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="portion" value=""{{if eq .SolidSheet.Portion ""}} checked{{end}}><span>—</span></label>
+        <label class="chip-option"><input type="radio" name="portion" value="taste"{{if eq .SolidSheet.Portion "taste"}} checked{{end}}><span>Taste</span></label>
+        <label class="chip-option"><input type="radio" name="portion" value="some"{{if eq .SolidSheet.Portion "some"}} checked{{end}}><span>Some</span></label>
+        <label class="chip-option"><input type="radio" name="portion" value="most"{{if eq .SolidSheet.Portion "most"}} checked{{end}}><span>Most</span></label>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Reaction (optional)</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="reaction" value=""{{if eq .SolidSheet.Reaction ""}} checked{{end}}><span>—</span></label>
+        <label class="chip-option"><input type="radio" name="reaction" value="none"{{if eq .SolidSheet.Reaction "none"}} checked{{end}}><span>None</span></label>
+        <label class="chip-option"><input type="radio" name="reaction" value="mild"{{if eq .SolidSheet.Reaction "mild"}} checked{{end}}><span>Mild</span></label>
+        <label class="chip-option"><input type="radio" name="reaction" value="allergic"{{if eq .SolidSheet.Reaction "allergic"}} checked{{end}}><span>Allergic</span></label>
+      </div>
+    </div>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.SolidSheet.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional note">{{.SolidSheet.Notes}}</textarea>
+    </label>
+    {{if .SolidSheet.Error}}<p class="field-error" role="alert">{{.SolidSheet.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save meal</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "solid-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Edit solid meal</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/solids/{{.SolidEdit.ID}}" hx-patch="/solids/{{.SolidEdit.ID}}" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+    <label class="field">
+      <span class="field-label">Food</span>
+      <input type="text" name="food" value="{{.SolidEdit.Food}}" maxlength="120" required>
+    </label>
+    <div class="field">
+      <span class="field-label">Portion</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="portion" value=""{{if eq .SolidEdit.Portion ""}} checked{{end}}><span>—</span></label>
+        <label class="chip-option"><input type="radio" name="portion" value="taste"{{if eq .SolidEdit.Portion "taste"}} checked{{end}}><span>Taste</span></label>
+        <label class="chip-option"><input type="radio" name="portion" value="some"{{if eq .SolidEdit.Portion "some"}} checked{{end}}><span>Some</span></label>
+        <label class="chip-option"><input type="radio" name="portion" value="most"{{if eq .SolidEdit.Portion "most"}} checked{{end}}><span>Most</span></label>
+      </div>
+    </div>
+    <div class="field">
+      <span class="field-label">Reaction</span>
+      <div class="chip-options">
+        <label class="chip-option"><input type="radio" name="reaction" value=""{{if eq .SolidEdit.Reaction ""}} checked{{end}}><span>—</span></label>
+        <label class="chip-option"><input type="radio" name="reaction" value="none"{{if eq .SolidEdit.Reaction "none"}} checked{{end}}><span>None</span></label>
+        <label class="chip-option"><input type="radio" name="reaction" value="mild"{{if eq .SolidEdit.Reaction "mild"}} checked{{end}}><span>Mild</span></label>
+        <label class="chip-option"><input type="radio" name="reaction" value="allergic"{{if eq .SolidEdit.Reaction "allergic"}} checked{{end}}><span>Allergic</span></label>
+      </div>
+    </div>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.SolidEdit.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <textarea name="notes" rows="2" maxlength="500" placeholder="Optional note">{{.SolidEdit.Notes}}</textarea>
+    </label>
+    {{if .SolidEdit.Error}}<p class="field-error" role="alert">{{.SolidEdit.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{{end}}

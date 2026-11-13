@@ -81,6 +81,7 @@
             {{template "timer" .}}
             {{template "diaper-row" .}}
             {{template "sleep-pill" .}}
+            {{template "intake-dock-rows" .}}
           </div>
         </div>
       </details>
@@ -98,6 +99,12 @@
       {{if eq .Sheet "diaper-edit"}}{{template "diaper-edit" .}}{{end}}
       {{if eq .Sheet "sleep-sheet"}}{{template "sleep-sheet" .}}{{end}}
       {{if eq .Sheet "sleep-edit"}}{{template "sleep-edit" .}}{{end}}
+      {{if eq .Sheet "bottle-sheet"}}{{template "bottle-sheet" .}}{{end}}
+      {{if eq .Sheet "bottle-edit"}}{{template "bottle-edit" .}}{{end}}
+      {{if eq .Sheet "pump-sheet"}}{{template "pump-sheet" .}}{{end}}
+      {{if eq .Sheet "pump-edit"}}{{template "pump-edit" .}}{{end}}
+      {{if eq .Sheet "solid-sheet"}}{{template "solid-sheet" .}}{{end}}
+      {{if eq .Sheet "solid-edit"}}{{template "solid-edit" .}}{{end}}
       {{if eq .Sheet "album-edit"}}{{template "album-edit" .}}{{end}}
     </dialog>
 

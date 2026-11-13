@@ -8,22 +8,26 @@ import (
 
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
+	"nurtur/internal/intake"
 	"nurtur/internal/sleep"
 )
 
-// Kind is one of the three event domains.
+// Kind is one of the event domains.
 type Kind string
 
 const (
 	Feed   Kind = "feed"
 	Diaper Kind = "diaper"
 	Sleep  Kind = "sleep"
+	Bottle Kind = "bottle"
+	Pump   Kind = "pump"
+	Solid  Kind = "solid"
 )
 
 // Valid reports whether k is a known event kind.
 func (k Kind) Valid() bool {
 	switch k {
-	case Feed, Diaper, Sleep:
+	case Feed, Diaper, Sleep, Bottle, Pump, Solid:
 		return true
 	default:
 		return false
@@ -48,13 +52,19 @@ func (k Kind) Title() string {
 		return "Diaper"
 	case Sleep:
 		return "Sleep"
+	case Bottle:
+		return "Bottle"
+	case Pump:
+		return "Pump"
+	case Solid:
+		return "Solid"
 	default:
 		return "Event"
 	}
 }
 
-// Entry is one event in the unified feed. Exactly one of Feed, Diaper, or
-// Sleep is set; Anchor is the timestamp the row is ordered by.
+// Entry is one event in the unified feed. Exactly one domain pointer is set;
+// Anchor is the timestamp the row is ordered by.
 type Entry struct {
 	Kind   Kind
 	ID     int64
@@ -62,6 +72,9 @@ type Entry struct {
 	Feed   *feed.Feed
 	Diaper *diaper.Diaper
 	Sleep  *sleep.Session
+	Bottle *intake.Bottle
+	Pump   *intake.Pump
+	Solid  *intake.Solid
 }
 
 // DaySummary is the per-day aggregate shown under a timeline date header.
@@ -72,4 +85,9 @@ type DaySummary struct {
 	Sleep     time.Duration
 	FeedLeft  time.Duration
 	FeedRight time.Duration
+	Bottles   int
+	BottleML  int
+	Pumps     int
+	PumpML    int
+	Solids    int
 }

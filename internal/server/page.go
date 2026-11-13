@@ -10,6 +10,7 @@ import (
 	"nurtur/internal/clock"
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
+	"nurtur/internal/intake"
 	"nurtur/internal/sleep"
 	"nurtur/internal/status"
 	"nurtur/internal/view"
@@ -42,6 +43,7 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 		AuthEnabled:     s.auth.enabled(),
 	}
 	p.FeedAlertMinutes = s.feedAlertMinutes(ctx)
+	p.Trackers = s.trackerSettings(ctx)
 	p.Greeting = view.Greeting(now.In(s.loc).Hour())
 	p.TodayLabel = now.In(s.loc).Format("Monday, January 2")
 
@@ -92,6 +94,33 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 	}
 
 	p.Events = s.eventRows(feeds, diapers, snap.SleepsToday, now)
+	todayEntries, err := s.store.TimelineBetween(ctx, snap.DayStart, snap.DayEnd, 500)
+	if err != nil {
+		return nil, fmt.Errorf("server: load today's intake: %w", err)
+	}
+	unit := intake.Unit(p.Trackers.VolumeUnit)
+	for _, entry := range todayEntries {
+		switch {
+		case entry.Bottle != nil:
+			p.Events = append(p.Events, s.bottleEventRow(*entry.Bottle, unit, false))
+		case entry.Pump != nil:
+			p.Events = append(p.Events, s.pumpEventRow(*entry.Pump, unit, false))
+		case entry.Solid != nil:
+			p.Events = append(p.Events, s.solidEventRow(*entry.Solid, false))
+		}
+	}
+	sort.SliceStable(p.Events, func(i, j int) bool {
+		if p.Events[i].Anchor.Equal(p.Events[j].Anchor) {
+			return p.Events[i].ID > p.Events[j].ID
+		}
+		return p.Events[i].Anchor.After(p.Events[j].Anchor)
+	})
+
+	daySum, err := s.store.TimelineDaySummary(ctx, snap.DayStart, snap.DayEnd, now)
+	if err != nil {
+		return nil, fmt.Errorf("server: load today's summary: %w", err)
+	}
+
 	sleepLabel := view.SleepTotalLabel(snap.SleepToday.Total)
 	if snap.ActiveSleep != nil && snap.SleepToday.Total < time.Minute {
 		sleepLabel = "Sleeping now"
@@ -100,6 +129,7 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 		Feeds:       view.NewFeedSummary(len(feeds), totalLeft, totalRight),
 		DiaperLabel: view.DiaperCountLabel(len(diapers)),
 		SleepLabel:  sleepLabel,
+		IntakeLabel: intakeSummaryLabel(daySum.Bottles, daySum.BottleML, daySum.Pumps, daySum.PumpML, daySum.Solids, unit),
 		HasEvents:   len(p.Events) > 0,
 	}
 	return p, nil

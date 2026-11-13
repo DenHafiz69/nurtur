@@ -5382,3 +5382,66 @@ body.album-viewer-open .app-main {
     width: 148px;
   }
 }
+
+/* ---------- Growing-baby intake trackers ---------- */
+
+.intake-dock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.intake-dock-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.intake-dock-label .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.intake-dock-actions {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.intake-dock-actions form {
+  display: contents;
+}
+
+.intake-pill {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.intake-pill-wide {
+  width: 100%;
+  justify-content: center;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.check-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--coral);
+}
