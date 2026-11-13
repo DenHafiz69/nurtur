@@ -30,6 +30,39 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.2",
+		Date:    "Nov 13, 2026",
+		Title:   "More ways to feed",
+		Summary: "Bottles, pumping, and solid meals join Quick log as opt-in trackers. Nursing works exactly as before until you turn them on.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"A Feeding mode in Settings: Direct nursing, Hybrid, or Exclusive pumping. Bottle and pump buttons appear only in the modes that use them.",
+					"Bottle logging for breast milk or formula, with 60, 90, and 120 ml presets (2, 3, and 4 oz) plus a custom amount and time.",
+					"Pump sessions for the left side, right side, or both, with optional output and duration.",
+					"A live pump timer in the Quick log dock that carries its minutes into the pump sheet when you tap Done & Log.",
+					"An optional Solids & meals tracker with food, portion, reaction, and notes.",
+					"Bottle, pump, and solid rows in Today and History, with edit and delete.",
+				},
+			},
+			{
+				Title: "Changed",
+				Items: []string{
+					"The Quick log drawer groups its options by category with matching colours, so the growing set of trackers stays easy to scan.",
+					"Saving tracker settings updates the Quick log dock right away, without a reload.",
+					"In exclusive pump mode, Start sleep spans the full width and the left/right nursing controls are hidden.",
+				},
+			},
+			{
+				Title: "Backups",
+				Items: []string{
+					"JSON, CSV, and SQL exports include bottles, pumps, and solid meals.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.1",
 		Date:    "Nov 3, 2026",
 		Title:   "Quieter checks, safer paths",
