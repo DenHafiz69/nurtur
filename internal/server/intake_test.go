@@ -41,6 +41,33 @@ func TestIntakeOptInAndQuickLogFlows(t *testing.T) {
 		t.Fatalf("expected enabled intake dock rows and manual link in hybrid oz mode")
 	}
 
+	// Exclusive pump mode hides Breastfeed Left/Right while keeping Bottle & Pump.
+	res = env.do(t, http.MethodPost, "/settings/trackers", url.Values{
+		"feeding_mode": {"exclusive_pump"},
+		"volume_unit":  {"oz"},
+	}, true)
+	if res.Code != http.StatusOK {
+		t.Fatalf("POST /settings/trackers exclusive_pump = %d", res.Code)
+	}
+	res = env.do(t, http.MethodGet, "/", nil, false)
+	body = res.Body.String()
+	if strings.Contains(body, `action="/feeds"`) {
+		t.Fatal("expected Breastfeed Left/Right to be hidden in exclusive_pump mode")
+	}
+	if !strings.Contains(body, "2oz") || !strings.Contains(body, "Start Pump") {
+		t.Fatal("expected Bottle & Pump to remain visible in exclusive_pump mode")
+	}
+
+	// Switch back to hybrid mode for subsequent tests.
+	res = env.do(t, http.MethodPost, "/settings/trackers", url.Values{
+		"feeding_mode": {"hybrid"},
+		"track_solids": {"1"},
+		"volume_unit":  {"oz"},
+	}, true)
+	if res.Code != http.StatusOK {
+		t.Fatalf("POST /settings/trackers = %d", res.Code)
+	}
+
 	// Manual sheet renders cleanly
 	res = env.do(t, http.MethodGet, "/manual/sheet", nil, true)
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Log past entry") {

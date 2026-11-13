@@ -38,7 +38,7 @@
         <button type="submit" class="btn btn-done">{{icon "check"}}<span>Done</span></button>
       </form>
     </div>
-  {{else}}
+  {{else if ne .Trackers.FeedingMode "exclusive_pump"}}
     <div class="dock-section">
       <p class="dock-micro-label">Breastfeed</p>
       <div class="timer-actions timer-actions-idle">

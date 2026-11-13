@@ -488,6 +488,7 @@ func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status 
 		Status:   status,
 		Primary:  "settings-panel",
 		Toast:    toast,
+		TimerOOB: len(extraOOB) > 0,
 		Retarget: "#settings-panel",
 		Reswap:   "outerHTML",
 		Redirect: "/settings",
