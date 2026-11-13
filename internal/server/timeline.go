@@ -12,6 +12,7 @@ import (
 	"nurtur/internal/clock"
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
+	"nurtur/internal/intake"
 	"nurtur/internal/sleep"
 	"nurtur/internal/timeline"
 	"nurtur/internal/view"
@@ -104,14 +105,15 @@ func (s *Server) buildTimeline(ctx context.Context, before time.Time, limit int)
 		}
 
 		if len(entries) > 0 {
+			unit := s.volumeUnit(ctx)
 			group := view.TimelineDay{
 				Key:   view.DateKey(dayStart, s.loc),
 				Label: view.DayLabelRelative(dayStart, now, s.loc),
-				Meta:  view.DayMetaLabel(summary.Diapers, summary.Sleep),
+				Meta:  dayMetaWithIntake(summary, unit),
 				Feeds: view.NewFeedSummary(summary.Feeds, summary.FeedLeft, summary.FeedRight),
 			}
 			for _, entry := range entries {
-				group.Rows = append(group.Rows, s.timelineRow(entry, now))
+				group.Rows = append(group.Rows, s.timelineRow(entry, now, unit))
 			}
 			if group.Key == view.DateKey(now, s.loc) {
 				page.HasToday = true
@@ -150,10 +152,11 @@ func (s *Server) timelineDayView(ctx context.Context, anchor time.Time) (*view.T
 	if err != nil {
 		return nil, err
 	}
+	unit := s.volumeUnit(ctx)
 	return &view.TimelineDay{
 		Key:   view.DateKey(start, s.loc),
 		Label: view.DayLabelRelative(start, now, s.loc),
-		Meta:  view.DayMetaLabel(summary.Diapers, summary.Sleep),
+		Meta:  dayMetaWithIntake(summary, unit),
 		Feeds: view.NewFeedSummary(summary.Feeds, summary.FeedLeft, summary.FeedRight),
 	}, nil
 }
@@ -193,7 +196,7 @@ func parseTimelineLimit(raw string) int {
 	return n
 }
 
-func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow {
+func (s *Server) timelineRow(entry timeline.Entry, now time.Time, unit intake.Unit) view.EventRow {
 	switch {
 	case entry.Feed != nil:
 		f := entry.Feed
@@ -287,6 +290,15 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time) view.EventRow 
 			DeleteKey:    fmt.Sprintf("sleep-%d", session.ID),
 			DayKey:       view.DateKey(entry.Anchor, s.loc),
 		}
+
+	case entry.Bottle != nil:
+		return s.bottleEventRow(*entry.Bottle, unit, true)
+
+	case entry.Pump != nil:
+		return s.pumpEventRow(*entry.Pump, unit, true)
+
+	case entry.Solid != nil:
+		return s.solidEventRow(*entry.Solid, true)
 	}
 	return view.EventRow{}
 }
@@ -318,10 +330,31 @@ func (s *Server) timelineRowByID(ctx context.Context, kind timeline.Kind, id int
 		}
 		entry.Sleep = &session
 		entry.Anchor = session.StartedAt
+	case timeline.Bottle:
+		b, err := s.store.GetBottle(ctx, id)
+		if err != nil {
+			return view.EventRow{}, err
+		}
+		entry.Bottle = &b
+		entry.Anchor = b.LoggedAt
+	case timeline.Pump:
+		p, err := s.store.GetPump(ctx, id)
+		if err != nil {
+			return view.EventRow{}, err
+		}
+		entry.Pump = &p
+		entry.Anchor = p.LoggedAt
+	case timeline.Solid:
+		sol, err := s.store.GetSolid(ctx, id)
+		if err != nil {
+			return view.EventRow{}, err
+		}
+		entry.Solid = &sol
+		entry.Anchor = sol.LoggedAt
 	default:
 		return view.EventRow{}, fmt.Errorf("server: unknown timeline kind %q", kind)
 	}
-	return s.timelineRow(entry, now), nil
+	return s.timelineRow(entry, now, s.volumeUnit(ctx)), nil
 }
 
 func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
@@ -344,18 +377,24 @@ func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
 		err = s.store.DeleteDiaper(r.Context(), id, now)
 	case timeline.Sleep:
 		err = s.store.DeleteSleep(r.Context(), id, now)
+	case timeline.Bottle:
+		_, err = s.store.DeleteBottle(r.Context(), id, now)
+	case timeline.Pump:
+		_, err = s.store.DeletePump(r.Context(), id, now)
+	case timeline.Solid:
+		_, err = s.store.DeleteSolid(r.Context(), id, now)
 	}
 
 	key := fmt.Sprintf("%s-%d", kind, id)
 	switch {
 	case err == nil:
-	case errors.Is(err, feed.ErrAlreadyDeleted), errors.Is(err, diaper.ErrAlreadyDeleted), errors.Is(err, sleep.ErrAlreadyDeleted):
+	case errors.Is(err, feed.ErrAlreadyDeleted), errors.Is(err, diaper.ErrAlreadyDeleted), errors.Is(err, sleep.ErrAlreadyDeleted), errors.Is(err, intake.ErrAlreadyDeleted):
 		s.renderMutation(w, r, "status-strip", &view.Toast{
 			Message: "That " + strings.ToLower(kind.Title()) + " was already deleted.",
 			Kind:    "info",
 		})
 		return
-	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound):
+	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound), errors.Is(err, intake.ErrNotFound):
 		s.notFound(w)
 		return
 	default:
@@ -413,6 +452,15 @@ func (s *Server) handleTimelineRestore(w http.ResponseWriter, r *http.Request) {
 		_, restored, err = s.store.RestoreDiaper(r.Context(), id)
 	case timeline.Sleep:
 		_, restored, err = s.store.RestoreSleep(r.Context(), id, now)
+	case timeline.Bottle:
+		_, err = s.store.RestoreBottle(r.Context(), id)
+		restored = err == nil
+	case timeline.Pump:
+		_, err = s.store.RestorePump(r.Context(), id)
+		restored = err == nil
+	case timeline.Solid:
+		_, err = s.store.RestoreSolid(r.Context(), id)
+		restored = err == nil
 	}
 
 	switch {
@@ -429,7 +477,7 @@ func (s *Server) handleTimelineRestore(w http.ResponseWriter, r *http.Request) {
 			Kind:    "info",
 		})
 		return
-	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound):
+	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound), errors.Is(err, intake.ErrNotFound):
 		s.notFound(w)
 		return
 	default:

@@ -1256,6 +1256,78 @@
     });
   }
 
+  /* ---------- Live Pump Timer ---------- */
+
+  var PUMP_STORAGE_KEY = "nurtur_pump_started_at";
+  var pumpInterval = null;
+
+  function pumpStartedAt() {
+    try {
+      var raw = localStorage.getItem(PUMP_STORAGE_KEY);
+      if (!raw) return 0;
+      var ts = Number(raw);
+      return isFinite(ts) && ts > 0 ? ts : 0;
+    } catch (e) { return 0; }
+  }
+
+  function setPumpStartedAt(ts) {
+    try {
+      if (ts > 0) localStorage.setItem(PUMP_STORAGE_KEY, String(ts));
+      else localStorage.removeItem(PUMP_STORAGE_KEY);
+    } catch (e) {}
+  }
+
+  function renderPumpTimer() {
+    var slot = document.getElementById("pump-dock-slot");
+    if (!slot) return;
+    var idle = slot.querySelector("[data-pump-idle]");
+    var live = slot.querySelector("[data-pump-live]");
+    var digits = slot.querySelector("[data-pump-digits]");
+    if (!idle || !live || !digits) return;
+    var started = pumpStartedAt();
+    if (!started) {
+      idle.hidden = false;
+      live.hidden = true;
+      if (pumpInterval) { window.clearInterval(pumpInterval); pumpInterval = null; }
+      return;
+    }
+    idle.hidden = true;
+    live.hidden = false;
+    var secs = Math.max(0, Math.floor((Date.now() - started) / 1000));
+    var mins = Math.floor(secs / 60);
+    var rem = secs % 60;
+    digits.textContent = (mins < 10 ? "0" : "") + mins + ":" + (rem < 10 ? "0" : "") + rem;
+  }
+
+  function startPumpTimer() {
+    setPumpStartedAt(Date.now());
+    renderPumpTimer();
+    if (!pumpInterval) pumpInterval = window.setInterval(renderPumpTimer, 500);
+  }
+
+  function stopPumpTimer() {
+    var started = pumpStartedAt();
+    var mins = started ? Math.max(1, Math.round((Date.now() - started) / 60000)) : 15;
+    setPumpStartedAt(0);
+    renderPumpTimer();
+    if (window.htmx) {
+      window.htmx.ajax("GET", "/pumps/sheet?side=both&duration_minutes=" + mins, {
+        target: "#action-dialog",
+        swap: "innerHTML"
+      });
+    }
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    if (target.closest("[data-pump-start]")) { startPumpTimer(); return; }
+    if (target.closest("[data-pump-cancel]")) { setPumpStartedAt(0); renderPumpTimer(); return; }
+    if (target.closest("[data-pump-stop]")) { stopPumpTimer(); return; }
+  });
+
+  document.addEventListener("htmx:afterSettle", renderPumpTimer);
+
   /* ---------- Boot ---------- */
 
   var card = timerCard();
@@ -1273,6 +1345,8 @@
   updateConnectivity();
   refreshNotificationUI();
   syncDockView(location.pathname);
+  renderPumpTimer();
+  if (pumpStartedAt() && !pumpInterval) pumpInterval = window.setInterval(renderPumpTimer, 500);
   tick();
   window.setInterval(tick, 250);
   window.setInterval(updateRelativeLabels, 30000);

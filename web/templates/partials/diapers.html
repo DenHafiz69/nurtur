@@ -1,17 +1,20 @@
 {{define "diaper-row"}}
-<section class="diaper-row" aria-label="Log a diaper">
-  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
-    <input type="hidden" name="type" value="wet">
-    <button type="submit" class="diaper-pill diaper-wet">{{icon "drop"}}<span>Wet</span></button>
-  </form>
-  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
-    <input type="hidden" name="type" value="dirty">
-    <button type="submit" class="diaper-pill diaper-dirty">{{icon "dirty"}}<span>Dirty</span></button>
-  </form>
-  <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
-    <input type="hidden" name="type" value="both">
-    <button type="submit" class="diaper-pill diaper-both">{{icon "diaper"}}<span>Both</span></button>
-  </form>
+<section class="dock-section" aria-label="Log a diaper">
+  <p class="dock-micro-label">Diaper</p>
+  <div class="diaper-row">
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="type" value="wet">
+      <button type="submit" class="diaper-pill diaper-wet">{{icon "drop"}}<span>Wet</span></button>
+    </form>
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="type" value="dirty">
+      <button type="submit" class="diaper-pill diaper-dirty">{{icon "dirty"}}<span>Dirty</span></button>
+    </form>
+    <form method="post" action="/diapers" hx-post="/diapers" hx-target="#toast-region" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+      <input type="hidden" name="type" value="both">
+      <button type="submit" class="diaper-pill diaper-both">{{icon "check"}}<span>Both</span></button>
+    </form>
+  </div>
 </section>
 {{end}}
 

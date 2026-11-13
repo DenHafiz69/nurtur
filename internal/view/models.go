@@ -82,6 +82,15 @@ type PageData struct {
 	DiaperEdit   *DiaperEditView
 	SleepSheet   *SleepSheetView
 	SleepEdit    *SleepEditView
+	BottleSheet  *BottleSheetView
+	BottleEdit   *BottleEditView
+	PumpSheet    *PumpSheetView
+	PumpEdit     *PumpEditView
+	SolidSheet   *SolidSheetView
+	SolidEdit    *SolidEditView
+
+	NextSide string // "left" or "right" recommended next nursing side
+	Trackers TrackerSettings
 
 	// TimerOOB adds hx-swap-oob when the timer is a companion fragment rather
 	// than the primary response target.
@@ -164,6 +173,7 @@ type TodaySummary struct {
 	Feeds       FeedSummary
 	DiaperLabel string
 	SleepLabel  string
+	IntakeLabel string
 	HasEvents   bool
 }
 
@@ -291,6 +301,13 @@ type SettingsView struct {
 
 	FeedAlertMinutes int
 	FeedAlertErr     string
+
+	FeedingMode  string // "direct", "hybrid", "exclusive_pump"
+	TrackBottles bool
+	TrackPumps   bool
+	TrackSolids  bool
+	VolumeUnit   string
+	TrackersErr  string
 
 	SyncMode   string
 	SyncStatus string
@@ -431,6 +448,94 @@ type NursingSheetView struct {
 	HasLast       bool
 	LastSide      string
 	LastAgo       string
+}
+
+// BottlePreset is one quick-tap volume button in the dock.
+type BottlePreset struct {
+	AmountML int
+	Label    string
+}
+
+// TrackerSettings holds per-account opt-in growing-baby trackers.
+type TrackerSettings struct {
+	FeedingMode   string // "direct", "hybrid", "exclusive_pump"
+	Bottles       bool
+	Pumps         bool
+	Solids        bool
+	ShowHybrid    bool   // true when FeedingMode is hybrid or exclusive_pump
+	VolumeUnit    string // "ml" or "oz"
+	BottlePresets []BottlePreset
+}
+
+// BottleSheetView backs the bottle create sheet.
+type BottleSheetView struct {
+	MilkType   string
+	Amount     string
+	Unit       string
+	TimeInput  string
+	Notes      string
+	Error      string
+	ErrorField string
+}
+
+// BottleEditView backs the bottle edit sheet.
+type BottleEditView struct {
+	ID         int64
+	MilkType   string
+	Amount     string
+	Unit       string
+	TimeInput  string
+	Notes      string
+	Error      string
+	ErrorField string
+}
+
+// PumpSheetView backs the pump create sheet.
+type PumpSheetView struct {
+	Side       string
+	Amount     string
+	Unit       string
+	Duration   string
+	TimeInput  string
+	Notes      string
+	Error      string
+	ErrorField string
+}
+
+// PumpEditView backs the pump edit sheet.
+type PumpEditView struct {
+	ID         int64
+	Side       string
+	Amount     string
+	Unit       string
+	Duration   string
+	TimeInput  string
+	Notes      string
+	Error      string
+	ErrorField string
+}
+
+// SolidSheetView backs the solid meal create sheet.
+type SolidSheetView struct {
+	Food       string
+	Portion    string
+	Reaction   string
+	TimeInput  string
+	Notes      string
+	Error      string
+	ErrorField string
+}
+
+// SolidEditView backs the solid meal edit sheet.
+type SolidEditView struct {
+	ID         int64
+	Food       string
+	Portion    string
+	Reaction   string
+	TimeInput  string
+	Notes      string
+	Error      string
+	ErrorField string
 }
 
 // AdminPageData backs the standalone admin screen. The admin is not a

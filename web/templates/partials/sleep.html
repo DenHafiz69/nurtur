@@ -25,16 +25,19 @@
       </div>
     </div>
   {{else}}
-    <form method="post" action="/sleeps" hx-post="/sleeps" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
-      <button type="submit" class="sleep-pill">
-        <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
-        <span class="sleep-copy">
-          <span class="sleep-title">Start sleep</span>
-          <span class="sleep-sub">Tap when {{if .BabyName}}{{.BabyName}}{{else}}your baby{{end}} is ready to rest</span>
-        </span>
-        <span class="sleep-action">{{icon "arrow-right"}}</span>
-      </button>
-    </form>
+    <div class="dock-section">
+      <p class="dock-micro-label">Sleep</p>
+      <form method="post" action="/sleeps" hx-post="/sleeps" hx-target="#sleep-pill" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+        <button type="submit" class="sleep-pill">
+          <span class="sleep-icon" aria-hidden="true">{{icon "moon"}}</span>
+          <span class="sleep-copy">
+            <span class="sleep-title">Start sleep</span>
+            <span class="sleep-sub">Tap when {{if .BabyName}}{{.BabyName}}{{else}}your baby{{end}} is ready to rest</span>
+          </span>
+          <span class="sleep-action">{{icon "arrow-right"}}</span>
+        </button>
+      </form>
+    </div>
   {{end}}
 {{end}}
 

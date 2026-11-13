@@ -12,7 +12,7 @@
       <a class="icon-btn timer-adjust" href="/feeds/{{.Active.ID}}/edit" hx-get="/feeds/{{.Active.ID}}/edit" hx-target="#feed-edit-dialog" hx-swap="innerHTML" aria-label="Adjust this feed">{{icon "pencil"}}</a>
     </div>
   {{else}}
-    <p class="timer-idle-hint">Tap a side to start.</p>
+    <p class="timer-idle-hint">Tap to start a timer or log instantly</p>
   {{end}}
 
   <p class="timer-cached" data-cached-timer hidden></p>
@@ -38,16 +38,19 @@
         <button type="submit" class="btn btn-done">{{icon "check"}}<span>Done</span></button>
       </form>
     </div>
-  {{else}}
-    <div class="timer-actions timer-actions-idle">
-      <form method="post" action="/feeds" hx-post="/feeds" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
-        <input type="hidden" name="side" value="left">
-        <button type="submit" class="btn btn-side btn-left">{{icon "drop-left"}}<span>Left</span></button>
-      </form>
-      <form method="post" action="/feeds" hx-post="/feeds" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
-        <input type="hidden" name="side" value="right">
-        <button type="submit" class="btn btn-side btn-right">{{icon "drop-right"}}<span>Right</span></button>
-      </form>
+  {{else if ne .Trackers.FeedingMode "exclusive_pump"}}
+    <div class="dock-section">
+      <p class="dock-micro-label">Breastfeed</p>
+      <div class="timer-actions timer-actions-idle">
+        <form method="post" action="/feeds" hx-post="/feeds" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+          <input type="hidden" name="side" value="left">
+          <button type="submit" class="btn btn-side btn-left{{if eq .NextSide "left"}} is-next{{end}}">{{icon "drop-left"}}<span>Left</span>{{if eq .NextSide "left"}}<span class="next-badge">Next</span>{{end}}</button>
+        </form>
+        <form method="post" action="/feeds" hx-post="/feeds" hx-target="#timer-card" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+          <input type="hidden" name="side" value="right">
+          <button type="submit" class="btn btn-side btn-right{{if eq .NextSide "right"}} is-next{{end}}">{{icon "drop-right"}}<span>Right</span>{{if eq .NextSide "right"}}<span class="next-badge">Next</span>{{end}}</button>
+        </form>
+      </div>
     </div>
   {{end}}
 </div>

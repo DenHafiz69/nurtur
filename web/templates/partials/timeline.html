@@ -26,6 +26,10 @@
       <span>{{.Today.DiaperLabel}}</span>
       <span class="summary-sep" aria-hidden="true">·</span>
       <span>{{.Today.SleepLabel}}</span>
+      {{if .Today.IntakeLabel}}
+        <span class="summary-sep" aria-hidden="true">·</span>
+        <span>{{.Today.IntakeLabel}}</span>
+      {{end}}
     </p>
     <ul class="feed-list" aria-label="Today's events">
       {{range .Events}}

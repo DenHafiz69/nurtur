@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"nurtur/internal/intake"
 	"nurtur/internal/view"
 )
 
@@ -23,6 +24,11 @@ const (
 	settingBabyGender       = "baby_gender"
 	settingMascot           = "mascot"
 	settingFeedAlertMinutes = "feed_alert_minutes"
+	settingFeedingMode      = "feeding_mode"
+	settingTrackBottles     = "track_bottles"
+	settingTrackPumps       = "track_pumps"
+	settingTrackSolids      = "track_solids"
+	settingVolumeUnit       = "volume_unit"
 
 	babyGenderGirl = "girl"
 	babyGenderBoy  = "boy"
@@ -482,6 +488,7 @@ func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status 
 		Status:   status,
 		Primary:  "settings-panel",
 		Toast:    toast,
+		TimerOOB: len(extraOOB) > 0,
 		Retarget: "#settings-panel",
 		Reswap:   "outerHTML",
 		Redirect: "/settings",
@@ -498,6 +505,7 @@ func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request, status 
 
 func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) {
 	nightStart, nightEnd := s.nightWindow(ctx)
+	trackers := s.trackerSettings(ctx)
 	out := &view.SettingsView{
 		BabyName:    s.currentBabyName(ctx),
 		Timezone:    s.loc.String(),
@@ -509,6 +517,12 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 		Mascot:      s.currentMascot(ctx),
 
 		FeedAlertMinutes: s.feedAlertMinutes(ctx),
+
+		FeedingMode:  trackers.FeedingMode,
+		TrackBottles: trackers.Bottles,
+		TrackPumps:   trackers.Pumps,
+		TrackSolids:  trackers.Solids,
+		VolumeUnit:   trackers.VolumeUnit,
 
 		SyncMode:   "Local only",
 		SyncStatus: "No cloud copy configured",
@@ -557,6 +571,127 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 	}
 	out.SyncDetail = fmt.Sprintf("last push %s · last pull %s", out.LastPush, out.LastPull)
 	return out, nil
+}
+
+func (s *Server) volumeUnit(ctx context.Context) intake.Unit {
+	raw, ok, err := s.store.Setting(ctx, settingVolumeUnit)
+	if err != nil || !ok {
+		return intake.UnitML
+	}
+	u, err := intake.ParseUnit(raw)
+	if err != nil {
+		return intake.UnitML
+	}
+	return u
+}
+
+func (s *Server) trackerSettings(ctx context.Context) view.TrackerSettings {
+	values, err := s.store.Settings(ctx)
+	if err != nil {
+		values = map[string]string{}
+	}
+	unit, err := intake.ParseUnit(values[settingVolumeUnit])
+	if err != nil {
+		unit = intake.UnitML
+	}
+	presets := []view.BottlePreset{
+		{AmountML: 60, Label: "60ml"},
+		{AmountML: 90, Label: "90ml"},
+		{AmountML: 120, Label: "120ml"},
+	}
+	if unit == intake.UnitOZ {
+		presets = []view.BottlePreset{
+			{AmountML: 59, Label: "2oz"},
+			{AmountML: 89, Label: "3oz"},
+			{AmountML: 118, Label: "4oz"},
+		}
+	}
+	mode := values[settingFeedingMode]
+	switch mode {
+	case "direct", "hybrid", "exclusive_pump":
+	default:
+		if values[settingTrackBottles] == "1" || values[settingTrackPumps] == "1" {
+			mode = "hybrid"
+		} else {
+			mode = "direct"
+		}
+	}
+	showHybrid := mode == "hybrid" || mode == "exclusive_pump"
+	return view.TrackerSettings{
+		FeedingMode:   mode,
+		Bottles:       showHybrid,
+		Pumps:         showHybrid,
+		Solids:        values[settingTrackSolids] == "1",
+		ShowHybrid:    showHybrid,
+		VolumeUnit:    string(unit),
+		BottlePresets: presets,
+	}
+}
+
+func (s *Server) handleSaveTrackers(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.badRequest(w, "Couldn't read that form. Try again.")
+		return
+	}
+	unit, err := intake.ParseUnit(r.FormValue("volume_unit"))
+	if err != nil {
+		settings, buildErr := s.buildSettings(r.Context())
+		if buildErr != nil {
+			s.serverError(w, r, buildErr)
+			return
+		}
+		settings.TrackersErr = "Choose ml or oz."
+		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
+		return
+	}
+	boolVal := func(name string) string {
+		if r.FormValue(name) == "1" || r.FormValue(name) == "on" {
+			return "1"
+		}
+		return "0"
+	}
+	mode := strings.TrimSpace(r.FormValue("feeding_mode"))
+	switch mode {
+	case "direct", "hybrid", "exclusive_pump":
+	case "":
+		if boolVal("track_bottles") == "1" || boolVal("track_pumps") == "1" {
+			mode = "hybrid"
+		} else {
+			mode = "direct"
+		}
+	default:
+		settings, buildErr := s.buildSettings(r.Context())
+		if buildErr != nil {
+			s.serverError(w, r, buildErr)
+			return
+		}
+		settings.TrackersErr = "Choose a valid feeding mode."
+		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
+		return
+	}
+	showHybrid := "0"
+	if mode == "hybrid" || mode == "exclusive_pump" {
+		showHybrid = "1"
+	}
+	if err := s.store.SetSettings(r.Context(), map[string]string{
+		settingFeedingMode:  mode,
+		settingTrackBottles: showHybrid,
+		settingTrackPumps:   showHybrid,
+		settingTrackSolids:  boolVal("track_solids"),
+		settingVolumeUnit:   string(unit),
+	}); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	settings, err := s.buildSettings(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.respondSettings(w, r, http.StatusOK, settings, &view.Toast{
+		Message: "Trackers updated.",
+		Kind:    "success",
+	}, "intake-dock-rows-oob")
 }
 
 func (s *Server) handleOffline(w http.ResponseWriter, r *http.Request) {

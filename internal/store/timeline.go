@@ -37,9 +37,21 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 			UNION ALL
 			SELECT 'sleep', id, started_at
 			  FROM sleeps WHERE account_id = ? AND deleted_at IS NULL AND started_at >= ? AND started_at < ?
+			UNION ALL
+			SELECT 'bottle', id, logged_at
+			  FROM bottles WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
+			UNION ALL
+			SELECT 'pump', id, logged_at
+			  FROM pumps WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
+			UNION ALL
+			SELECT 'solid', id, logged_at
+			  FROM solids WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
 		)
 		ORDER BY anchor DESC, id DESC, kind DESC
 		LIMIT ?`,
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
@@ -55,7 +67,7 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 		anchor time.Time
 	}
 	var anchors []anchor
-	var feedIDs, diaperIDs, sleepIDs []int64
+	var feedIDs, diaperIDs, sleepIDs, bottleIDs, pumpIDs, solidIDs []int64
 	for rows.Next() {
 		var (
 			kindRaw string
@@ -78,6 +90,12 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 			diaperIDs = append(diaperIDs, id)
 		case timeline.Sleep:
 			sleepIDs = append(sleepIDs, id)
+		case timeline.Bottle:
+			bottleIDs = append(bottleIDs, id)
+		case timeline.Pump:
+			pumpIDs = append(pumpIDs, id)
+		case timeline.Solid:
+			solidIDs = append(solidIDs, id)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -99,6 +117,18 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 	if err != nil {
 		return nil, err
 	}
+	bottles, err := s.bottlesByIDs(ctx, bottleIDs)
+	if err != nil {
+		return nil, err
+	}
+	pumps, err := s.pumpsByIDs(ctx, pumpIDs)
+	if err != nil {
+		return nil, err
+	}
+	solids, err := s.solidsByIDs(ctx, solidIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]timeline.Entry, 0, len(anchors))
 	for _, a := range anchors {
@@ -116,10 +146,22 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 			if session, ok := sleeps[a.id]; ok {
 				entry.Sleep = session
 			}
+		case timeline.Bottle:
+			if b, ok := bottles[a.id]; ok {
+				entry.Bottle = b
+			}
+		case timeline.Pump:
+			if p, ok := pumps[a.id]; ok {
+				entry.Pump = p
+			}
+		case timeline.Solid:
+			if sol, ok := solids[a.id]; ok {
+				entry.Solid = sol
+			}
 		}
 		// A row can disappear between the anchor query and hydration (sync pull,
 		// for example). Skipping it keeps the response honest.
-		if entry.Feed != nil || entry.Diaper != nil || entry.Sleep != nil {
+		if entry.Feed != nil || entry.Diaper != nil || entry.Sleep != nil || entry.Bottle != nil || entry.Pump != nil || entry.Solid != nil {
 			out = append(out, entry)
 		}
 	}
@@ -137,10 +179,20 @@ func (s *Store) TimelineDaySummary(ctx context.Context, from, to, now time.Time)
 	if err := s.db.QueryRowContext(ctx, `
 		SELECT
 			(SELECT COUNT(1) FROM feeds   WHERE account_id = ? AND deleted_at IS NULL AND started_at >= ? AND started_at < ?),
-			(SELECT COUNT(1) FROM diapers WHERE account_id = ? AND deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?)`,
+			(SELECT COUNT(1) FROM diapers WHERE account_id = ? AND deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?),
+			(SELECT COUNT(1) FROM bottles WHERE account_id = ? AND deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?),
+			(SELECT COALESCE(SUM(amount_ml), 0) FROM bottles WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?),
+			(SELECT COUNT(1) FROM pumps   WHERE account_id = ? AND deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?),
+			(SELECT COALESCE(SUM(amount_ml), 0) FROM pumps   WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?),
+			(SELECT COUNT(1) FROM solids  WHERE account_id = ? AND deleted_at IS NULL AND logged_at  >= ? AND logged_at  < ?)`,
 		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
-	).Scan(&summary.Feeds, &summary.Diapers); err != nil {
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+		AccountID(ctx), encodeTime(from), encodeTime(to),
+	).Scan(&summary.Feeds, &summary.Diapers, &summary.Bottles, &summary.BottleML, &summary.Pumps, &summary.PumpML, &summary.Solids); err != nil {
 		return timeline.DaySummary{}, fmt.Errorf("store: timeline day counts: %w", err)
 	}
 
@@ -206,8 +258,14 @@ func (s *Store) HasTimelineBefore(ctx context.Context, before time.Time) (bool, 
 		SELECT CASE WHEN
 			EXISTS (SELECT 1 FROM feeds   WHERE account_id = ? AND deleted_at IS NULL AND started_at < ?) OR
 			EXISTS (SELECT 1 FROM diapers WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
-			EXISTS (SELECT 1 FROM sleeps  WHERE account_id = ? AND deleted_at IS NULL AND started_at < ?)
+			EXISTS (SELECT 1 FROM sleeps  WHERE account_id = ? AND deleted_at IS NULL AND started_at < ?) OR
+			EXISTS (SELECT 1 FROM bottles WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
+			EXISTS (SELECT 1 FROM pumps   WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
+			EXISTS (SELECT 1 FROM solids  WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?)
 		THEN 1 ELSE 0 END`,
+		AccountID(ctx), encodeTime(before),
+		AccountID(ctx), encodeTime(before),
+		AccountID(ctx), encodeTime(before),
 		AccountID(ctx), encodeTime(before),
 		AccountID(ctx), encodeTime(before),
 		AccountID(ctx), encodeTime(before),

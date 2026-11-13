@@ -182,6 +182,35 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sleeps/{id}/delete", s.handleDeleteSleep)   // no-JS fallback
 	mux.HandleFunc("POST /sleeps/{id}/restore", s.handleRestoreSleep) // undo
 
+	mux.HandleFunc("GET /bottles/sheet", s.handleBottleSheet)
+	mux.HandleFunc("POST /bottles", s.handleCreateBottle)
+	mux.HandleFunc("GET /bottles/{id}/sheet", s.handleBottleEditPage)
+	mux.HandleFunc("PATCH /bottles/{id}", s.handleUpdateBottle)
+	mux.HandleFunc("POST /bottles/{id}", s.handleUpdateBottle) // no-JS fallback
+	mux.HandleFunc("DELETE /bottles/{id}", s.handleDeleteBottle)
+	mux.HandleFunc("POST /bottles/{id}/delete", s.handleDeleteBottle)   // no-JS fallback
+	mux.HandleFunc("POST /bottles/{id}/restore", s.handleRestoreBottle) // undo
+
+	mux.HandleFunc("GET /pumps/sheet", s.handlePumpSheet)
+	mux.HandleFunc("POST /pumps", s.handleCreatePump)
+	mux.HandleFunc("GET /pumps/{id}/sheet", s.handlePumpEditPage)
+	mux.HandleFunc("PATCH /pumps/{id}", s.handleUpdatePump)
+	mux.HandleFunc("POST /pumps/{id}", s.handleUpdatePump) // no-JS fallback
+	mux.HandleFunc("DELETE /pumps/{id}", s.handleDeletePump)
+	mux.HandleFunc("POST /pumps/{id}/delete", s.handleDeletePump)   // no-JS fallback
+	mux.HandleFunc("POST /pumps/{id}/restore", s.handleRestorePump) // undo
+
+	mux.HandleFunc("GET /solids/sheet", s.handleSolidSheet)
+	mux.HandleFunc("POST /solids", s.handleCreateSolid)
+	mux.HandleFunc("GET /solids/{id}/sheet", s.handleSolidEditPage)
+	mux.HandleFunc("PATCH /solids/{id}", s.handleUpdateSolid)
+	mux.HandleFunc("POST /solids/{id}", s.handleUpdateSolid) // no-JS fallback
+	mux.HandleFunc("DELETE /solids/{id}", s.handleDeleteSolid)
+	mux.HandleFunc("POST /solids/{id}/delete", s.handleDeleteSolid)   // no-JS fallback
+	mux.HandleFunc("POST /solids/{id}/restore", s.handleRestoreSolid) // undo
+
+	mux.HandleFunc("GET /manual/sheet", s.handleManualSheet)
+
 	mux.HandleFunc("GET /album", s.handleAlbumPage)
 	mux.HandleFunc("GET /album/partial", s.handleAlbumPartial)
 	mux.HandleFunc("POST /album/photos", s.handleAlbumUpload)
@@ -208,6 +237,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/baby", s.handleSaveBabyName)
 	mux.HandleFunc("POST /settings/mascot", s.handleSaveMascot)
 	mux.HandleFunc("POST /settings/feed-alert", s.handleSaveFeedAlert)
+	mux.HandleFunc("POST /settings/trackers", s.handleSaveTrackers)
 	mux.HandleFunc("GET /export.csv", s.handleExportCSV)
 	mux.HandleFunc("GET /export.json", s.handleExportJSON)
 	mux.HandleFunc("GET /export.sql", s.handleExportSQL)
