@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.3",
+		Date:    "Nov 13, 2026",
+		Title:   "Cleaner settings, even albums",
+		Summary: "The Feeding Mode picker becomes a simple three-part control, and landscape photos now fill their album tiles. Your logs stay exactly as they are.",
+		Sections: []Section{
+			{
+				Title: "Changed",
+				Items: []string{
+					"Feeding Mode in Settings is now a three-segment control: Direct Latch, Hybrid, or Exclusive Pump, with shorter labels that fit on a phone.",
+					"Landscape album photos now crop to fill square grid tiles, so rows line up evenly instead of mixing tall and wide cards.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.2",
 		Date:    "Nov 13, 2026",
 		Title:   "More ways to feed",
