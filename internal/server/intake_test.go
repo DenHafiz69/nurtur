@@ -22,24 +22,29 @@ func TestIntakeOptInAndQuickLogFlows(t *testing.T) {
 		t.Fatal("expected intake dock rows to be hidden by default")
 	}
 
-	// Enable all 3 trackers in oz mode via Settings (HTMX request must OOB-update the dock).
+	// Enable hybrid mode in oz mode via Settings (HTMX request must OOB-update the dock).
 	res = env.do(t, http.MethodPost, "/settings/trackers", url.Values{
-		"track_bottles": {"1"},
-		"track_pumps":   {"1"},
-		"track_solids":  {"1"},
-		"volume_unit":   {"oz"},
+		"feeding_mode": {"hybrid"},
+		"track_solids": {"1"},
+		"volume_unit":  {"oz"},
 	}, true)
 	if res.Code != http.StatusOK {
 		t.Fatalf("POST /settings/trackers = %d: %s", res.Code, res.Body.String())
 	}
-	if !strings.Contains(res.Body.String(), `id="intake-dock-rows"`) || !strings.Contains(res.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(res.Body.String(), "2 oz") {
+	if !strings.Contains(res.Body.String(), `id="intake-dock-rows"`) || !strings.Contains(res.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(res.Body.String(), "2oz") {
 		t.Fatalf("expected POST /settings/trackers to OOB-swap #intake-dock-rows")
 	}
 
 	res = env.do(t, http.MethodGet, "/", nil, false)
 	body = res.Body.String()
-	if !strings.Contains(body, "2 oz") || !strings.Contains(body, "/pumps/sheet?side=left") || !strings.Contains(body, "/solids/sheet") {
-		t.Fatalf("expected enabled intake dock rows in oz mode")
+	if !strings.Contains(body, "2oz") || !strings.Contains(body, "Start Pump") || !strings.Contains(body, "Log Output") || !strings.Contains(body, "/solids/sheet") || !strings.Contains(body, "/manual/sheet") {
+		t.Fatalf("expected enabled intake dock rows and manual link in hybrid oz mode")
+	}
+
+	// Manual sheet renders cleanly
+	res = env.do(t, http.MethodGet, "/manual/sheet", nil, true)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Log past entry") {
+		t.Fatalf("GET /manual/sheet = %d", res.Code)
 	}
 
 	// Quick-tap bottle

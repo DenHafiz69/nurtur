@@ -75,6 +75,7 @@ func (s *Server) buildPage(ctx context.Context, nonce string, toast *view.Toast)
 			Since:     *snap.LastFeed.EndedAt,
 			Elapsed:   elapsed,
 		}
+		p.NextSide = string(feed.Opposite(snap.LastFeed.MostRecentSide()))
 	}
 
 	feeds, err := s.store.RecentFeeds(ctx, snap.DayStart, snap.DayEnd, 100)

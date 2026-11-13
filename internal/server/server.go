@@ -209,6 +209,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /solids/{id}/delete", s.handleDeleteSolid)   // no-JS fallback
 	mux.HandleFunc("POST /solids/{id}/restore", s.handleRestoreSolid) // undo
 
+	mux.HandleFunc("GET /manual/sheet", s.handleManualSheet)
+
 	mux.HandleFunc("GET /album", s.handleAlbumPage)
 	mux.HandleFunc("GET /album/partial", s.handleAlbumPartial)
 	mux.HandleFunc("POST /album/photos", s.handleAlbumUpload)

@@ -7,34 +7,43 @@
 {{end}}
 
 {{define "intake-dock-rows-inner"}}
-  {{if .Trackers.Bottles}}
-  <section class="intake-dock-row" aria-label="Log a bottle">
-    <span class="intake-dock-label">{{icon "bottle"}}<span>Bottle</span></span>
-    <div class="intake-dock-actions">
+  {{if .Trackers.ShowHybrid}}
+  <section class="dock-section" aria-label="Log a bottle">
+    <p class="dock-micro-label">Bottle</p>
+    <div class="bottle-grid">
       {{range .Trackers.BottlePresets}}
       <form method="post" action="/bottles" hx-post="/bottles" hx-target="#status-strip" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
         <input type="hidden" name="milk_type" value="breast_milk">
         <input type="hidden" name="amount_ml" value="{{.AmountML}}">
         <input type="hidden" name="quick" value="1">
-        <button type="submit" class="diaper-pill intake-pill">{{.Label}}</button>
+        <button type="submit" class="bottle-pill">{{.Label}}</button>
       </form>
       {{end}}
-      <a class="diaper-pill intake-pill intake-pill-more" href="/bottles/sheet" hx-get="/bottles/sheet" hx-target="#action-dialog" hx-swap="innerHTML">Custom</a>
+      <a class="bottle-pill bottle-pill-custom" href="/bottles/sheet" hx-get="/bottles/sheet" hx-target="#action-dialog" hx-swap="innerHTML">Custom</a>
     </div>
   </section>
-  {{end}}
-  {{if .Trackers.Pumps}}
-  <section class="intake-dock-row" aria-label="Log pumping">
-    <span class="intake-dock-label">{{icon "pump"}}<span>Pump</span></span>
-    <div class="intake-dock-actions">
-      <a class="diaper-pill intake-pill" href="/pumps/sheet?side=left" hx-get="/pumps/sheet?side=left" hx-target="#action-dialog" hx-swap="innerHTML">Left</a>
-      <a class="diaper-pill intake-pill" href="/pumps/sheet?side=right" hx-get="/pumps/sheet?side=right" hx-target="#action-dialog" hx-swap="innerHTML">Right</a>
-      <a class="diaper-pill intake-pill" href="/pumps/sheet?side=both" hx-get="/pumps/sheet?side=both" hx-target="#action-dialog" hx-swap="innerHTML">Both</a>
+  <section class="dock-section" id="pump-dock-slot" aria-label="Log pumping">
+    <p class="dock-micro-label">Pump</p>
+    <div class="pump-grid" data-pump-idle>
+      <button type="button" class="pump-pill" data-pump-start>{{icon "play"}}<span>Start Pump</span></button>
+      <a class="pump-pill" href="/pumps/sheet?side=both" hx-get="/pumps/sheet?side=both" hx-target="#action-dialog" hx-swap="innerHTML">{{icon "pump"}}<span>Log Output</span></a>
+    </div>
+    <div class="pump-live" data-pump-live hidden>
+      <div class="pump-live-readout">
+        <span class="pump-live-dot" aria-hidden="true"></span>
+        <span class="pump-live-label">Pumping</span>
+        <strong class="pump-live-digits" data-pump-digits>00:00</strong>
+      </div>
+      <div class="pump-live-actions">
+        <button type="button" class="pump-pill pump-pill-cancel" data-pump-cancel>Cancel</button>
+        <button type="button" class="pump-pill pump-pill-done" data-pump-stop>{{icon "check"}}<span>Done &amp; Log</span></button>
+      </div>
     </div>
   </section>
   {{end}}
   {{if .Trackers.Solids}}
-  <section class="intake-dock-row" aria-label="Log solids">
+  <section class="dock-section" aria-label="Log solids">
+    <p class="dock-micro-label">Solids</p>
     <a class="diaper-pill intake-pill intake-pill-wide" href="/solids/sheet" hx-get="/solids/sheet" hx-target="#action-dialog" hx-swap="innerHTML">{{icon "solid"}}<span>Log solid meal</span></a>
   </section>
   {{end}}
@@ -289,5 +298,43 @@
       <button type="submit" class="btn btn-primary">Save</button>
     </div>
   </form>
+</div>
+{{end}}
+
+{{define "manual-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Log past entry</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <p class="sheet-copy">Choose what you want to backdate or log manually.</p>
+  <div class="manual-sheet-list">
+    <a class="manual-sheet-item" href="/sleeps/sheet" hx-get="/sleeps/sheet" hx-target="#action-dialog" hx-swap="innerHTML">
+      <span class="manual-sheet-icon tone-sage">{{icon "moon"}}</span>
+      <span>Earlier sleep</span>
+      <span class="manual-sheet-arrow">{{icon "arrow-right"}}</span>
+    </a>
+    <a class="manual-sheet-item" href="/diapers/sheet" hx-get="/diapers/sheet" hx-target="#action-dialog" hx-swap="innerHTML">
+      <span class="manual-sheet-icon tone-butter">{{icon "diaper"}}</span>
+      <span>Diaper</span>
+      <span class="manual-sheet-arrow">{{icon "arrow-right"}}</span>
+    </a>
+    <a class="manual-sheet-item" href="/bottles/sheet" hx-get="/bottles/sheet" hx-target="#action-dialog" hx-swap="innerHTML">
+      <span class="manual-sheet-icon tone-lavender">{{icon "bottle"}}</span>
+      <span>Bottle</span>
+      <span class="manual-sheet-arrow">{{icon "arrow-right"}}</span>
+    </a>
+    <a class="manual-sheet-item" href="/pumps/sheet?side=both" hx-get="/pumps/sheet?side=both" hx-target="#action-dialog" hx-swap="innerHTML">
+      <span class="manual-sheet-icon tone-sky">{{icon "pump"}}</span>
+      <span>Pump</span>
+      <span class="manual-sheet-arrow">{{icon "arrow-right"}}</span>
+    </a>
+    <a class="manual-sheet-item" href="/solids/sheet" hx-get="/solids/sheet" hx-target="#action-dialog" hx-swap="innerHTML">
+      <span class="manual-sheet-icon tone-peach">{{icon "solid"}}</span>
+      <span>Solid meal</span>
+      <span class="manual-sheet-arrow">{{icon "arrow-right"}}</span>
+    </a>
+  </div>
 </div>
 {{end}}

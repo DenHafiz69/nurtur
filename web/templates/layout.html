@@ -83,6 +83,7 @@
             {{template "sleep-pill" .}}
             {{template "intake-dock-rows" .}}
           </div>
+          <a class="dock-manual-link" href="/manual/sheet" hx-get="/manual/sheet" hx-target="#action-dialog" hx-swap="innerHTML">+ Log past entry / manual</a>
         </div>
       </details>
     </footer>
@@ -105,6 +106,7 @@
       {{if eq .Sheet "pump-edit"}}{{template "pump-edit" .}}{{end}}
       {{if eq .Sheet "solid-sheet"}}{{template "solid-sheet" .}}{{end}}
       {{if eq .Sheet "solid-edit"}}{{template "solid-edit" .}}{{end}}
+      {{if eq .Sheet "manual-sheet"}}{{template "manual-sheet" .}}{{end}}
       {{if eq .Sheet "album-edit"}}{{template "album-edit" .}}{{end}}
     </dialog>
 

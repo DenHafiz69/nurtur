@@ -132,7 +132,7 @@ func TestDashboardShellAndSecurityHeaders(t *testing.T) {
 	for _, want := range []string{
 		`id="timer-card"`,
 		`data-theme="day"`,
-		"Tap a side to start.",
+		"Tap to start a timer or log instantly",
 		"Nothing logged yet today.",
 		`id="last-nursed"`,
 		`id="status-strip"`,

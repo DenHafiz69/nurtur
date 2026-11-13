@@ -63,16 +63,16 @@
 
   <section class="settings-card" aria-labelledby="settings-trackers">
     <h3 id="settings-trackers" class="settings-title">Growing baby trackers</h3>
-    <p class="settings-note">Optional extra buttons in Quick log as your baby grows. Turning one off hides the button without deleting past logs.</p>
+    <p class="settings-note">Choose how you feed and which extra buttons appear in Quick log. Switching modes never deletes past logs.</p>
     <form class="settings-form" method="post" action="/settings/trackers" hx-post="/settings/trackers" hx-target="#settings-panel" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
-      <label class="check-row">
-        <input type="checkbox" name="track_bottles" value="1"{{if .Settings.TrackBottles}} checked{{end}}>
-        <span>Bottle feeds (breast milk &amp; formula)</span>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" name="track_pumps" value="1"{{if .Settings.TrackPumps}} checked{{end}}>
-        <span>Pumping sessions</span>
-      </label>
+      <div class="field">
+        <span class="field-label">Feeding mode</span>
+        <div class="chip-options">
+          <label class="chip-option"><input type="radio" name="feeding_mode" value="direct"{{if eq .Settings.FeedingMode "direct"}} checked{{end}}><span>Direct nursing</span></label>
+          <label class="chip-option"><input type="radio" name="feeding_mode" value="hybrid"{{if eq .Settings.FeedingMode "hybrid"}} checked{{end}}><span>Hybrid (nursing + bottle/pump)</span></label>
+          <label class="chip-option"><input type="radio" name="feeding_mode" value="exclusive_pump"{{if eq .Settings.FeedingMode "exclusive_pump"}} checked{{end}}><span>Exclusive pumping</span></label>
+        </div>
+      </div>
       <label class="check-row">
         <input type="checkbox" name="track_solids" value="1"{{if .Settings.TrackSolids}} checked{{end}}>
         <span>Solids &amp; meals</span>

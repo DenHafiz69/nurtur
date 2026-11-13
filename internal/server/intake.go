@@ -461,13 +461,28 @@ func (s *Server) handlePumpSheet(w http.ResponseWriter, r *http.Request) {
 		side = intake.SideBoth
 	}
 	unit := s.volumeUnit(r.Context())
+	dur := "15"
+	if rawDur := strings.TrimSpace(r.URL.Query().Get("duration_minutes")); rawDur != "" {
+		if d, convErr := strconv.Atoi(rawDur); convErr == nil && d >= 0 && d <= intake.MaxDurationMin {
+			dur = strconv.Itoa(d)
+		}
+	}
 	data.PumpSheet = &view.PumpSheetView{
 		Side:      string(side),
 		Unit:      string(unit),
-		Duration:  "15",
+		Duration:  dur,
 		TimeInput: s.clock.Now().In(s.loc).Format("2006-01-02T15:04"),
 	}
 	s.renderSheet(w, r, "pump-sheet", data)
+}
+
+func (s *Server) handleManualSheet(w http.ResponseWriter, r *http.Request) {
+	data, err := s.buildPage(r.Context(), nonceFrom(r.Context()), nil)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.renderSheet(w, r, "manual-sheet", data)
 }
 
 func (s *Server) handleCreatePump(w http.ResponseWriter, r *http.Request) {

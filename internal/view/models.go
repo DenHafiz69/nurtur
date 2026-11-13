@@ -89,6 +89,7 @@ type PageData struct {
 	SolidSheet   *SolidSheetView
 	SolidEdit    *SolidEditView
 
+	NextSide string // "left" or "right" recommended next nursing side
 	Trackers TrackerSettings
 
 	// TimerOOB adds hx-swap-oob when the timer is a companion fragment rather
@@ -301,6 +302,7 @@ type SettingsView struct {
 	FeedAlertMinutes int
 	FeedAlertErr     string
 
+	FeedingMode  string // "direct", "hybrid", "exclusive_pump"
 	TrackBottles bool
 	TrackPumps   bool
 	TrackSolids  bool
@@ -456,9 +458,11 @@ type BottlePreset struct {
 
 // TrackerSettings holds per-account opt-in growing-baby trackers.
 type TrackerSettings struct {
+	FeedingMode   string // "direct", "hybrid", "exclusive_pump"
 	Bottles       bool
 	Pumps         bool
 	Solids        bool
+	ShowHybrid    bool   // true when FeedingMode is hybrid or exclusive_pump
 	VolumeUnit    string // "ml" or "oz"
 	BottlePresets []BottlePreset
 }

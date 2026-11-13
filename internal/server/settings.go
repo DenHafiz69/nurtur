@@ -24,6 +24,7 @@ const (
 	settingBabyGender       = "baby_gender"
 	settingMascot           = "mascot"
 	settingFeedAlertMinutes = "feed_alert_minutes"
+	settingFeedingMode      = "feeding_mode"
 	settingTrackBottles     = "track_bottles"
 	settingTrackPumps       = "track_pumps"
 	settingTrackSolids      = "track_solids"
@@ -516,6 +517,7 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 
 		FeedAlertMinutes: s.feedAlertMinutes(ctx),
 
+		FeedingMode:  trackers.FeedingMode,
 		TrackBottles: trackers.Bottles,
 		TrackPumps:   trackers.Pumps,
 		TrackSolids:  trackers.Solids,
@@ -592,21 +594,34 @@ func (s *Server) trackerSettings(ctx context.Context) view.TrackerSettings {
 		unit = intake.UnitML
 	}
 	presets := []view.BottlePreset{
-		{AmountML: 60, Label: "60 ml"},
-		{AmountML: 90, Label: "90 ml"},
-		{AmountML: 120, Label: "120 ml"},
+		{AmountML: 60, Label: "60ml"},
+		{AmountML: 90, Label: "90ml"},
+		{AmountML: 120, Label: "120ml"},
 	}
 	if unit == intake.UnitOZ {
 		presets = []view.BottlePreset{
-			{AmountML: 59, Label: "2 oz"},
-			{AmountML: 89, Label: "3 oz"},
-			{AmountML: 118, Label: "4 oz"},
+			{AmountML: 59, Label: "2oz"},
+			{AmountML: 89, Label: "3oz"},
+			{AmountML: 118, Label: "4oz"},
 		}
 	}
+	mode := values[settingFeedingMode]
+	switch mode {
+	case "direct", "hybrid", "exclusive_pump":
+	default:
+		if values[settingTrackBottles] == "1" || values[settingTrackPumps] == "1" {
+			mode = "hybrid"
+		} else {
+			mode = "direct"
+		}
+	}
+	showHybrid := mode == "hybrid" || mode == "exclusive_pump"
 	return view.TrackerSettings{
-		Bottles:       values[settingTrackBottles] == "1",
-		Pumps:         values[settingTrackPumps] == "1",
+		FeedingMode:   mode,
+		Bottles:       showHybrid,
+		Pumps:         showHybrid,
 		Solids:        values[settingTrackSolids] == "1",
+		ShowHybrid:    showHybrid,
 		VolumeUnit:    string(unit),
 		BottlePresets: presets,
 	}
@@ -634,9 +649,33 @@ func (s *Server) handleSaveTrackers(w http.ResponseWriter, r *http.Request) {
 		}
 		return "0"
 	}
+	mode := strings.TrimSpace(r.FormValue("feeding_mode"))
+	switch mode {
+	case "direct", "hybrid", "exclusive_pump":
+	case "":
+		if boolVal("track_bottles") == "1" || boolVal("track_pumps") == "1" {
+			mode = "hybrid"
+		} else {
+			mode = "direct"
+		}
+	default:
+		settings, buildErr := s.buildSettings(r.Context())
+		if buildErr != nil {
+			s.serverError(w, r, buildErr)
+			return
+		}
+		settings.TrackersErr = "Choose a valid feeding mode."
+		s.respondSettings(w, r, http.StatusUnprocessableEntity, settings, nil)
+		return
+	}
+	showHybrid := "0"
+	if mode == "hybrid" || mode == "exclusive_pump" {
+		showHybrid = "1"
+	}
 	if err := s.store.SetSettings(r.Context(), map[string]string{
-		settingTrackBottles: boolVal("track_bottles"),
-		settingTrackPumps:   boolVal("track_pumps"),
+		settingFeedingMode:  mode,
+		settingTrackBottles: showHybrid,
+		settingTrackPumps:   showHybrid,
 		settingTrackSolids:  boolVal("track_solids"),
 		settingVolumeUnit:   string(unit),
 	}); err != nil {

@@ -266,7 +266,7 @@ func TestAccountsHaveSeparateData(t *testing.T) {
 	if strings.Contains(husbandBody, "Aisyah") || strings.Contains(husbandBody, `data-feed-id=`) {
 		t.Fatalf("husband dashboard leaked the wife's data:\n%s", husbandBody)
 	}
-	if !strings.Contains(husbandBody, "Tap a side to start.") {
+	if !strings.Contains(husbandBody, "Tap to start a timer or log instantly") {
 		t.Fatalf("husband should start with an idle dashboard:\n%s", husbandBody)
 	}
 
