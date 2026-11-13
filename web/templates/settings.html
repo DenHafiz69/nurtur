@@ -62,16 +62,22 @@
   </section>
 
   <section class="settings-card" aria-labelledby="settings-trackers">
-    <h3 id="settings-trackers" class="settings-title">Growing baby trackers</h3>
-    <p class="settings-note">Choose how you feed and which extra buttons appear in Quick log. Switching modes never deletes past logs.</p>
+    <h3 id="settings-trackers" class="settings-title">Feeding Mode</h3>
+    <p class="settings-note">Shows or hides pumping &amp; stash widgets without deleting any logged history.</p>
     <form class="settings-form" method="post" action="/settings/trackers" hx-post="/settings/trackers" hx-target="#settings-panel" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
-      <div class="field">
-        <span class="field-label">Feeding mode</span>
-        <div class="chip-options">
-          <label class="chip-option"><input type="radio" name="feeding_mode" value="direct"{{if eq .Settings.FeedingMode "direct"}} checked{{end}}><span>Direct nursing</span></label>
-          <label class="chip-option"><input type="radio" name="feeding_mode" value="hybrid"{{if eq .Settings.FeedingMode "hybrid"}} checked{{end}}><span>Hybrid (nursing + bottle/pump)</span></label>
-          <label class="chip-option"><input type="radio" name="feeding_mode" value="exclusive_pump"{{if eq .Settings.FeedingMode "exclusive_pump"}} checked{{end}}><span>Exclusive pumping</span></label>
-        </div>
+      <div class="segmented-control" role="radiogroup" aria-label="Feeding Mode">
+        <label class="segmented-option">
+          <input type="radio" name="feeding_mode" value="direct"{{if eq .Settings.FeedingMode "direct"}} checked{{end}}>
+          <span>Direct Latch</span>
+        </label>
+        <label class="segmented-option">
+          <input type="radio" name="feeding_mode" value="hybrid"{{if eq .Settings.FeedingMode "hybrid"}} checked{{end}}>
+          <span>Hybrid</span>
+        </label>
+        <label class="segmented-option">
+          <input type="radio" name="feeding_mode" value="exclusive_pump"{{if eq .Settings.FeedingMode "exclusive_pump"}} checked{{end}}>
+          <span>Exclusive Pump</span>
+        </label>
       </div>
       <label class="check-row">
         <input type="checkbox" name="track_solids" value="1"{{if .Settings.TrackSolids}} checked{{end}}>
@@ -86,7 +92,7 @@
       </div>
       {{if .Settings.TrackersErr}}<p class="field-error" role="alert">{{.Settings.TrackersErr}}</p>{{end}}
       <div class="sheet-actions">
-        <button type="submit" class="btn btn-primary">Save trackers</button>
+        <button type="submit" class="btn btn-primary">Save feeding mode</button>
       </div>
     </form>
   </section>
