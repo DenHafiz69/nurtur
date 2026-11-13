@@ -22,7 +22,7 @@ func TestIntakeOptInAndQuickLogFlows(t *testing.T) {
 		t.Fatal("expected intake dock rows to be hidden by default")
 	}
 
-	// Enable all 3 trackers in oz mode via Settings.
+	// Enable all 3 trackers in oz mode via Settings (HTMX request must OOB-update the dock).
 	res = env.do(t, http.MethodPost, "/settings/trackers", url.Values{
 		"track_bottles": {"1"},
 		"track_pumps":   {"1"},
@@ -31,6 +31,9 @@ func TestIntakeOptInAndQuickLogFlows(t *testing.T) {
 	}, true)
 	if res.Code != http.StatusOK {
 		t.Fatalf("POST /settings/trackers = %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), `id="intake-dock-rows"`) || !strings.Contains(res.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(res.Body.String(), "2 oz") {
+		t.Fatalf("expected POST /settings/trackers to OOB-swap #intake-dock-rows")
 	}
 
 	res = env.do(t, http.MethodGet, "/", nil, false)

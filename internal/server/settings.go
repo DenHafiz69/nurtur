@@ -651,7 +651,7 @@ func (s *Server) handleSaveTrackers(w http.ResponseWriter, r *http.Request) {
 	s.respondSettings(w, r, http.StatusOK, settings, &view.Toast{
 		Message: "Trackers updated.",
 		Kind:    "success",
-	})
+	}, "intake-dock-rows-oob")
 }
 
 func (s *Server) handleOffline(w http.ResponseWriter, r *http.Request) {

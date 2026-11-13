@@ -1,4 +1,12 @@
 {{define "intake-dock-rows"}}
+<div id="intake-dock-rows" class="intake-dock-rows">{{template "intake-dock-rows-inner" .}}</div>
+{{end}}
+
+{{define "intake-dock-rows-oob"}}
+<div id="intake-dock-rows" class="intake-dock-rows" hx-swap-oob="outerHTML">{{template "intake-dock-rows-inner" .}}</div>
+{{end}}
+
+{{define "intake-dock-rows-inner"}}
   {{if .Trackers.Bottles}}
   <section class="intake-dock-row" aria-label="Log a bottle">
     <span class="intake-dock-label">{{icon "bottle"}}<span>Bottle</span></span>

@@ -5385,6 +5385,16 @@ body.album-viewer-open .app-main {
 
 /* ---------- Growing-baby intake trackers ---------- */
 
+.intake-dock-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intake-dock-rows:empty {
+  display: none;
+}
+
 .intake-dock-row {
   display: flex;
   align-items: center;
