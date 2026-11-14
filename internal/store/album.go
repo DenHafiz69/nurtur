@@ -247,6 +247,20 @@ func (s *Store) HasAlbumPhotosBefore(ctx context.Context, before time.Time) (boo
 	return exists == 1, nil
 }
 
+// CountAlbumPhotos returns the total number of live photos in the current account's album.
+func (s *Store) CountAlbumPhotos(ctx context.Context) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(1) FROM album_photos
+		WHERE account_id = ? AND deleted_at IS NULL`,
+		AccountID(ctx),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("store: count album photos: %w", err)
+	}
+	return count, nil
+}
+
 // UpdateAlbumPhoto corrects the capture date and caption. A manual correction
 // always records taken_at_source='manual' so the UI can explain where the date
 // came from.

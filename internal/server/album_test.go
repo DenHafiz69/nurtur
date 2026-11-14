@@ -417,6 +417,10 @@ func TestAlbumPagingNeverSplitsADay(t *testing.T) {
 	if !strings.Contains(body, "Load earlier days") {
 		t.Fatalf("first page has no paging control:\n%s", body)
 	}
+	wantCount := fmt.Sprintf(">%d photos</p>", defaultAlbumLimit+1)
+	if !strings.Contains(body, wantCount) {
+		t.Fatalf("first page count did not include older unloaded photo (want %s):\n%s", wantCount, body)
+	}
 
 	dayStart := time.Date(testNow.Year(), testNow.Month(), testNow.Day(), 0, 0, 0, 0, time.UTC)
 	cursor := url.QueryEscape(dayStart.Format(time.RFC3339))
@@ -433,6 +437,59 @@ func TestAlbumPagingNeverSplitsADay(t *testing.T) {
 	}
 	if strings.Contains(partial, "Load earlier days") {
 		t.Fatalf("partial offered another page with no older photos:\n%s", partial)
+	}
+}
+
+func TestAlbumTotalCountAcrossUploadDeleteRestore(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+
+	for i := 0; i < defaultAlbumLimit; i++ {
+		seedAlbumPhoto(t, env.store, ctx, fmt.Sprintf("%032x", i+1), testNow.Add(-time.Duration(i+1)*time.Minute))
+	}
+	older := seedAlbumPhoto(t, env.store, ctx, fmt.Sprintf("%032x", 1000), testNow.AddDate(0, 0, -2))
+
+	// Uploading an out-of-range older photo returns the full album total.
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     testAlbumWebP(t),
+		thumb:    testAlbumWebP(t),
+		fullType: "image/webp",
+		uploadID: "fedcba9876543210fedcba9876543210",
+		takenAt:  testNow.AddDate(0, 0, -5).Format(time.RFC3339),
+		extra:    map[string]string{"loaded_before": testNow.AddDate(0, 0, -1).Format(time.RFC3339)},
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d\n%s", rec.Code, rec.Body.String())
+	}
+	var up albumUploadResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &up); err != nil {
+		t.Fatalf("decode upload response: %v", err)
+	}
+	if up.TotalCount != defaultAlbumLimit+2 {
+		t.Fatalf("upload total_count = %d, want %d", up.TotalCount, defaultAlbumLimit+2)
+	}
+
+	// Deleting a photo returns the updated total including older photos.
+	delRec := env.albumJSON(t, http.MethodDelete, fmt.Sprintf("/album/photos/%d", older.ID), nil)
+	if delRec.Code != http.StatusOK {
+		t.Fatalf("delete status = %d\n%s", delRec.Code, delRec.Body.String())
+	}
+	var del albumDeleteResponse
+	if err := json.Unmarshal(delRec.Body.Bytes(), &del); err != nil {
+		t.Fatalf("decode delete response: %v", err)
+	}
+	if del.TotalCount != defaultAlbumLimit+1 {
+		t.Fatalf("delete total_count = %d, want %d", del.TotalCount, defaultAlbumLimit+1)
+	}
+
+	// Restoring via HTMX returns an OOB #album-count with the restored total.
+	restRec := env.do(t, http.MethodPost, del.UndoURL, nil, true)
+	if restRec.Code != http.StatusOK {
+		t.Fatalf("restore status = %d\n%s", restRec.Code, restRec.Body.String())
+	}
+	wantOOB := fmt.Sprintf(`id="album-count" class="album-count" hx-swap-oob="outerHTML">%d photos</p>`, defaultAlbumLimit+2)
+	if !strings.Contains(restRec.Body.String(), wantOOB) {
+		t.Fatalf("restore response missing updated OOB count %q:\n%s", wantOOB, restRec.Body.String())
 	}
 }
 

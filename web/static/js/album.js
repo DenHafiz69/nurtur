@@ -440,10 +440,12 @@
     closeViewer();
     removeAlbumTile(tile);
     if (data.out_of_range) {
+      if (typeof data.total_count === "number") updateCount(data.total_count);
       dispatchToast("Moved to " + (data.day_label || "another day") + ".", "success", "View that day", data.day_url);
       return;
     }
     insertTile(data);
+    if (typeof data.total_count === "number") updateCount(data.total_count);
     dispatchToast("Photo moved to " + (data.day_label || "another day") + ".", "success", "View that day", data.day_url);
   }
 
@@ -474,6 +476,7 @@
         closeViewer();
         var current = document.querySelector('.album-tile[data-photo-id="' + String(id) + '"]');
         if (current) removeAlbumTile(current);
+        if (typeof data.total_count === "number") updateCount(data.total_count);
         dispatchToast("Photo deleted.", "success", "Undo", data.undo_url, "post", "#album-day-" + dayKey, 8000);
       })
       .catch(function () {
@@ -493,7 +496,6 @@
         if (day.hidden && day.isConnected) day.remove();
       }, 20000);
     }
-    updateCount();
   }
 
   function dispatchToast(message, kind, actionLabel, actionURL, actionMethod, actionTarget, duration) {
@@ -516,7 +518,6 @@
   document.body.addEventListener("htmx:afterSwap", function () {
     if (isAlbumPage()) {
       initViewerDialog();
-      updateCount();
     } else {
       document.body.classList.remove("album-viewer-open");
       viewerReturnFocus = null;
@@ -974,6 +975,7 @@
           } else {
             insertTile(data);
           }
+          if (typeof data.total_count === "number") updateCount(data.total_count);
           resolve();
           return;
         }
@@ -1153,7 +1155,6 @@
       }
     }
     grid.insertBefore(tile, before);
-    updateCount();
   }
 
   function insertDay(root, day, key) {
@@ -1172,24 +1173,26 @@
     root.appendChild(day);
   }
 
-  function updateCount() {
-    var root = find("album-days");
-    if (!root) return;
-    var count = root.querySelectorAll(".album-tile").length;
-    var heading = document.querySelector(".album-heading");
-    if (!heading) return;
-    var label = document.querySelector(".album-count");
-    if (count === 0) {
-      if (label) label.parentNode.removeChild(label);
-      return;
-    }
+  function updateCount(total) {
+    if (typeof total !== "number" || !isFinite(total)) return;
+    var count = Math.max(0, Math.floor(total));
+    var label = find("album-count") || document.querySelector(".album-count");
     if (!label) {
+      var heading = document.querySelector(".album-heading");
+      if (!heading) return;
       label = document.createElement("p");
+      label.id = "album-count";
       label.className = "album-count";
       var sub = heading.querySelector(".page-sub");
       if (sub && sub.nextSibling) heading.insertBefore(label, sub.nextSibling);
       else heading.appendChild(label);
     }
+    if (count === 0) {
+      label.hidden = true;
+      label.textContent = "";
+      return;
+    }
+    label.hidden = false;
     label.textContent = count + (count === 1 ? " photo" : " photos");
   }
 

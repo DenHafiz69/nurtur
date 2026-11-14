@@ -111,6 +111,7 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 		dayEnd = now
 	}
 
+	loaded := 0
 	nextBoundary := dayEnd
 	for days := 0; days < maxAlbumDays; days++ {
 		// Find the newest photo before this page's boundary. Its local day is
@@ -143,20 +144,25 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 				group.Rows = append(group.Rows, s.albumRow(photo))
 			}
 			page.Days = append(page.Days, group)
-			page.Count += len(photos)
+			loaded += len(photos)
 		}
 
 		nextBoundary = dayStart
-		if page.Count >= defaultAlbumLimit {
+		if loaded >= defaultAlbumLimit {
 			break
 		}
 		dayEnd = dayStart
 	}
 
+	total, err := s.store.CountAlbumPhotos(ctx)
+	if err != nil {
+		return nil, err
+	}
 	hasMore, err := s.store.HasAlbumPhotosBefore(ctx, nextBoundary)
 	if err != nil {
 		return nil, err
 	}
+	page.Count = total
 	page.HasMore = hasMore
 	page.HasDays = len(page.Days) > 0
 	if hasMore {
@@ -234,6 +240,7 @@ type albumUploadResponse struct {
 	DayStart   string `json:"day_start,omitempty"`
 	OutOfRange bool   `json:"out_of_range,omitempty"`
 	DayURL     string `json:"day_url,omitempty"`
+	TotalCount int    `json:"total_count"`
 	Error      string `json:"error,omitempty"`
 }
 
@@ -373,6 +380,11 @@ func (s *Server) albumUploadSuccess(w http.ResponseWriter, r *http.Request, want
 		outOfRange = start.Before(oldest.UTC())
 	}
 	dayURL := "/album?before=" + url.QueryEscape(end.UTC().Format(time.RFC3339)) + "#album-day-" + dayKey
+	total, err := s.store.CountAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 
 	resp := albumUploadResponse{
 		OK:         true,
@@ -385,6 +397,7 @@ func (s *Server) albumUploadSuccess(w http.ResponseWriter, r *http.Request, want
 		DayStart:   start.UTC().Format(time.RFC3339),
 		OutOfRange: outOfRange,
 		DayURL:     dayURL,
+		TotalCount: total,
 	}
 	status := http.StatusCreated
 	if !created {
@@ -670,16 +683,18 @@ type albumEditResponse struct {
 	DayStart   string            `json:"day_start,omitempty"`
 	OutOfRange bool              `json:"out_of_range,omitempty"`
 	DayURL     string            `json:"day_url,omitempty"`
+	TotalCount int               `json:"total_count"`
 	Error      string            `json:"error,omitempty"`
 	Errors     map[string]string `json:"errors,omitempty"`
 }
 
 type albumDeleteResponse struct {
-	OK      bool   `json:"ok"`
-	ID      int64  `json:"id,omitempty"`
-	DayKey  string `json:"day_key,omitempty"`
-	UndoURL string `json:"undo_url,omitempty"`
-	Error   string `json:"error,omitempty"`
+	OK         bool   `json:"ok"`
+	ID         int64  `json:"id,omitempty"`
+	DayKey     string `json:"day_key,omitempty"`
+	UndoURL    string `json:"undo_url,omitempty"`
+	TotalCount int    `json:"total_count"`
+	Error      string `json:"error,omitempty"`
 }
 
 func wantsAlbumJSON(r *http.Request) bool {
@@ -827,6 +842,11 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 	if oldest, err := time.Parse(time.RFC3339, loadedFrom); err == nil && !oldest.IsZero() {
 		outOfRange = start.Before(oldest.UTC())
 	}
+	total, err := s.store.CountAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	writeAlbumMutationJSON(w, http.StatusOK, albumEditResponse{
 		OK:         true,
 		ID:         updated.ID,
@@ -841,6 +861,7 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 		DayStart:   start.UTC().Format(time.RFC3339),
 		OutOfRange: outOfRange,
 		DayURL:     "/album?before=" + url.QueryEscape(end.UTC().Format(time.RFC3339)) + "#album-day-" + s.albumDayKey(updated.TakenAt),
+		TotalCount: total,
 	})
 }
 
@@ -914,11 +935,17 @@ func (s *Server) handleAlbumDelete(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/album?deleted=1", http.StatusSeeOther)
 		return
 	}
+	total, err := s.store.CountAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	writeAlbumMutationJSON(w, http.StatusOK, albumDeleteResponse{
-		OK:      true,
-		ID:      id,
-		DayKey:  s.albumDayKey(photo.TakenAt),
-		UndoURL: fmt.Sprintf("/album/photos/%d/restore", id),
+		OK:         true,
+		ID:         id,
+		DayKey:     s.albumDayKey(photo.TakenAt),
+		UndoURL:    fmt.Sprintf("/album/photos/%d/restore", id),
+		TotalCount: total,
 	})
 }
 
@@ -966,9 +993,14 @@ func (s *Server) handleAlbumRestore(w http.ResponseWriter, r *http.Request) {
 	if !restored {
 		toast = &view.Toast{Message: "That photo is already back.", Kind: "info"}
 	}
+	total, err := s.store.CountAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	data := &view.PageData{
-		Album: &view.AlbumPageView{Days: []view.AlbumDay{day}, HasDays: true},
+		Album: &view.AlbumPageView{Days: []view.AlbumDay{day}, HasDays: true, Count: total},
 		Toast: toast,
 	}
-	s.writeFragments(w, r, http.StatusOK, "album-day-fragment", data, false, []string{"toast-oob"}, "", false, "", "")
+	s.writeFragments(w, r, http.StatusOK, "album-day-fragment", data, false, []string{"album-count-oob", "toast-oob"}, "", false, "", "")
 }

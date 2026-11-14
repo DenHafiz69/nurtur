@@ -4,7 +4,7 @@
     <div class="album-heading">
       <h2 class="page-title">Album</h2>
       <p class="page-sub">Photos of the small moments.</p>
-      {{if .Album.HasDays}}<p class="album-count">{{.Album.Count}} photo{{if ne .Album.Count 1}}s{{end}}</p>{{end}}
+      <p id="album-count" class="album-count"{{if not .Album.Count}} hidden{{end}}>{{template "album-count-inner" .}}</p>
     </div>
     <button type="button" class="btn album-add-btn" data-album-add>
       {{icon "camera"}}<span>Add photos</span>
@@ -150,6 +150,8 @@
 </section>
 {{end}}
 
+{{define "album-count-inner"}}{{if .Album.Count}}{{.Album.Count}} photo{{if ne .Album.Count 1}}s{{end}}{{end}}{{end}}
+{{define "album-count-oob"}}<p id="album-count" class="album-count" hx-swap-oob="outerHTML"{{if not .Album.Count}} hidden{{end}}>{{template "album-count-inner" .}}</p>{{end}}
 {{define "album-day-fragment"}}{{range .Album.Days}}{{template "album-day" .}}{{end}}{{end}}
 
 {{define "album-tile"}}
