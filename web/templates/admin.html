@@ -160,22 +160,25 @@
   {{end}}
 
   <dialog id="account-delete-dialog" class="sheet" aria-labelledby="account-delete-title">
-    <div class="sheet-head">
-      <h2 id="account-delete-title">Delete account?</h2>
-      <button type="button" class="icon-btn" data-close-delete-dialog aria-label="Cancel">{{icon "close"}}</button>
-    </div>
-    <p class="admin-note">This will immediately lock out <strong data-delete-target-name></strong>. You can recover the account for 30 days; after 30 days, all logs and photos are permanently deleted.</p>
-    <form class="admin-form" method="post" data-delete-account-form>
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <label class="field">
-        <span class="field-label">Type <strong data-delete-target-name-inline></strong> to confirm</span>
-        <input type="text" name="confirm_username" autocomplete="off" spellcheck="false" required data-delete-confirm-input>
-      </label>
-      <div class="admin-actions">
-        <button type="button" class="btn btn-ghost" data-close-delete-dialog>Cancel</button>
-        <button type="submit" class="btn btn-danger" disabled data-delete-submit>Yes, delete account</button>
+    <div class="sheet-inner">
+      <div class="sheet-grab" aria-hidden="true"><div class="sheet-handle"></div></div>
+      <div class="sheet-head">
+        <h2 id="account-delete-title">Delete account?</h2>
+        <button type="button" class="icon-btn" data-close-delete-dialog aria-label="Cancel">{{icon "close"}}</button>
       </div>
-    </form>
+      <p class="sheet-copy">This will immediately lock out <strong data-delete-target-name></strong>. You can recover the account for 30 days; after 30 days, all logs and photos are permanently deleted.</p>
+      <form class="sheet-form" method="post" data-delete-account-form>
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label class="field">
+          <span class="field-label">Type <strong data-delete-target-name-inline></strong> to confirm</span>
+          <input type="text" name="confirm_username" autocomplete="off" spellcheck="false" required data-delete-confirm-input>
+        </label>
+        <div class="sheet-actions">
+          <button type="button" class="btn btn-ghost" data-close-delete-dialog>Cancel</button>
+          <button type="submit" class="btn btn-danger" disabled data-delete-submit>Yes, delete account</button>
+        </div>
+      </form>
+    </div>
   </dialog>
 
   <footer class="admin-footer">
