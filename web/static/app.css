@@ -344,7 +344,6 @@ body.app-body {
   font-variant-numeric: tabular-nums;
   line-height: 1.25;
   text-overflow: ellipsis;
-  transform: rotate(-1.2deg);
   white-space: nowrap;
 }
 
