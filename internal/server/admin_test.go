@@ -342,3 +342,128 @@ func TestAdminLogout(t *testing.T) {
 		t.Fatalf("after logout = %d, want 303", rec.Code)
 	}
 }
+
+func TestAdminSoftDeleteRestoreAndPurge(t *testing.T) {
+	env := adminEnv(t)
+	client := loginAdmin(t, env)
+	now := env.clock.Now().UTC()
+
+	// Create an invite and sign up a user ("brother").
+	token := "brother-invite"
+	if _, err := env.store.CreateInvite(context.Background(), hashInviteToken(token), "Brother", now, now.Add(24*time.Hour)); err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	rec := env.do(t, http.MethodPost, "/signup", url.Values{
+		"invite":           {token},
+		"username":         {"brother"},
+		"baby_name":        {"BabyB"},
+		"baby_birth_date":  {"2026-07-01"},
+		"baby_gender":      {"boy"},
+		"mascot":           {"pip"},
+		"password":         {"password123"},
+		"confirm_password": {"password123"},
+	}, false)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("signup = %d\n%s", rec.Code, rec.Body.String())
+	}
+	var userCookie string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			userCookie = c.Name + "=" + c.Value
+		}
+	}
+	if userCookie == "" {
+		t.Fatal("missing user session cookie")
+	}
+	acct, err := env.store.AccountByUsername(context.Background(), "brother")
+	if err != nil {
+		t.Fatalf("AccountByUsername: %v", err)
+	}
+
+	// Double-confirm check: wrong username is rejected.
+	adminPage := client.do(http.MethodGet, "/admin", nil)
+	csrf := extractAdminCSRF(t, adminPage.Body.String())
+	rec = client.do(http.MethodPost, fmt.Sprintf("/admin/accounts/%d/delete", acct.ID), url.Values{
+		"csrf":             {csrf},
+		"confirm_username": {"wrongname"},
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("wrong confirm_username = %d, want 400", rec.Code)
+	}
+
+	// Matching username soft-deletes the account.
+	rec = client.do(http.MethodPost, fmt.Sprintf("/admin/accounts/%d/delete", acct.ID), url.Values{
+		"csrf":             {csrf},
+		"confirm_username": {"brother"},
+	})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin?notice=account_deleted" {
+		t.Fatalf("soft delete = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	// Existing session cookie is immediately locked out.
+	rec = doWith(t, env, http.MethodGet, "/timeline", nil, map[string]string{"Cookie": userCookie})
+	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/login") {
+		t.Fatalf("deleted user /timeline = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	// New login is rejected while soft-deleted.
+	rec = env.do(t, http.MethodPost, "/login", url.Values{
+		"username": {"brother"},
+		"password": {"password123"},
+	}, false)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("deleted user login = %d, want 401", rec.Code)
+	}
+
+	// Admin page shows the account in Deleted accounts with a Recover action.
+	adminPage = client.do(http.MethodGet, "/admin", nil)
+	if body := adminPage.Body.String(); !strings.Contains(body, "Deleted accounts") || !strings.Contains(body, "days left") {
+		t.Fatalf("admin page missing deleted account section:\n%s", body)
+	}
+
+	// Before 30 days, the retention sweep leaves the account intact.
+	removed, _, err := env.server.sweepExpiredAccounts(context.Background(), now.Add(29*24*time.Hour))
+	if err != nil {
+		t.Fatalf("sweepExpiredAccounts (29d): %v", err)
+	}
+	if removed != 0 {
+		t.Fatalf("29d sweep removed %d accounts, want 0", removed)
+	}
+
+	// Recover restores the account so they can sign in again.
+	csrf = extractAdminCSRF(t, adminPage.Body.String())
+	rec = client.do(http.MethodPost, fmt.Sprintf("/admin/accounts/%d/restore", acct.ID), url.Values{
+		"csrf": {csrf},
+	})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/admin?notice=account_restored" {
+		t.Fatalf("restore = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	rec = env.do(t, http.MethodPost, "/login", url.Values{
+		"username": {"brother"},
+		"password": {"password123"},
+	}, false)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
+		t.Fatalf("restored user login = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	// Soft-delete again and advance past 30 days: sweep permanently purges it.
+	adminPage = client.do(http.MethodGet, "/admin", nil)
+	csrf = extractAdminCSRF(t, adminPage.Body.String())
+	rec = client.do(http.MethodPost, fmt.Sprintf("/admin/accounts/%d/delete", acct.ID), url.Values{
+		"csrf":             {csrf},
+		"confirm_username": {"brother"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("second soft delete = %d", rec.Code)
+	}
+	removed, _, err = env.server.sweepExpiredAccounts(context.Background(), now.Add(31*24*time.Hour))
+	if err != nil {
+		t.Fatalf("sweepExpiredAccounts (31d): %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("31d sweep removed %d accounts, want 1", removed)
+	}
+	if _, err := env.store.AccountByID(context.Background(), acct.ID); err == nil {
+		t.Fatal("expected account to be permanently deleted after 30 days")
+	}
+}

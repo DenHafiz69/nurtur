@@ -554,8 +554,9 @@ type AdminPageData struct {
 	// link. It is the only time the full token exists outside the invitee's URL.
 	NewInviteURL string
 
-	Invites  []AdminInviteRow
-	Accounts []AdminAccountRow
+	Invites         []AdminInviteRow
+	Accounts        []AdminAccountRow
+	DeletedAccounts []AdminAccountRow
 }
 
 // AdminInviteRow is one invite in the admin table. Labels are preformatted in
@@ -570,8 +571,11 @@ type AdminInviteRow struct {
 	Active       bool
 }
 
-// AdminAccountRow is one household account in the read-only admin list.
+// AdminAccountRow is one household account in the admin list.
 type AdminAccountRow struct {
+	ID           int64
 	Username     string
 	CreatedLabel string
+	DeletedLabel string
+	PurgeLabel   string
 }

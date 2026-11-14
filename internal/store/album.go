@@ -333,6 +333,31 @@ func (s *Store) RestoreAlbumPhoto(ctx context.Context, id int64) (album.Photo, b
 	return photo, false, nil
 }
 
+// AccountAlbumPhotos returns every album photo (including soft-deleted ones)
+// belonging to accountID, so a hard-delete sweep can remove all stored objects.
+func (s *Store) AccountAlbumPhotos(ctx context.Context, accountID int64) ([]album.Photo, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+albumColumns+` FROM album_photos WHERE account_id = ? ORDER BY id ASC`,
+		accountID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list account album photos: %w", err)
+	}
+	defer rows.Close()
+
+	photos := make([]album.Photo, 0, 16)
+	for rows.Next() {
+		photo, err := scanAlbumPhoto(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: scan account album photo: %w", err)
+		}
+		photos = append(photos, photo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: list account album photos: %w", err)
+	}
+	return photos, nil
+}
+
 func (s *Store) albumPhotoByUploadID(ctx context.Context, uploadID string) (album.Photo, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT `+albumColumns+` FROM album_photos

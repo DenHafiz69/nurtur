@@ -367,6 +367,72 @@ func (s *Server) handleAdminRevokeInvite(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+func (s *Server) handleAdminDeleteAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.badRequest(w, "That account couldn't be found.")
+		return
+	}
+	acct, err := s.store.AccountByID(r.Context(), id)
+	switch {
+	case errors.Is(err, store.ErrAccountNotFound):
+		http.Redirect(w, r, "/admin?notice=account_unchanged", http.StatusSeeOther)
+		return
+	case err != nil:
+		s.serverError(w, r, err)
+		return
+	}
+	if acct.DeletedAt != nil {
+		http.Redirect(w, r, "/admin?notice=account_unchanged", http.StatusSeeOther)
+		return
+	}
+
+	confirm := strings.TrimSpace(r.PostForm.Get("confirm_username"))
+	if !strings.EqualFold(confirm, acct.Username) {
+		data, loadErr := s.adminPageData(r, "")
+		if loadErr != nil {
+			s.serverError(w, r, loadErr)
+			return
+		}
+		data.Error = fmt.Sprintf("Type %q to confirm deleting that account.", acct.Username)
+		s.renderNamed(w, r, http.StatusBadRequest, "admin", data)
+		return
+	}
+
+	now := s.clock.Now().UTC()
+	err = s.store.SoftDeleteAccount(r.Context(), id, now)
+	switch {
+	case errors.Is(err, store.ErrAccountNotFound), errors.Is(err, store.ErrAccountAlreadyDeleted):
+		http.Redirect(w, r, "/admin?notice=account_unchanged", http.StatusSeeOther)
+		return
+	case err != nil:
+		s.serverError(w, r, err)
+		return
+	}
+	s.log.Info("account soft-deleted", "id", id, "username", acct.Username, "ip", clientIP(r))
+	http.Redirect(w, r, "/admin?notice=account_deleted", http.StatusSeeOther)
+}
+
+func (s *Server) handleAdminRestoreAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.badRequest(w, "That account couldn't be found.")
+		return
+	}
+	err = s.store.RestoreAccount(r.Context(), id)
+	switch {
+	case errors.Is(err, store.ErrAccountNotFound), errors.Is(err, store.ErrAccountNotDeleted):
+		http.Redirect(w, r, "/admin?notice=account_unchanged", http.StatusSeeOther)
+		return
+	case err != nil:
+		s.serverError(w, r, err)
+		return
+	}
+	s.auth.setHasAccounts(true)
+	s.log.Info("account restored", "id", id, "ip", clientIP(r))
+	http.Redirect(w, r, "/admin?notice=account_restored", http.StatusSeeOther)
+}
+
 func (s *Server) adminPageData(r *http.Request, notice string) (*view.AdminPageData, error) {
 	now := s.clock.Now().UTC()
 	invites, err := s.store.ListInvites(r.Context(), inviteListLimit)
@@ -406,10 +472,30 @@ func (s *Server) adminPageData(r *http.Request, notice string) (*view.AdminPageD
 		data.Invites = append(data.Invites, row)
 	}
 	for _, acct := range accounts {
-		data.Accounts = append(data.Accounts, view.AdminAccountRow{
+		row := view.AdminAccountRow{
+			ID:           acct.ID,
 			Username:     acct.Username,
 			CreatedLabel: acct.CreatedAt.In(s.loc).Format("Jan 2, 2006"),
-		})
+		}
+		if acct.DeletedAt == nil {
+			data.Accounts = append(data.Accounts, row)
+			continue
+		}
+		row.DeletedLabel = acct.DeletedAt.In(s.loc).Format("Jan 2, 2006")
+		purgeAt := acct.DeletedAt.Add(accountRetention)
+		remaining := purgeAt.Sub(now)
+		daysLeft := int(remaining / (24 * time.Hour))
+		switch {
+		case remaining <= 0:
+			row.PurgeLabel = "Due for purge"
+		case daysLeft == 0:
+			row.PurgeLabel = "Less than 1 day left"
+		case daysLeft == 1:
+			row.PurgeLabel = "1 day left"
+		default:
+			row.PurgeLabel = fmt.Sprintf("%d days left", daysLeft)
+		}
+		data.DeletedAccounts = append(data.DeletedAccounts, row)
 	}
 	return data, nil
 }
@@ -420,6 +506,12 @@ func adminNotice(raw string) string {
 		return "Invitation revoked."
 	case "unchanged":
 		return "That invitation was already used or revoked."
+	case "account_deleted":
+		return "Account deleted. It is locked out now and recoverable for 30 days."
+	case "account_restored":
+		return "Account recovered. They can sign in again."
+	case "account_unchanged":
+		return "That account was already updated."
 	default:
 		return ""
 	}

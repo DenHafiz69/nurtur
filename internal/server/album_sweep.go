@@ -9,7 +9,10 @@ import (
 	"nurtur/internal/album"
 )
 
-const albumRetention = 30 * 24 * time.Hour
+const (
+	albumRetention   = 30 * 24 * time.Hour
+	accountRetention = 30 * 24 * time.Hour
+)
 
 // StartAlbumSweep runs the retention sweep at startup and once a day after
 // that. Deleted rows keep their objects for the undo window; after that the
@@ -34,18 +37,81 @@ func (s *Server) StartAlbumSweep(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Server) runAlbumSweep(ctx context.Context) {
-	removed, kept, err := s.sweepExpiredAlbums(ctx, s.clock.Now().UTC())
+	now := s.clock.Now().UTC()
+	removed, kept, err := s.sweepExpiredAlbums(ctx, now)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			s.log.Error("album retention sweep failed", "error", err)
 		}
+	} else {
+		s.log.Info("album retention sweep",
+			"removed", removed,
+			"kept", kept,
+			"retention_days", int(albumRetention.Hours()/24),
+		)
+	}
+
+	acctRemoved, acctKept, err := s.sweepExpiredAccounts(ctx, now)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			s.log.Error("account retention sweep failed", "error", err)
+		}
 		return
 	}
-	s.log.Info("album retention sweep",
-		"removed", removed,
-		"kept", kept,
-		"retention_days", int(albumRetention.Hours()/24),
-	)
+	if acctRemoved > 0 || acctKept > 0 {
+		s.log.Info("account retention sweep",
+			"removed", acctRemoved,
+			"kept", acctKept,
+			"retention_days", int(accountRetention.Hours()/24),
+		)
+	}
+}
+
+func (s *Server) sweepExpiredAccounts(ctx context.Context, now time.Time) (int, int, error) {
+	accounts, err := s.store.ExpiredDeletedAccounts(ctx, now.Add(-accountRetention))
+	if err != nil {
+		return 0, 0, err
+	}
+	removed := 0
+	kept := 0
+	for _, acct := range accounts {
+		if err := ctx.Err(); err != nil {
+			return removed, kept, err
+		}
+		if s.album != nil {
+			photos, err := s.store.AccountAlbumPhotos(ctx, acct.ID)
+			if err != nil {
+				s.log.Warn("account sweep could not list album photos", "account_id", acct.ID, "error", err)
+				kept++
+				continue
+			}
+			failed := false
+			for _, photo := range photos {
+				keys := albumObjectKeys(photo)
+				for _, key := range keys {
+					if err := s.album.Remove(ctx, key); err != nil {
+						s.log.Warn("account sweep could not remove album object",
+							"account_id", acct.ID,
+							"photo_id", photo.ID,
+							"error", redactAlbumError(err, keys...),
+						)
+						failed = true
+					}
+				}
+			}
+			if failed {
+				kept++
+				continue
+			}
+		}
+		if err := s.store.HardDeleteAccount(ctx, acct.ID); err != nil {
+			s.log.Warn("account sweep could not hard delete account", "account_id", acct.ID, "error", err)
+			kept++
+			continue
+		}
+		removed++
+	}
+	return removed, kept, nil
 }
 
 func (s *Server) sweepExpiredAlbums(ctx context.Context, now time.Time) (int, int, error) {

@@ -14,33 +14,66 @@ type Account struct {
 	Username     string
 	PasswordHash string
 	CreatedAt    time.Time
+	DeletedAt    *time.Time
 }
 
-// ErrAccountNotFound means no account has the requested username.
+// ErrAccountNotFound means no account has the requested username or id.
 var ErrAccountNotFound = errors.New("store: account not found")
 
 // ErrAccountExists means the requested username is already registered.
 var ErrAccountExists = errors.New("store: account already exists")
 
-// CountAccounts reports how many accounts exist.
+// ErrAccountAlreadyDeleted means the account was already soft-deleted.
+var ErrAccountAlreadyDeleted = errors.New("store: account already deleted")
+
+// ErrAccountNotDeleted means the account is active and cannot be restored.
+var ErrAccountNotDeleted = errors.New("store: account not deleted")
+
+// CountAccounts reports how many active (non-deleted) accounts exist.
 func (s *Store) CountAccounts(ctx context.Context) (int, error) {
 	var count int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(1) FROM accounts`).Scan(&count); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(1) FROM accounts WHERE deleted_at IS NULL`).Scan(&count); err != nil {
 		return 0, fmt.Errorf("store: count accounts: %w", err)
 	}
 	return count, nil
 }
 
-// AccountByUsername returns the account for username (already normalized).
+// AccountByUsername returns the active account for username (already normalized).
 func (s *Store) AccountByUsername(ctx context.Context, username string) (Account, error) {
-	var (
-		acct    Account
-		created string
-	)
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, password_hash, created_at FROM accounts WHERE username = ?`,
+	return s.scanSingleAccount(ctx,
+		`SELECT id, username, password_hash, created_at, deleted_at FROM accounts WHERE username = ? AND deleted_at IS NULL`,
 		username,
-	).Scan(&acct.ID, &acct.Username, &acct.PasswordHash, &created)
+	)
+}
+
+// AccountByID returns the account for id, whether active or soft-deleted.
+func (s *Store) AccountByID(ctx context.Context, id int64) (Account, error) {
+	return s.scanSingleAccount(ctx,
+		`SELECT id, username, password_hash, created_at, deleted_at FROM accounts WHERE id = ?`,
+		id,
+	)
+}
+
+// AccountActive reports whether id belongs to an existing, non-deleted account.
+func (s *Store) AccountActive(ctx context.Context, id int64) (bool, error) {
+	var count int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(1) FROM accounts WHERE id = ? AND deleted_at IS NULL`, id,
+	).Scan(&count); err != nil {
+		return false, fmt.Errorf("store: check active account: %w", err)
+	}
+	return count > 0, nil
+}
+
+func (s *Store) scanSingleAccount(ctx context.Context, query string, arg any) (Account, error) {
+	var (
+		acct      Account
+		created   string
+		deletedAt sql.NullString
+	)
+	err := s.db.QueryRowContext(ctx, query, arg).Scan(
+		&acct.ID, &acct.Username, &acct.PasswordHash, &created, &deletedAt,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Account{}, ErrAccountNotFound
 	}
@@ -51,14 +84,17 @@ func (s *Store) AccountByUsername(ctx context.Context, username string) (Account
 	if err != nil {
 		return Account{}, err
 	}
+	acct.DeletedAt, err = decodeNullTime(deletedAt)
+	if err != nil {
+		return Account{}, err
+	}
 	return acct, nil
 }
 
-// ListAccounts returns every account, oldest first. It backs the read-only
-// admin screen.
+// ListAccounts returns every account (active first, then soft-deleted), oldest first.
 func (s *Store) ListAccounts(ctx context.Context) ([]Account, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, username, created_at FROM accounts ORDER BY id ASC`)
+		`SELECT id, username, created_at, deleted_at FROM accounts ORDER BY deleted_at IS NOT NULL ASC, id ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("store: list accounts: %w", err)
 	}
@@ -67,13 +103,18 @@ func (s *Store) ListAccounts(ctx context.Context) ([]Account, error) {
 	accounts := make([]Account, 0, 8)
 	for rows.Next() {
 		var (
-			acct    Account
-			created string
+			acct      Account
+			created   string
+			deletedAt sql.NullString
 		)
-		if err := rows.Scan(&acct.ID, &acct.Username, &created); err != nil {
+		if err := rows.Scan(&acct.ID, &acct.Username, &created, &deletedAt); err != nil {
 			return nil, fmt.Errorf("store: scan account: %w", err)
 		}
 		acct.CreatedAt, err = decodeTime(created)
+		if err != nil {
+			return nil, err
+		}
+		acct.DeletedAt, err = decodeNullTime(deletedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -83,6 +124,123 @@ func (s *Store) ListAccounts(ctx context.Context) ([]Account, error) {
 		return nil, fmt.Errorf("store: list accounts: %w", err)
 	}
 	return accounts, nil
+}
+
+// SoftDeleteAccount marks an active account as deleted at now.
+func (s *Store) SoftDeleteAccount(ctx context.Context, id int64, now time.Time) error {
+	now = normalizeTime(now)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE accounts SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`,
+		encodeTime(now), id)
+	if err != nil {
+		return fmt.Errorf("store: soft delete account: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("store: soft delete account rows: %w", err)
+	}
+	if n > 0 {
+		return nil
+	}
+	var deleted sql.NullString
+	err = s.db.QueryRowContext(ctx, `SELECT deleted_at FROM accounts WHERE id = ?`, id).Scan(&deleted)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrAccountNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("store: check account delete: %w", err)
+	}
+	return ErrAccountAlreadyDeleted
+}
+
+// RestoreAccount clears deleted_at on a soft-deleted account so it can sign in again.
+func (s *Store) RestoreAccount(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE accounts SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL`,
+		id)
+	if err != nil {
+		return fmt.Errorf("store: restore account: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("store: restore account rows: %w", err)
+	}
+	if n > 0 {
+		return nil
+	}
+	var deleted sql.NullString
+	err = s.db.QueryRowContext(ctx, `SELECT deleted_at FROM accounts WHERE id = ?`, id).Scan(&deleted)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrAccountNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("store: check account restore: %w", err)
+	}
+	return ErrAccountNotDeleted
+}
+
+// ExpiredDeletedAccounts returns accounts soft-deleted at or before cutoff.
+func (s *Store) ExpiredDeletedAccounts(ctx context.Context, cutoff time.Time) ([]Account, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, username, created_at, deleted_at FROM accounts
+		 WHERE deleted_at IS NOT NULL AND deleted_at <= ?
+		 ORDER BY deleted_at ASC, id ASC`,
+		encodeTime(normalizeTime(cutoff)))
+	if err != nil {
+		return nil, fmt.Errorf("store: list expired accounts: %w", err)
+	}
+	defer rows.Close()
+
+	accounts := make([]Account, 0, 4)
+	for rows.Next() {
+		var (
+			acct      Account
+			created   string
+			deletedAt sql.NullString
+		)
+		if err := rows.Scan(&acct.ID, &acct.Username, &created, &deletedAt); err != nil {
+			return nil, fmt.Errorf("store: scan expired account: %w", err)
+		}
+		acct.CreatedAt, err = decodeTime(created)
+		if err != nil {
+			return nil, err
+		}
+		acct.DeletedAt, err = decodeNullTime(deletedAt)
+		if err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, acct)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: list expired accounts: %w", err)
+	}
+	return accounts, nil
+}
+
+// HardDeleteAccount permanently removes an account and all of its scoped rows.
+// Callers must remove external album objects first.
+func (s *Store) HardDeleteAccount(ctx context.Context, id int64) error {
+	return s.WithTx(ctx, func(tx *sql.Tx) error {
+		scopedDeletes := []string{
+			`DELETE FROM feed_segments WHERE account_id = ?`,
+			`DELETE FROM feeds WHERE account_id = ?`,
+			`DELETE FROM diapers WHERE account_id = ?`,
+			`DELETE FROM sleeps WHERE account_id = ?`,
+			`DELETE FROM bottles WHERE account_id = ?`,
+			`DELETE FROM pumps WHERE account_id = ?`,
+			`DELETE FROM solids WHERE account_id = ?`,
+			`DELETE FROM album_photos WHERE account_id = ?`,
+			`DELETE FROM settings WHERE account_id = ?`,
+			`UPDATE invites SET used_account_id = NULL WHERE used_account_id = ?`,
+			`DELETE FROM accounts WHERE id = ?`,
+		}
+		for _, stmt := range scopedDeletes {
+			if _, err := tx.ExecContext(ctx, stmt, id); err != nil {
+				return fmt.Errorf("store: hard delete account %d: %w", id, err)
+			}
+		}
+		return nil
+	})
 }
 
 // CreateAccount inserts a new account. It refuses a username that is already

@@ -46,11 +46,12 @@ func isDemoFrom(ctx context.Context) bool {
 // key). When neither is configured, the middleware is a no-op, which keeps
 // LAN-only installs simple.
 type auth struct {
-	passcode  string
-	signupKey string
-	key       []byte
-	secure    bool
-	limiter   *loginLimiter
+	passcode    string
+	signupKey   string
+	key         []byte
+	secure      bool
+	limiter     *loginLimiter
+	activeCheck func(context.Context, int64) (bool, error)
 
 	accountsMu sync.RWMutex
 	accounts   bool
@@ -131,6 +132,17 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 		}
 
 		accountID, csrf, isDemo, ok := a.session(r)
+		if ok && !isDemo && accountID > 0 && a.activeCheck != nil {
+			active, err := a.activeCheck(r.Context(), accountID)
+			if err != nil {
+				http.Error(w, "Something went wrong.", http.StatusInternalServerError)
+				return
+			}
+			if !active {
+				a.clearSession(w, r)
+				ok = false
+			}
+		}
 		if !ok {
 			// The root is the public front door. Let it through so the
 			// dashboard handler can show the landing page instead of a

@@ -113,18 +113,70 @@
     {{if .Accounts}}
     <div class="admin-table-wrap">
       <table class="admin-table">
-        <thead><tr><th scope="col">Username</th><th scope="col">Joined</th></tr></thead>
+        <thead><tr><th scope="col">Username</th><th scope="col">Joined</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
         <tbody>
           {{range .Accounts}}
-          <tr><td data-label="Username">{{.Username}}</td><td data-label="Joined">{{.CreatedLabel}}</td></tr>
+          <tr>
+            <td data-label="Username">{{.Username}}</td>
+            <td data-label="Joined">{{.CreatedLabel}}</td>
+            <td class="admin-table-action">
+              <button type="button" class="btn btn-ghost admin-revoke" data-delete-account-id="{{.ID}}" data-delete-account-name="{{.Username}}">Delete</button>
+            </td>
+          </tr>
           {{end}}
         </tbody>
       </table>
     </div>
     {{else}}
-    <p class="admin-note">No accounts yet.</p>
+    <p class="admin-note">No active accounts.</p>
     {{end}}
   </section>
+
+  {{if .DeletedAccounts}}
+  <section class="admin-card" aria-labelledby="admin-deleted-accounts-title">
+    <h2 id="admin-deleted-accounts-title" class="admin-card-title">Deleted accounts</h2>
+    <p class="admin-note">Deleted accounts are locked out immediately and permanently purged 30 days after deletion.</p>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th scope="col">Username</th><th scope="col">Deleted</th><th scope="col">Permanent purge</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>
+          {{range .DeletedAccounts}}
+          <tr>
+            <td data-label="Username">{{.Username}}</td>
+            <td data-label="Deleted">{{.DeletedLabel}}</td>
+            <td data-label="Permanent purge"><span class="admin-pill admin-pill-muted">{{.PurgeLabel}}</span></td>
+            <td class="admin-table-action">
+              <form method="post" action="/admin/accounts/{{.ID}}/restore">
+                <input type="hidden" name="csrf" value="{{$.CSRF}}">
+                <button type="submit" class="btn btn-ghost admin-revoke">Recover</button>
+              </form>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {{end}}
+
+  <dialog id="account-delete-dialog" class="sheet" aria-labelledby="account-delete-title">
+    <div class="sheet-head">
+      <h2 id="account-delete-title">Delete account?</h2>
+      <button type="button" class="icon-btn" data-close-delete-dialog aria-label="Cancel">{{icon "close"}}</button>
+    </div>
+    <p class="admin-note">This will immediately lock out <strong data-delete-target-name></strong>. You can recover the account for 30 days; after 30 days, all logs and photos are permanently deleted.</p>
+    <form class="admin-form" method="post" data-delete-account-form>
+      <input type="hidden" name="csrf" value="{{.CSRF}}">
+      <label class="field">
+        <span class="field-label">Type <strong data-delete-target-name-inline></strong> to confirm</span>
+        <input type="text" name="confirm_username" autocomplete="off" spellcheck="false" required data-delete-confirm-input>
+      </label>
+      <div class="admin-actions">
+        <button type="button" class="btn btn-ghost" data-close-delete-dialog>Cancel</button>
+        <button type="submit" class="btn btn-danger" disabled data-delete-submit>Yes, delete account</button>
+      </div>
+    </form>
+  </dialog>
 
   <footer class="admin-footer">
     <a class="auth-alt" href="/">Open Nurtur</a>
@@ -151,6 +203,43 @@
       }
       try { document.execCommand("copy"); done(); } catch (e) {}
     });
+  })();
+
+  (function () {
+    var dialog = document.getElementById("account-delete-dialog");
+    if (!dialog) return;
+    var form = dialog.querySelector("[data-delete-account-form]");
+    var input = dialog.querySelector("[data-delete-confirm-input]");
+    var submit = dialog.querySelector("[data-delete-submit]");
+    var nameEl = dialog.querySelector("[data-delete-target-name]");
+    var inlineNameEl = dialog.querySelector("[data-delete-target-name-inline]");
+    var expected = "";
+
+    function syncSubmit() {
+      var val = (input.value || "").trim().toLowerCase();
+      submit.disabled = !expected || val !== expected.toLowerCase();
+    }
+
+    document.addEventListener("click", function (event) {
+      var btn = event.target.closest ? event.target.closest("[data-delete-account-id]") : null;
+      if (btn) {
+        var id = btn.getAttribute("data-delete-account-id");
+        expected = btn.getAttribute("data-delete-account-name") || "";
+        form.action = "/admin/accounts/" + encodeURIComponent(id) + "/delete";
+        nameEl.textContent = expected;
+        inlineNameEl.textContent = expected;
+        input.value = "";
+        syncSubmit();
+        dialog.showModal();
+        input.focus();
+        return;
+      }
+      if (event.target.closest && event.target.closest("[data-close-delete-dialog]")) {
+        dialog.close();
+      }
+    });
+
+    input.addEventListener("input", syncSubmit);
   })();
 </script>
 </body>

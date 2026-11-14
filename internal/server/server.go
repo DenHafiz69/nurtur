@@ -120,6 +120,9 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("server: count accounts: %w", err)
 	}
 
+	authGate := newAuth(cfg.Passcode, cfg.SignupKey, cfg.SessionSecret, cfg.SecureCookie, accountCount > 0)
+	authGate.activeCheck = cfg.Store.AccountActive
+
 	return &Server{
 		store:           cfg.Store,
 		clock:           cfg.Clock,
@@ -135,7 +138,7 @@ func New(cfg Config) (*Server, error) {
 		nightEnd:        cfg.NightEnd,
 		migrations:      cfg.Migrations,
 		assets:          cfg.Assets,
-		auth:            newAuth(cfg.Passcode, cfg.SignupKey, cfg.SessionSecret, cfg.SecureCookie, accountCount > 0),
+		auth:            authGate,
 		admin:           newAdminAuth(cfg.AdminPassword, cfg.SessionSecret, cfg.SecureCookie),
 		publicURL:       strings.TrimRight(cfg.PublicURL, "/"),
 		album:           cfg.Album,
@@ -264,6 +267,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /admin/logout", s.adminOnly(http.HandlerFunc(s.handleAdminLogout)))
 	mux.Handle("POST /admin/invites", s.adminOnly(http.HandlerFunc(s.handleAdminCreateInvite)))
 	mux.Handle("POST /admin/invites/{id}/revoke", s.adminOnly(http.HandlerFunc(s.handleAdminRevokeInvite)))
+	mux.Handle("POST /admin/accounts/{id}/delete", s.adminOnly(http.HandlerFunc(s.handleAdminDeleteAccount)))
+	mux.Handle("POST /admin/accounts/{id}/restore", s.adminOnly(http.HandlerFunc(s.handleAdminRestoreAccount)))
 
 	mux.HandleFunc("GET /sw.js", s.handleServiceWorker)
 
