@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.5",
+		Date:    "Nov 14, 2026",
+		Title:   "One-tap app install",
+		Summary: "Install Nurtur to your home screen directly from the landing page or Settings.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"An Install app button on the landing page and in Settings that triggers the browser's install prompt on Android, Chrome, Edge, and desktop.",
+					"A quick two-step Add to Home Screen guide sheet for Safari on iPhone and iPad.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.4",
 		Date:    "Nov 14, 2026",
 		Title:   "Live demo, updated landing page, and account recovery",
