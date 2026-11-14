@@ -30,6 +30,28 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.4",
+		Date:    "Nov 14, 2026",
+		Title:   "Live demo, updated landing page, and account recovery",
+		Summary: "Share Nurtur with family using a no-login live demo, a refreshed landing page covering all trackers, and safer account management in Admin.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"A live demo mode (/demo) that lets visitors try the full app with sample data without logging in.",
+					"Account soft-deletion with double confirmation, 30-day recovery, and automatic permanent purge in Admin.",
+				},
+			},
+			{
+				Title: "Changed",
+				Items: []string{
+					"The landing page now highlights nursing, bottles, pumping, diapers, sleep, solids, and the baby album, with a collapsible mobile menu.",
+					"The Last nursed badge now sits level without tilt.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.3",
 		Date:    "Nov 13, 2026",
 		Title:   "Cleaner settings, even albums",
