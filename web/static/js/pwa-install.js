@@ -12,11 +12,36 @@
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   }
 
+  function isFirefox() {
+    return /Firefox|FxiOS/i.test(navigator.userAgent || "");
+  }
+
   function syncInstallUI() {
-    var show = !isStandalone() && (!!deferredPrompt || isIOS());
+    var show = !isStandalone() && (!!deferredPrompt || isIOS() || isFirefox());
     document.querySelectorAll("[data-pwa-install]").forEach(function (el) {
       el.hidden = !show;
     });
+  }
+
+  function openGuide(kind) {
+    var dialog = document.getElementById("pwa-ios-dialog");
+    if (!dialog || typeof dialog.showModal !== "function") return;
+    var title = dialog.querySelector("[data-pwa-guide-title]");
+    var copy = dialog.querySelector("[data-pwa-guide-copy]");
+    var iosSteps = dialog.querySelector('[data-pwa-guide-steps="ios"]');
+    var ffSteps = dialog.querySelector('[data-pwa-guide-steps="firefox"]');
+    if (kind === "firefox") {
+      if (title) title.textContent = "Install in Firefox";
+      if (copy) copy.textContent = "Firefox doesn't allow one-tap install buttons, so it takes two quick taps:";
+      if (iosSteps) iosSteps.hidden = true;
+      if (ffSteps) ffSteps.hidden = false;
+    } else {
+      if (title) title.textContent = "Install on iPhone or iPad";
+      if (copy) copy.textContent = "Safari doesn't allow one-tap install buttons, so it takes two quick taps:";
+      if (iosSteps) iosSteps.hidden = false;
+      if (ffSteps) ffSteps.hidden = true;
+    }
+    dialog.showModal();
   }
 
   window.addEventListener("beforeinstallprompt", function (event) {
@@ -56,10 +81,9 @@
     }
 
     if (isIOS()) {
-      var iosDialog = document.getElementById("pwa-ios-dialog");
-      if (iosDialog && typeof iosDialog.showModal === "function") {
-        iosDialog.showModal();
-      }
+      openGuide("ios");
+    } else if (isFirefox()) {
+      openGuide("firefox");
     }
   });
 
