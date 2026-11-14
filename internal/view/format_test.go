@@ -299,3 +299,26 @@ func TestFormatBabyAge(t *testing.T) {
 		t.Errorf("FormatBabyAge(zero) = %q, want empty", got)
 	}
 }
+
+func TestPhotoRecapLabel(t *testing.T) {
+	loc := time.FixedZone("test", 8*60*60)
+	now := time.Date(2026, 11, 14, 9, 30, 0, 0, loc)
+	cases := []struct {
+		name  string
+		taken time.Time
+		want  string
+	}{
+		{"same day", time.Date(2026, 11, 14, 7, 0, 0, 0, loc), ""},
+		{"different day", time.Date(2026, 10, 15, 7, 0, 0, 0, loc), ""},
+		{"one month ago", time.Date(2026, 10, 14, 15, 0, 0, 0, loc), "1 month ago today"},
+		{"three months ago", time.Date(2026, 8, 14, 12, 0, 0, 0, loc), "3 months ago today"},
+		{"one year ago", time.Date(2025, 11, 14, 8, 0, 0, 0, loc), "1 year ago today"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := PhotoRecapLabel(tt.taken, now, loc); got != tt.want {
+				t.Errorf("PhotoRecapLabel(%s) = %q, want %q", tt.taken.Format(time.RFC3339), got, tt.want)
+			}
+		})
+	}
+}

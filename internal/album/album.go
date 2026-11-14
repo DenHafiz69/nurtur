@@ -17,6 +17,8 @@ import (
 const (
 	// MaxCaption is the longest caption the edit sheet accepts.
 	MaxCaption = 280
+	// MaxTag is the longest milestone tag the edit sheet accepts.
+	MaxTag = 32
 	// MaxDimension is the largest edge the browser may upload. It is a guard
 	// against decompression bombs, not a target size.
 	MaxDimension = 12000
@@ -58,6 +60,8 @@ type Photo struct {
 	TakenAt       time.Time
 	TakenAtSource TakenAtSource
 	Caption       string
+	Favorite      bool
+	Tag           string
 	Width         int
 	Height        int
 	Bytes         int64
@@ -178,6 +182,24 @@ func ValidateEdit(takenAt time.Time, caption string, now time.Time) error {
 	}
 	if utf8.RuneCountInString(strings.TrimSpace(caption)) > MaxCaption {
 		return &ValidationError{Field: "caption", Message: fmt.Sprintf("Keep the caption under %d characters.", MaxCaption)}
+	}
+	return nil
+}
+
+// MilestoneTags is the calm preset list of milestone chips offered in the edit sheet.
+var MilestoneTags = []string{
+	"First smile",
+	"Monthly",
+	"Tummy time",
+	"First bath",
+	"Outing",
+	"Family",
+}
+
+// ValidateTag checks that a milestone tag fits within MaxTag runes.
+func ValidateTag(tag string) error {
+	if utf8.RuneCountInString(strings.TrimSpace(tag)) > MaxTag {
+		return &ValidationError{Field: "tag", Message: fmt.Sprintf("Keep the tag under %d characters.", MaxTag)}
 	}
 	return nil
 }

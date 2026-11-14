@@ -258,3 +258,42 @@ func TestAlbumPhotoAccountIsolation(t *testing.T) {
 		t.Fatal("cross-account upload id returned the other account's row")
 	}
 }
+
+func TestAlbumFavoritesAndTags(t *testing.T) {
+	st := newTestStore(t)
+	ctx := WithAccount(context.Background(), 1)
+
+	p1, _, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(1))
+	if err != nil {
+		t.Fatalf("CreateAlbumPhoto 1: %v", err)
+	}
+	p2, _, err := st.CreateAlbumPhoto(ctx, testAlbumPhoto(2))
+	if err != nil {
+		t.Fatalf("CreateAlbumPhoto 2: %v", err)
+	}
+
+	if _, err := st.SetAlbumPhotoFavorite(ctx, p1.ID, true); err != nil {
+		t.Fatalf("SetAlbumPhotoFavorite: %v", err)
+	}
+	if _, err := st.UpdateAlbumPhotoDetails(ctx, p2.ID, p2.TakenAt, "First smile!", "First smile", false); err != nil {
+		t.Fatalf("UpdateAlbumPhotoDetails: %v", err)
+	}
+
+	favCount, err := st.CountAlbumPhotosFiltered(ctx, AlbumFilter{FavoritesOnly: true})
+	if err != nil || favCount != 1 {
+		t.Fatalf("favCount = %d, err = %v, want 1", favCount, err)
+	}
+	favs, err := st.ListAlbumPhotosFiltered(ctx, time.Time{}, AlbumFilter{FavoritesOnly: true}, 10)
+	if err != nil || len(favs) != 1 || favs[0].ID != p1.ID || !favs[0].Favorite {
+		t.Fatalf("favs = %+v, err = %v", favs, err)
+	}
+
+	tagCount, err := st.CountAlbumPhotosFiltered(ctx, AlbumFilter{Tag: "First smile"})
+	if err != nil || tagCount != 1 {
+		t.Fatalf("tagCount = %d, err = %v, want 1", tagCount, err)
+	}
+	tags, err := st.ListAlbumTags(ctx)
+	if err != nil || len(tags) != 1 || tags[0] != "First smile" {
+		t.Fatalf("tags = %v, err = %v", tags, err)
+	}
+}

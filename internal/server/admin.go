@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -541,12 +542,10 @@ func hashInviteToken(token string) string {
 }
 
 // publicBaseURL prefers an explicit configuration, because a reverse proxy can
-// rewrite the Host header. Otherwise it reconstructs the public origin from
-// the request and the usual forwarding headers.
+// rewrite the Host header. Otherwise (or when the request itself targets a
+// local loopback host during local testing) it reconstructs the origin from the
+// request and the usual forwarding headers.
 func (s *Server) publicBaseURL(r *http.Request) string {
-	if s.publicURL != "" {
-		return s.publicURL
-	}
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -558,5 +557,24 @@ func (s *Server) publicBaseURL(r *http.Request) string {
 	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-Host")); forwarded != "" {
 		host = forwarded
 	}
+	if s.publicURL != "" && !isLocalHost(host) {
+		return s.publicURL
+	}
 	return scheme + "://" + host
+}
+
+func isLocalHost(hostport string) bool {
+	host := strings.TrimSpace(hostport)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	host = strings.ToLower(host)
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return true
+	}
+	return false
 }

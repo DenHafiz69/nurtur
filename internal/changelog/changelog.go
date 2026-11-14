@@ -30,6 +30,29 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.7",
+		Date:    "Nov 14, 2026",
+		Title:   "Album favorites, milestones, and age badges",
+		Summary: "Star favorite photos, tag milestone moments, and see baby's age and monthly recaps right in the photo viewer.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"One-tap Favorite star button in the photo viewer and Favorites filter chip on the Album page.",
+					"Milestone tag chips (First smile, Monthly, Tummy time, First bath, Outing, Family) in the photo edit sheet and Album filter bar.",
+					"Baby's age and quiet monthly/yearly \"ago today\" recap labels in the photo viewer.",
+				},
+			},
+			{
+				Title: "Fixed",
+				Items: []string{
+					"Album photo count now includes older unloaded photos instead of only counting visible tiles.",
+					"Invite links created while testing on localhost use the local origin instead of the production URL.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.6",
 		Date:    "Nov 14, 2026",
 		Title:   "Firefox install guide",

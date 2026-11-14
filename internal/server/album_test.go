@@ -493,6 +493,70 @@ func TestAlbumTotalCountAcrossUploadDeleteRestore(t *testing.T) {
 	}
 }
 
+func TestAlbumEnhancementsFilterFavoriteTagAndViewerMeta(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+
+	// Set baby birth date 1 month before testNow so age and recap labels populate.
+	if err := env.store.SetSettings(ctx, map[string]string{settingBabyBirthDate: testNow.AddDate(0, -1, 0).Format("2006-01-02")}); err != nil {
+		t.Fatalf("set birth date: %v", err)
+	}
+
+	pMonthAgo := seedAlbumPhoto(t, env.store, ctx, fmt.Sprintf("%032x", 1), testNow.AddDate(0, -1, 0))
+	pToday := seedAlbumPhoto(t, env.store, ctx, fmt.Sprintf("%032x", 2), testNow.Add(-time.Hour))
+
+	// Favorite toggle endpoint sets favorite and returns updated tile HTML.
+	favRec := env.albumJSON(t, http.MethodPost, fmt.Sprintf("/album/photos/%d/favorite", pMonthAgo.ID), nil)
+	if favRec.Code != http.StatusOK {
+		t.Fatalf("favorite status = %d\n%s", favRec.Code, favRec.Body.String())
+	}
+	var favResp albumFavoriteResponse
+	if err := json.Unmarshal(favRec.Body.Bytes(), &favResp); err != nil {
+		t.Fatalf("decode favorite response: %v", err)
+	}
+	if !favResp.Favorite || !strings.Contains(favResp.TileHTML, `data-favorite="1"`) {
+		t.Fatalf("unexpected favorite response: %+v", favResp)
+	}
+
+	// Edit endpoint saves milestone tag + favorite and returns age/recap metadata.
+	editRec := env.albumJSON(t, http.MethodPatch, fmt.Sprintf("/album/photos/%d", pToday.ID), url.Values{
+		"taken_at":         {pToday.TakenAt.In(env.server.loc).Format("2006-01-02T15:04:05")},
+		"caption":          {"Big grin"},
+		"tag":              {"First smile"},
+		"favorite_present": {"1"},
+	})
+	if editRec.Code != http.StatusOK {
+		t.Fatalf("edit status = %d\n%s", editRec.Code, editRec.Body.String())
+	}
+	var editResp albumEditResponse
+	if err := json.Unmarshal(editRec.Body.Bytes(), &editResp); err != nil {
+		t.Fatalf("decode edit response: %v", err)
+	}
+	if editResp.Tag != "First smile" || editResp.AgeLabel == "" {
+		t.Fatalf("unexpected edit response: %+v", editResp)
+	}
+
+	// Favorites filter shows only the favorited photo and includes age + recap metadata.
+	favPage := env.do(t, http.MethodGet, "/album?filter=favorites", nil, false)
+	favBody := favPage.Body.String()
+	if !strings.Contains(favBody, fmt.Sprintf(`data-photo-id="%d"`, pMonthAgo.ID)) ||
+		strings.Contains(favBody, fmt.Sprintf(`data-photo-id="%d"`, pToday.ID)) {
+		t.Fatalf("favorites filter returned wrong photos:\n%s", favBody)
+	}
+	if !strings.Contains(favBody, `data-age-label="born today"`) ||
+		!strings.Contains(favBody, `data-recap-label="1 month ago today"`) {
+		t.Fatalf("missing age or recap metadata on tile:\n%s", favBody)
+	}
+
+	// Tag filter shows only photos with that milestone tag.
+	tagPage := env.do(t, http.MethodGet, "/album?tag=First+smile", nil, false)
+	tagBody := tagPage.Body.String()
+	if !strings.Contains(tagBody, fmt.Sprintf(`data-photo-id="%d"`, pToday.ID)) ||
+		strings.Contains(tagBody, fmt.Sprintf(`data-photo-id="%d"`, pMonthAgo.ID)) {
+		t.Fatalf("tag filter returned wrong photos:\n%s", tagBody)
+	}
+}
+
 func TestAlbumDeletedPhotoReturns404(t *testing.T) {
 	env := newTestEnv(t)
 	rec := env.uploadPhoto(t, albumUploadForm{

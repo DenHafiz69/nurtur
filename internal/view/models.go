@@ -238,11 +238,16 @@ type TimelineDay struct {
 // AlbumPageView is one page of photos, grouped by the local day each photo was
 // taken. HasDays is false when the account has no photos yet.
 type AlbumPageView struct {
-	Days       []AlbumDay
-	HasDays    bool
-	HasMore    bool
-	NextCursor string
-	Count      int
+	Days        []AlbumDay
+	HasDays     bool
+	HasMore     bool
+	NextCursor  string
+	Count       int
+	Filter      string
+	ActiveTag   string
+	Tags        []string
+	HasFilters  bool
+	FilterQuery string
 }
 
 // AlbumDay is one local-date group in the album. Label is the calm relative
@@ -271,6 +276,10 @@ type AlbumRow struct {
 	Height      int
 	AspectRatio string
 	Caption     string
+	Favorite    bool
+	Tag         string
+	AgeLabel    string
+	RecapLabel  string
 }
 
 // AlbumEditView backs the date and caption sheet.
@@ -279,9 +288,14 @@ type AlbumEditView struct {
 	TimeInput  string
 	Caption    string
 	CaptionMax int
+	Favorite   bool
+	Tag        string
+	TagMax     int
+	TagPresets []string
 	FullLabel  string
 	TimeErr    string
 	CaptionErr string
+	TagErr     string
 }
 
 // SettingsView backs the settings page.

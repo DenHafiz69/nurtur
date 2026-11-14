@@ -331,6 +331,32 @@ func ageCount(n int, unit string) string {
 	return fmt.Sprintf("%d %ss", n, unit)
 }
 
+// PhotoRecapLabel returns a quiet "N month(s)/year(s) ago today" label when
+// takenAt falls on the same day-of-month in an earlier month or year than now.
+func PhotoRecapLabel(takenAt, now time.Time, loc *time.Location) string {
+	if takenAt.IsZero() || now.IsZero() {
+		return ""
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	taken := takenAt.In(loc)
+	today := now.In(loc)
+	takenDay := time.Date(taken.Year(), taken.Month(), taken.Day(), 0, 0, 0, 0, time.UTC)
+	todayDay := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.UTC)
+	if !takenDay.Before(todayDay) || taken.Day() != today.Day() {
+		return ""
+	}
+	months := (today.Year()-taken.Year())*12 + int(today.Month()) - int(taken.Month())
+	if months <= 0 {
+		return ""
+	}
+	if months%12 == 0 {
+		return ageCount(months/12, "year") + " ago today"
+	}
+	return ageCount(months, "month") + " ago today"
+}
+
 // FormatBytes renders a compact file size.
 func FormatBytes(n int64) string {
 	switch {

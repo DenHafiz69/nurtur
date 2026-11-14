@@ -11,7 +11,21 @@ import (
 	"nurtur/internal/album"
 )
 
-const albumColumns = `id, account_id, upload_id, taken_at, taken_at_source, COALESCE(caption, ''), width, height, bytes, thumb_bytes, content_type, full_key, thumb_key, created_at, deleted_at`
+const albumColumns = `id, account_id, upload_id, taken_at, taken_at_source, COALESCE(caption, ''), favorite, COALESCE(tag, ''), width, height, bytes, thumb_bytes, content_type, full_key, thumb_key, created_at, deleted_at`
+
+// AlbumFilter narrows album queries to favorites or a single milestone tag.
+type AlbumFilter struct {
+	FavoritesOnly bool
+	Tag           string
+}
+
+func albumFilterArgs(filter AlbumFilter) (int, string) {
+	fav := 0
+	if filter.FavoritesOnly {
+		fav = 1
+	}
+	return fav, strings.TrimSpace(filter.Tag)
+}
 
 const (
 	defaultAlbumListLimit = 60
@@ -26,22 +40,32 @@ func (s *Store) CreateAlbumPhoto(ctx context.Context, photo album.Photo) (album.
 	photo.AccountID = AccountID(ctx)
 	photo.UploadID = strings.TrimSpace(photo.UploadID)
 	photo.Caption = strings.TrimSpace(photo.Caption)
+	photo.Tag = strings.TrimSpace(photo.Tag)
 	photo.TakenAt = normalizeTime(photo.TakenAt)
 	photo.CreatedAt = normalizeTime(photo.CreatedAt)
 	if err := photo.Validate(); err != nil {
 		return album.Photo{}, false, err
 	}
+	if err := album.ValidateTag(photo.Tag); err != nil {
+		return album.Photo{}, false, err
+	}
 
+	favInt := 0
+	if photo.Favorite {
+		favInt = 1
+	}
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO album_photos (
-			account_id, upload_id, taken_at, taken_at_source, caption, width, height,
+			account_id, upload_id, taken_at, taken_at_source, caption, favorite, tag, width, height,
 			bytes, thumb_bytes, content_type, full_key, thumb_key, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		photo.AccountID,
 		photo.UploadID,
 		encodeTime(photo.TakenAt),
 		string(photo.TakenAtSource),
 		nullableString(photo.Caption),
+		favInt,
+		photo.Tag,
 		photo.Width,
 		photo.Height,
 		photo.Bytes,
@@ -162,13 +186,20 @@ func (s *Store) GetAlbumPhoto(ctx context.Context, id int64) (album.Photo, error
 // day boundary. A zero before value starts from the newest photo. The limit is
 // clamped to the per-day ceiling used by the album page.
 func (s *Store) ListAlbumPhotos(ctx context.Context, before time.Time, limit int) ([]album.Photo, error) {
+	return s.ListAlbumPhotosFiltered(ctx, before, AlbumFilter{}, limit)
+}
+
+// ListAlbumPhotosFiltered returns live photos matching filter, newest-first.
+func (s *Store) ListAlbumPhotosFiltered(ctx context.Context, before time.Time, filter AlbumFilter, limit int) ([]album.Photo, error) {
 	if limit <= 0 || limit > maxAlbumListLimit {
 		limit = defaultAlbumListLimit
 	}
 
+	fav, tag := albumFilterArgs(filter)
 	query := `SELECT ` + albumColumns + ` FROM album_photos
-		WHERE account_id = ? AND deleted_at IS NULL`
-	args := []any{AccountID(ctx)}
+		WHERE account_id = ? AND deleted_at IS NULL
+		AND (? = 0 OR favorite = 1) AND (? = '' OR tag = ?)`
+	args := []any{AccountID(ctx), fav, tag, tag}
 	if !before.IsZero() {
 		query += ` AND taken_at < ?`
 		args = append(args, encodeTime(before))
@@ -199,18 +230,25 @@ func (s *Store) ListAlbumPhotos(ctx context.Context, before time.Time, limit int
 // ListAlbumPhotosBetween returns live photos in the half-open local-day range
 // [from, to), newest first. It is how the album loads one whole day at a time.
 func (s *Store) ListAlbumPhotosBetween(ctx context.Context, from, to time.Time, limit int) ([]album.Photo, error) {
+	return s.ListAlbumPhotosBetweenFiltered(ctx, from, to, AlbumFilter{}, limit)
+}
+
+// ListAlbumPhotosBetweenFiltered returns live photos matching filter in [from, to).
+func (s *Store) ListAlbumPhotosBetweenFiltered(ctx context.Context, from, to time.Time, filter AlbumFilter, limit int) ([]album.Photo, error) {
 	if !to.After(from) {
 		return nil, nil
 	}
 	if limit <= 0 || limit > maxAlbumListLimit {
 		limit = maxAlbumListLimit
 	}
+	fav, tag := albumFilterArgs(filter)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+albumColumns+` FROM album_photos
 		WHERE account_id = ? AND deleted_at IS NULL AND taken_at >= ? AND taken_at < ?
+		AND (? = 0 OR favorite = 1) AND (? = '' OR tag = ?)
 		ORDER BY taken_at DESC, id DESC
 		LIMIT ?`,
-		AccountID(ctx), encodeTime(from), encodeTime(to), limit)
+		AccountID(ctx), encodeTime(from), encodeTime(to), fav, tag, tag, limit)
 	if err != nil {
 		return nil, fmt.Errorf("store: album photos between: %w", err)
 	}
@@ -233,13 +271,20 @@ func (s *Store) ListAlbumPhotosBetween(ctx context.Context, from, to time.Time, 
 // HasAlbumPhotosBefore reports whether any live photo is older than t. It
 // drives "Load earlier days" without loading an extra page just to check.
 func (s *Store) HasAlbumPhotosBefore(ctx context.Context, before time.Time) (bool, error) {
+	return s.HasAlbumPhotosBeforeFiltered(ctx, before, AlbumFilter{})
+}
+
+// HasAlbumPhotosBeforeFiltered reports whether any live photo matching filter is older than t.
+func (s *Store) HasAlbumPhotosBeforeFiltered(ctx context.Context, before time.Time, filter AlbumFilter) (bool, error) {
+	fav, tag := albumFilterArgs(filter)
 	var exists int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT CASE WHEN EXISTS (
 			SELECT 1 FROM album_photos
 			WHERE account_id = ? AND deleted_at IS NULL AND taken_at < ?
+			AND (? = 0 OR favorite = 1) AND (? = '' OR tag = ?)
 		) THEN 1 ELSE 0 END`,
-		AccountID(ctx), encodeTime(before),
+		AccountID(ctx), encodeTime(before), fav, tag, tag,
 	).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("store: album before: %w", err)
@@ -249,16 +294,50 @@ func (s *Store) HasAlbumPhotosBefore(ctx context.Context, before time.Time) (boo
 
 // CountAlbumPhotos returns the total number of live photos in the current account's album.
 func (s *Store) CountAlbumPhotos(ctx context.Context) (int, error) {
+	return s.CountAlbumPhotosFiltered(ctx, AlbumFilter{})
+}
+
+// CountAlbumPhotosFiltered returns the number of live photos matching filter.
+func (s *Store) CountAlbumPhotosFiltered(ctx context.Context, filter AlbumFilter) (int, error) {
+	fav, tag := albumFilterArgs(filter)
 	var count int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT COUNT(1) FROM album_photos
-		WHERE account_id = ? AND deleted_at IS NULL`,
-		AccountID(ctx),
+		WHERE account_id = ? AND deleted_at IS NULL
+		AND (? = 0 OR favorite = 1) AND (? = '' OR tag = ?)`,
+		AccountID(ctx), fav, tag, tag,
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("store: count album photos: %w", err)
 	}
 	return count, nil
+}
+
+// ListAlbumTags returns distinct non-empty milestone tags on live photos in the account.
+func (s *Store) ListAlbumTags(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT DISTINCT tag FROM album_photos
+		WHERE account_id = ? AND deleted_at IS NULL AND tag != ''
+		ORDER BY tag ASC`,
+		AccountID(ctx),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("store: list album tags: %w", err)
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err != nil {
+			return nil, fmt.Errorf("store: scan album tag: %w", err)
+		}
+		tags = append(tags, tag)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: list album tags: %w", err)
+	}
+	return tags, nil
 }
 
 // UpdateAlbumPhoto corrects the capture date and caption. A manual correction
@@ -277,6 +356,70 @@ func (s *Store) UpdateAlbumPhoto(ctx context.Context, id int64, takenAt time.Tim
 	n, err := res.RowsAffected()
 	if err != nil {
 		return album.Photo{}, fmt.Errorf("store: update album photo rows: %w", err)
+	}
+	if n == 0 {
+		return album.Photo{}, album.ErrNotFound
+	}
+	photo, err := s.GetAlbumPhoto(ctx, id)
+	if err != nil {
+		return album.Photo{}, err
+	}
+	s.notifyChange()
+	return photo, nil
+}
+
+// UpdateAlbumPhotoDetails updates capture date, caption, milestone tag, and favorite state.
+func (s *Store) UpdateAlbumPhotoDetails(ctx context.Context, id int64, takenAt time.Time, caption, tag string, favorite bool) (album.Photo, error) {
+	tag = strings.TrimSpace(tag)
+	if err := album.ValidateTag(tag); err != nil {
+		return album.Photo{}, err
+	}
+	favInt := 0
+	if favorite {
+		favInt = 1
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE album_photos
+		SET taken_at = ?, taken_at_source = ?, caption = ?, tag = ?, favorite = ?
+		WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+		encodeTime(normalizeTime(takenAt)), string(album.SourceManual),
+		nullableString(strings.TrimSpace(caption)), tag, favInt,
+		id, AccountID(ctx))
+	if err != nil {
+		return album.Photo{}, fmt.Errorf("store: update album photo details: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return album.Photo{}, fmt.Errorf("store: update album photo details rows: %w", err)
+	}
+	if n == 0 {
+		return album.Photo{}, album.ErrNotFound
+	}
+	photo, err := s.GetAlbumPhoto(ctx, id)
+	if err != nil {
+		return album.Photo{}, err
+	}
+	s.notifyChange()
+	return photo, nil
+}
+
+// SetAlbumPhotoFavorite sets the favorite flag on a live photo.
+func (s *Store) SetAlbumPhotoFavorite(ctx context.Context, id int64, favorite bool) (album.Photo, error) {
+	favInt := 0
+	if favorite {
+		favInt = 1
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE album_photos
+		SET favorite = ?
+		WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+		favInt, id, AccountID(ctx))
+	if err != nil {
+		return album.Photo{}, fmt.Errorf("store: set album favorite: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return album.Photo{}, fmt.Errorf("store: set album favorite rows: %w", err)
 	}
 	if n == 0 {
 		return album.Photo{}, album.ErrNotFound
@@ -393,6 +536,8 @@ func scanAlbumPhoto(s scanner) (album.Photo, error) {
 		taken   string
 		source  string
 		caption string
+		fav     int
+		tag     string
 		created string
 		deleted sql.NullString
 	)
@@ -403,6 +548,8 @@ func scanAlbumPhoto(s scanner) (album.Photo, error) {
 		&taken,
 		&source,
 		&caption,
+		&fav,
+		&tag,
 		&photo.Width,
 		&photo.Height,
 		&photo.Bytes,
@@ -427,5 +574,7 @@ func scanAlbumPhoto(s scanner) (album.Photo, error) {
 	}
 	photo.TakenAtSource = album.TakenAtSource(source)
 	photo.Caption = caption
+	photo.Favorite = fav != 0
+	photo.Tag = tag
 	return photo, nil
 }
