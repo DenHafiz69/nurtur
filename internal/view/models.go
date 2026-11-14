@@ -47,6 +47,7 @@ type PageData struct {
 	// CSRF is set only when the optional passcode gate is enabled.
 	CSRF        string
 	AuthEnabled bool
+	DemoMode    bool
 
 	// FeedAlertMinutes is the nursing ping threshold. Zero disables it.
 	FeedAlertMinutes int

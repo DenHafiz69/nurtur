@@ -59,6 +59,19 @@
     </header>
 
     <div id="offline-banner" class="offline-banner" hidden role="status">Offline — showing the last saved screen. New logs will wait for the connection.</div>
+    {{if .DemoMode}}
+    <div class="demo-banner" role="status">
+      <span>Demo mode — try everything without logging in.</span>
+      <div class="demo-banner-actions">
+        <form method="post" action="/demo/reset">
+          <button type="submit" class="demo-banner-btn">Reset</button>
+        </form>
+        <form method="post" action="/demo/exit">
+          <button type="submit" class="demo-banner-btn demo-banner-exit">Exit</button>
+        </form>
+      </div>
+    </div>
+    {{end}}
 
     {{template "page-main" .}}
 

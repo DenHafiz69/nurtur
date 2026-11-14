@@ -33,7 +33,13 @@ type authContextKey string
 
 const (
 	authCSRFKey authContextKey = "csrf"
+	authDemoKey authContextKey = "demo"
 )
+
+func isDemoFrom(ctx context.Context) bool {
+	demo, _ := ctx.Value(authDemoKey).(bool)
+	return demo
+}
 
 // auth implements Nurtur's local gate. It supports the original single
 // passcode and the account flow (username + password created with a signup
@@ -103,6 +109,19 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !a.enabled() {
+			if accountID, csrf, isDemo, ok := a.session(r); ok && isDemo {
+				if isUnsafeMethod(r.Method) {
+					if err := a.checkCSRF(r, csrf); err != nil {
+						http.Error(w, "That request could not be verified. Reload and try again.", http.StatusForbidden)
+						return
+					}
+				}
+				ctx := context.WithValue(r.Context(), authCSRFKey, csrf)
+				ctx = context.WithValue(ctx, authDemoKey, true)
+				ctx = store.WithAccount(ctx, accountID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -111,7 +130,7 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		accountID, csrf, ok := a.session(r)
+		accountID, csrf, isDemo, ok := a.session(r)
 		if !ok {
 			// The root is the public front door. Let it through so the
 			// dashboard handler can show the landing page instead of a
@@ -143,6 +162,9 @@ func (a *auth) middleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), authCSRFKey, csrf)
+		if isDemo {
+			ctx = context.WithValue(ctx, authDemoKey, true)
+		}
 		ctx = store.WithAccount(ctx, accountID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -161,9 +183,9 @@ func publicLanding(r *http.Request) bool {
 	return !isHTMX(r)
 }
 
-// signedIn reports whether the request carries a valid household session.
+// signedIn reports whether the request carries a valid household or demo session.
 func (a *auth) signedIn(r *http.Request) bool {
-	_, _, ok := a.session(r)
+	_, _, _, ok := a.session(r)
 	return ok
 }
 
@@ -171,6 +193,7 @@ func requiresAuth(r *http.Request) bool {
 	path := r.URL.Path
 	switch {
 	case path == "/login", path == "/signup", path == "/logout",
+		path == "/landing", path == "/demo",
 		path == "/healthz",
 		path == "/offline",
 		path == "/sw.js",
@@ -233,42 +256,64 @@ func sameOrigin(r *http.Request) error {
 }
 
 func (a *auth) newSession(accountID int64) (value, csrf string, err error) {
+	return a.buildSessionCookie("v2", accountID, sessionLifetime)
+}
+
+func (a *auth) newDemoSession(demoAccountID int64) (value, csrf string, err error) {
+	return a.buildSessionCookie("v2demo", demoAccountID, 24*time.Hour)
+}
+
+func (a *auth) buildSessionCookie(kind string, accountID int64, lifetime time.Duration) (value, csrf string, err error) {
 	var raw [18]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return "", "", err
 	}
 	csrf = base64.RawURLEncoding.EncodeToString(raw[:])
 	payload := strings.Join([]string{
-		"v2",
-		time.Now().UTC().Add(sessionLifetime).Format(time.RFC3339),
+		kind,
+		time.Now().UTC().Add(lifetime).Format(time.RFC3339),
 		strconv.FormatInt(accountID, 10),
 		csrf,
 	}, "|")
 	return payload + "." + a.sign(payload), csrf, nil
 }
 
-func (a *auth) session(r *http.Request) (accountID int64, csrf string, ok bool) {
+func (a *auth) session(r *http.Request) (accountID int64, csrf string, isDemo bool, ok bool) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil || cookie.Value == "" {
-		return 0, "", false
+		return 0, "", false, false
 	}
 	payload, sig, found := strings.Cut(cookie.Value, ".")
 	if !found || !hmac.Equal([]byte(sig), []byte(a.sign(payload))) {
-		return 0, "", false
+		return 0, "", false, false
 	}
 	parts := strings.Split(payload, "|")
-	if len(parts) != 4 || parts[0] != "v2" {
-		return 0, "", false
+	if len(parts) != 4 {
+		return 0, "", false, false
+	}
+	switch parts[0] {
+	case "v2":
+	case "v2demo":
+		isDemo = true
+	default:
+		return 0, "", false, false
 	}
 	expires, err := time.Parse(time.RFC3339, parts[1])
 	if err != nil || time.Now().UTC().After(expires) {
-		return 0, "", false
+		return 0, "", false, false
 	}
 	accountID, err = strconv.ParseInt(parts[2], 10, 64)
-	if err != nil || accountID < 0 {
-		return 0, "", false
+	if err != nil {
+		return 0, "", false, false
 	}
-	return accountID, parts[3], true
+	if isDemo {
+		if accountID >= -999 {
+			return 0, "", false, false
+		}
+	} else if accountID < 0 {
+		return 0, "", false, false
+	}
+	return accountID, parts[3], isDemo, true
 }
 
 func (a *auth) sign(payload string) string {
@@ -278,13 +323,21 @@ func (a *auth) sign(payload string) string {
 }
 
 func (a *auth) setSession(w http.ResponseWriter, r *http.Request, accountID int64, csrf string) {
+	a.writeSessionCookie(w, r, "v2", accountID, csrf, sessionLifetime)
+}
+
+func (a *auth) setDemoSession(w http.ResponseWriter, r *http.Request, demoAccountID int64, csrf string) {
+	a.writeSessionCookie(w, r, "v2demo", demoAccountID, csrf, 24*time.Hour)
+}
+
+func (a *auth) writeSessionCookie(w http.ResponseWriter, r *http.Request, kind string, accountID int64, csrf string, lifetime time.Duration) {
 	if csrf == "" {
 		return
 	}
 	// Rebuild the value so expiry and signature match the token issued above.
 	payload := strings.Join([]string{
-		"v2",
-		time.Now().UTC().Add(sessionLifetime).Format(time.RFC3339),
+		kind,
+		time.Now().UTC().Add(lifetime).Format(time.RFC3339),
 		strconv.FormatInt(accountID, 10),
 		csrf,
 	}, "|")
@@ -294,7 +347,7 @@ func (a *auth) setSession(w http.ResponseWriter, r *http.Request, accountID int6
 		Name:     sessionCookieName,
 		Value:    payload + "." + a.sign(payload),
 		Path:     "/",
-		MaxAge:   int(sessionLifetime / time.Second),
+		MaxAge:   int(lifetime / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   a.secure || r.TLS != nil,
@@ -744,8 +797,17 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, accountID 
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	if s.auth.enabled() {
+	isDemo := isDemoFrom(r.Context())
+	if s.auth != nil && (s.auth.enabled() || isDemo) {
 		s.auth.clearSession(w, r)
+	}
+	if isDemo {
+		if s.auth.enabled() {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
 	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }

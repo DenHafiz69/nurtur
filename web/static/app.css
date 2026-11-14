@@ -2738,6 +2738,61 @@ textarea {
   text-align: center;
 }
 
+.demo-banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--sky);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.demo-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.demo-banner-actions form {
+  margin: 0;
+}
+
+.demo-banner-btn {
+  appearance: none;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.demo-banner-btn:hover {
+  background: var(--surface-soft);
+}
+
+.demo-banner-exit {
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  border-color: var(--toast-bg);
+}
+
+.demo-banner-exit:hover {
+  opacity: 0.9;
+  background: var(--toast-bg);
+}
+
 /* ---------- Full history page ---------- */
 
 .page-head {
@@ -4073,6 +4128,7 @@ body.album-viewer-open .app-main {
 }
 
 .landing-header {
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4138,6 +4194,99 @@ body.album-viewer-open .app-main {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.landing-nav-account {
+  display: none;
+}
+
+.landing-menu {
+  position: relative;
+}
+
+.landing-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  list-style: none;
+}
+
+.landing-menu-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.landing-menu-toggle::marker {
+  display: none;
+}
+
+.landing-menu-chevron {
+  display: inline-flex;
+  transition: transform 160ms ease;
+}
+
+.landing-menu-chevron .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.landing-menu[open] .landing-menu-chevron {
+  transform: rotate(180deg);
+}
+
+.landing-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(260px, calc(100vw - 36px));
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 14px 32px rgba(59, 47, 47, 0.16);
+}
+
+.landing-menu-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1.5px solid var(--line-soft);
+}
+
+.landing-menu-links a {
+  padding: 9px 10px;
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.landing-menu-links a:hover {
+  background: var(--surface-soft);
+}
+
+.landing-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landing-menu-btn {
+  width: 100%;
+  min-height: 44px;
+  font-size: 15px;
 }
 
 .landing-theme {
@@ -5332,13 +5481,13 @@ body.album-viewer-open .app-main {
 }
 
 @media (min-width: 820px) {
-  .landing-nav-sections {
+  .landing-nav-sections,
+  .landing-nav-account {
     display: flex;
   }
 
-  .landing-hero {
-    grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
-    gap: clamp(32px, 4vw, 60px);
+  .landing-menu {
+    display: none;
   }
 
   .landing-actions {

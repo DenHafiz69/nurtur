@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Nurtur — a calm little nursery companion</title>
-  <meta name="description" content="Nurtur keeps nursing, diapers, and sleep in one quiet place — so your hands and your head can stay with your baby.">
+  <meta name="description" content="Nurtur keeps nursing, bottles, pumping, diapers, sleep, solids, and baby photos in one quiet place — so your hands and your head can stay with your baby.">
   <meta name="theme-color" content="#fff8f0">
   <meta name="color-scheme" content="light dark">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Nurtur — a calm little nursery companion">
-  <meta property="og:description" content="One thumb, one quiet log. Nursing, diapers, and sleep, made for the 3 a.m. version of you.">
+  <meta property="og:description" content="One thumb, one quiet log. Nursing, bottles, pumping, diapers, sleep, and solids, made for the 3 a.m. version of you.">
   <meta property="og:image" content="/static/img/icon-512.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
@@ -55,10 +55,30 @@
         <span class="theme-icon theme-icon-day">{{icon "sun"}}</span>
         <span class="theme-icon theme-icon-night">{{icon "moon"}}</span>
       </button>
-      <nav class="landing-nav" aria-label="Account">
+      <nav class="landing-nav landing-nav-account" aria-label="Account">
+        <a class="landing-nav-link" href="/demo">Try demo</a>
         <a class="landing-nav-link" href="/login?mode=signin">Sign in</a>
         <a class="btn btn-primary landing-nav-cta" href="/login?mode=signup">Sign up</a>
       </nav>
+      <details class="landing-menu">
+        <summary class="landing-menu-toggle" aria-label="Open menu">
+          <span>Menu</span>
+          <span class="landing-menu-chevron" aria-hidden="true">{{icon "chevron-down"}}</span>
+        </summary>
+        <div class="landing-menu-panel">
+          <nav class="landing-menu-links" aria-label="Mobile menu">
+            <a href="#why">Why it works</a>
+            <a href="#features">Features</a>
+            <a href="#privacy">Privacy</a>
+            <a href="#questions">Questions</a>
+          </nav>
+          <div class="landing-menu-actions">
+            <a class="btn btn-ghost landing-menu-btn" href="/demo">Try live demo</a>
+            <a class="btn btn-ghost landing-menu-btn" href="/login?mode=signin">Sign in</a>
+            <a class="btn btn-primary landing-menu-btn" href="/login?mode=signup">Sign up</a>
+          </div>
+        </div>
+      </details>
     </div>
   </header>
 
@@ -67,99 +87,20 @@
       <div class="landing-hero-copy">
         <p class="landing-eyebrow"><span class="landing-eyebrow-dot" aria-hidden="true"></span> For the 3 a.m. version of you</p>
         <h1 class="landing-title" id="hero-title">One less thing to remember.</h1>
-        <p class="landing-lede">Nursing, diapers, and sleep in one quiet place. The last side, the last change, and the wake window stay within one thumb — so your hands and your head can stay with your baby.</p>
+        <p class="landing-lede">Nursing, bottles, pumping, diapers, sleep, and solids in one quiet place. The last feed, the last change, and the wake window stay within one thumb — so your hands and your head can stay with your baby.</p>
         <div class="landing-actions">
-          <a class="btn btn-primary landing-cta" href="/login?mode=signup">
-            Create your account
+          <a class="btn btn-primary landing-cta" href="/demo">
+            Try live demo
             <span class="landing-cta-icon" aria-hidden="true">{{icon "arrow-right"}}</span>
           </a>
           <a class="btn btn-ghost landing-cta" href="/login?mode=signin">Sign in</a>
         </div>
         <ul class="landing-trust" role="list">
-          <li>{{icon "check"}} One tap at a time</li>
-          <li>{{icon "check"}} Private to your household</li>
+          <li>{{icon "check"}} No login needed for demo</li>
+          <li>{{icon "check"}} Invite link or password for your log</li>
           <li>{{icon "check"}} Export anytime</li>
         </ul>
-        <p class="landing-hint">No ads, no feed to scroll — just your baby's day.</p>
-      </div>
-
-      <div class="landing-hero-art">
-        <div class="preview-stage">
-          <div class="preview-phone" aria-hidden="true">
-            <span class="preview-speaker"></span>
-            <div class="preview-screen">
-              <div class="preview-status">
-                <span>9:41</span>
-                <span class="preview-status-icons"><i></i><i></i><i></i><i></i></span>
-              </div>
-
-              <div class="preview-head">
-                <span class="preview-pip">{{.Mascot "awake"}}</span>
-                <div class="preview-head-copy">
-                  <small>Good morning</small>
-                  <strong>Aisyah</strong>
-                  <small>4 months old · Girl</small>
-                </div>
-                <span class="preview-sun">{{icon "sun"}}</span>
-              </div>
-
-              <span class="preview-last">Last: Left · 1h 50m ago</span>
-
-              <div class="preview-cards">
-                <div class="preview-card preview-card-peach">
-                  <span class="preview-card-label">Nursing</span>
-                  <strong>1h 50m</strong>
-                  <small>Right side</small>
-                </div>
-                <div class="preview-card preview-card-butter">
-                  <span class="preview-card-label">Diaper</span>
-                  <strong>15m</strong>
-                  <small>Wet</small>
-                </div>
-                <div class="preview-card preview-card-sage">
-                  <span class="preview-card-label">Sleep</span>
-                  <strong>45m</strong>
-                  <small>Awake</small>
-                </div>
-              </div>
-
-              <div class="preview-today">
-                <strong>Today</strong>
-                <span>Thursday, October 29</span>
-              </div>
-
-              <div class="preview-timer">
-                <div class="preview-timer-head">
-                  <span>{{icon "drop-left"}} Nursing</span>
-                  <strong>12:34</strong>
-                </div>
-                <div class="preview-timer-sides">
-                  <span>Left</span>
-                  <span>Right</span>
-                </div>
-              </div>
-
-              <div class="preview-row">
-                <span class="preview-row-icon preview-row-moon">{{icon "moon"}}</span>
-                <div><strong>8:11 AM · Slept</strong><small>1h 42m · 8:11 AM–9:53 AM</small></div>
-              </div>
-              <div class="preview-row">
-                <span class="preview-row-icon preview-row-drop">{{icon "drop-left"}}</span>
-                <div><strong>7:57 AM · Nursed</strong><small>Right 7m</small></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="preview-note preview-note-top">
-            <span class="preview-note-icon">{{icon "clock"}}</span>
-            <div><strong>One thumb</strong><small>Every tap in reach</small></div>
-          </div>
-          <div class="preview-note preview-note-bottom">
-            <span class="preview-note-icon">{{icon "moon"}}</span>
-            <div><strong>Quiet at 3 a.m.</strong><small>A low-glare night palette</small></div>
-          </div>
-        </div>
-        <p class="landing-caption">A calm log for the long nights and the short naps.</p>
+        <p class="landing-hint">Have an invite link or password? <a href="/login?mode=signin">Sign in</a> or <a href="/login?mode=signup">create your account</a>.</p>
       </div>
     </section>
 
@@ -217,33 +158,48 @@
       <ul class="landing-grid">
         <li class="landing-card landing-card-peach">
           <span class="landing-card-icon" aria-hidden="true">{{icon "drop-left"}}</span>
-          <h3>Nursing that keeps up</h3>
-          <p>Tap left or right to start. Switch sides without stopping, pause when your baby unlatches, and let the timer keep the real start time.</p>
+          <h3>Nursing &amp; live timer</h3>
+          <p>Tap left or right to start. Switch sides without stopping, pause when your baby unlatches, and always see which side was last.</p>
         </li>
         <li class="landing-card landing-card-butter">
-          <span class="landing-card-icon" aria-hidden="true">{{icon "clock"}}</span>
-          <h3>The last side, at a glance</h3>
-          <p>The top of the screen always shows which side and how long ago, so the next feed starts without the mental maths.</p>
+          <span class="landing-card-icon" aria-hidden="true">{{icon "bottle"}}</span>
+          <h3>Bottles in one tap</h3>
+          <p>Log breast milk or formula with quick 60, 90, and 120 ml (2, 3, and 4 oz) presets, custom amounts, and notes.</p>
         </li>
         <li class="landing-card landing-card-sky">
-          <span class="landing-card-icon" aria-hidden="true">{{icon "diaper"}}</span>
-          <h3>Diapers in one tap</h3>
-          <p>Wet, dirty, or both — logged right away. Colour and consistency are there when a check-up asks, tucked away when it doesn't.</p>
+          <span class="landing-card-icon" aria-hidden="true">{{icon "pump"}}</span>
+          <h3>Pumping sessions</h3>
+          <p>Track left, right, or both sides with a live pump timer in the dock and optional output volume and duration.</p>
         </li>
         <li class="landing-card landing-card-lilac">
           <span class="landing-card-icon" aria-hidden="true">{{icon "moon"}}</span>
-          <h3>Sleep and wake windows</h3>
+          <h3>Sleep &amp; wake windows</h3>
           <p>Start a nap and see how long your little one has been awake — before the overtired meltdown, not after.</p>
         </li>
         <li class="landing-card landing-card-sage">
-          <span class="landing-card-icon" aria-hidden="true">{{icon "pencil"}}</span>
-          <h3>Easy to fix later</h3>
-          <p>Forgot to stop the timer? Nudge the time, or edit the start and end. No starting over, and no guilt.</p>
+          <span class="landing-card-icon" aria-hidden="true">{{icon "diaper"}}</span>
+          <h3>Diapers at a glance</h3>
+          <p>Wet, dirty, or both — logged right away. Colour and consistency are there when a check-up asks, tucked away when it doesn't.</p>
         </li>
         <li class="landing-card landing-card-peach">
+          <span class="landing-card-icon" aria-hidden="true">{{icon "solid"}}</span>
+          <h3>Solids &amp; first meals</h3>
+          <p>As your baby grows, log foods, portions, and any reactions in the same calm timeline — opt-in from Settings.</p>
+        </li>
+        <li class="landing-card landing-card-butter">
+          <span class="landing-card-icon" aria-hidden="true">{{icon "camera"}}</span>
+          <h3>Private baby album</h3>
+          <p>Keep daily snapshots grouped by day with a calm full-screen viewer — no social feed, no algorithms.</p>
+        </li>
+        <li class="landing-card landing-card-sky">
+          <span class="landing-card-icon" aria-hidden="true">{{icon "pencil"}}</span>
+          <h3>Easy to fix later</h3>
+          <p>Forgot to stop the timer? Nudge the time, edit any entry, or undo an accidental delete in one tap.</p>
+        </li>
+        <li class="landing-card landing-card-lilac">
           <span class="landing-card-icon" aria-hidden="true">{{icon "lock"}}</span>
-          <h3>Yours to keep</h3>
-          <p>Private to your household. No ads, no tracking, and every log can be exported whenever you like.</p>
+          <h3>Invite-only &amp; exportable</h3>
+          <p>Protected by invite link or password. No ads, no tracking, and CSV, JSON, or SQL exports whenever you want.</p>
         </li>
       </ul>
     </section>
@@ -293,7 +249,7 @@
       <div class="landing-faq-list">
         <details>
           <summary>Do I need an account?<span class="landing-faq-icon" aria-hidden="true">{{icon "chevron-down"}}</span></summary>
-          <div class="landing-faq-answer">On this server, yes. An account keeps the log private to your household, and each account gets its own baby profile. Sign-ups may be invite-only — the app will tell you if you need a key.</div>
+          <div class="landing-faq-answer">To keep your family's log private, yes — you'll need an invite link or a username and password. Want to look around first? <a href="/demo">Open the live demo</a> to try the full app without logging in.</div>
         </details>
         <details>
           <summary>Does it work offline?<span class="landing-faq-icon" aria-hidden="true">{{icon "chevron-down"}}</span></summary>
@@ -316,10 +272,11 @@
       <h2 class="landing-section-title" id="cta-title">One less thing to carry.</h2>
       <p>Setting up takes a minute. After that, it's one tap at a time.</p>
       <div class="landing-actions landing-actions-inline">
-        <a class="btn btn-primary landing-cta" href="/login?mode=signup">Sign up</a>
+        <a class="btn btn-primary landing-cta" href="/demo">Try live demo</a>
         <a class="btn btn-ghost landing-cta" href="/login?mode=signin">Sign in</a>
+        <a class="btn btn-ghost landing-cta" href="/login?mode=signup">Sign up</a>
       </div>
-      {{if not .SignupOpen}}<p class="landing-hint">Sign-ups are invite-only on this server. Ask for an invite if you need one.</p>{{end}}
+      {{if not .SignupOpen}}<p class="landing-hint">Sign-ups are invite-only on this server. Ask for an invite link if you need one, or try the live demo above.</p>{{end}}
     </section>
   </main>
 
@@ -336,6 +293,7 @@
       <a href="#features">Features</a>
       <a href="#privacy">Privacy</a>
       <a href="#questions">Questions</a>
+      <a href="/demo">Try demo</a>
       <a href="/login?mode=signin">Sign in</a>
     </nav>
     <p class="landing-footer-fine">Made for the long nights, the short naps, and the one free hand. Nurtur is a logbook, not medical advice.</p>
@@ -368,6 +326,20 @@
           syncThemeButton();
         });
         syncThemeButton();
+      }
+
+      var menu = document.querySelector(".landing-menu");
+      if (menu) {
+        menu.addEventListener("click", function (event) {
+          if (event.target.closest && event.target.closest("a")) {
+            menu.removeAttribute("open");
+          }
+        });
+        document.addEventListener("click", function (event) {
+          if (menu.open && !menu.contains(event.target)) {
+            menu.removeAttribute("open");
+          }
+        });
       }
     })();
   </script>

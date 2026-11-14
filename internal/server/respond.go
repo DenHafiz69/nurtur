@@ -315,6 +315,7 @@ func (s *Server) writeFragments(
 
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, status int, data *view.PageData) {
 	data.Path = r.URL.RequestURI()
+	data.DemoMode = isDemoFrom(r.Context())
 	s.attachChangelog(r.Context(), data)
 	templateName := "layout"
 	if wantsMainFragment(r) {

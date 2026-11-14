@@ -16,9 +16,10 @@ func (s *Server) landingRequest(r *http.Request) bool {
 
 func (s *Server) handleLanding(w http.ResponseWriter, r *http.Request) {
 	s.renderNamed(w, r, http.StatusOK, "landing", &view.PageData{
-		Nonce:      nonceFrom(r.Context()),
-		Version:    s.version,
-		MascotName: view.MascotPip,
-		SignupOpen: s.auth.signupOpen(),
+		Nonce:       nonceFrom(r.Context()),
+		Version:     s.version,
+		MascotName:  view.MascotPip,
+		AuthEnabled: s.auth != nil && s.auth.enabled(),
+		SignupOpen:  s.auth != nil && s.auth.signupOpen(),
 	})
 }
