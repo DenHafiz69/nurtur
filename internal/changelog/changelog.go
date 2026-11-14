@@ -30,6 +30,20 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.6",
+		Date:    "Nov 14, 2026",
+		Title:   "Firefox install guide",
+		Summary: "The Install app button now appears in Firefox too, with quick steps to add Nurtur to your home screen.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"An Install app button and two-step Add to Home screen guide for Firefox.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.5",
 		Date:    "Nov 14, 2026",
 		Title:   "One-tap app install",
