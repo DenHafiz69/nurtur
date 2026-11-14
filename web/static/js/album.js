@@ -108,6 +108,12 @@
       stepViewer(1);
       return;
     }
+    var fav = event.target.closest("[data-album-viewer-fav]");
+    if (fav) {
+      event.preventDefault();
+      toggleViewerFavorite(fav);
+      return;
+    }
     var edit = event.target.closest("[data-album-viewer-edit]");
     if (edit) {
       event.preventDefault();
@@ -159,6 +165,10 @@
       fullURL: tile.getAttribute("href"),
       fullLabel: tile.getAttribute("data-full-label") || "",
       caption: tile.getAttribute("data-caption") || "",
+      favorite: tile.getAttribute("data-favorite") === "1",
+      tag: tile.getAttribute("data-tag") || "",
+      ageLabel: tile.getAttribute("data-age-label") || "",
+      recapLabel: tile.getAttribute("data-recap-label") || "",
       alt: (img && img.alt) || "",
       editURL: tile.getAttribute("data-edit-url") || "",
       downloadURL: tile.getAttribute("data-download-url") || tile.getAttribute("href")
@@ -238,7 +248,10 @@
     var item = viewerItem(tile);
     var image = dialog.querySelector("[data-album-viewer-image]");
     var date = dialog.querySelector("[data-album-viewer-date]");
+    var meta = dialog.querySelector("[data-album-viewer-meta]");
     var caption = dialog.querySelector("[data-album-viewer-caption]");
+    var fav = dialog.querySelector("[data-album-viewer-fav]");
+    var favLabel = dialog.querySelector("[data-album-viewer-fav-label]");
     var download = dialog.querySelector("[data-album-viewer-download]");
     var edit = dialog.querySelector("[data-album-viewer-edit]");
     var form = dialog.querySelector("[data-album-viewer-delete-form]");
@@ -250,9 +263,24 @@
       image.alt = item.alt;
     }
     if (date) date.textContent = item.fullLabel;
+    if (meta) {
+      var parts = [];
+      if (item.ageLabel) parts.push(item.ageLabel);
+      if (item.recapLabel) parts.push(item.recapLabel);
+      if (item.tag) parts.push(item.tag);
+      meta.textContent = parts.join(" · ");
+      meta.hidden = parts.length === 0;
+    }
     if (caption) {
       caption.textContent = item.caption;
       caption.hidden = !item.caption;
+    }
+    if (fav) {
+      fav.classList.toggle("is-active", item.favorite);
+      fav.setAttribute("aria-pressed", item.favorite ? "true" : "false");
+    }
+    if (favLabel) {
+      favLabel.textContent = item.favorite ? "Favorited" : "Favorite";
     }
     if (download) download.href = item.downloadURL;
     if (edit) edit.href = item.editURL;
@@ -447,6 +475,44 @@
     insertTile(data);
     if (typeof data.total_count === "number") updateCount(data.total_count);
     dispatchToast("Photo moved to " + (data.day_label || "another day") + ".", "success", "View that day", data.day_url);
+  }
+
+  function toggleViewerFavorite(button) {
+    var tile = viewerItems[viewerIndex];
+    if (!tile) return;
+    var id = tile.getAttribute("data-photo-id");
+    if (!id) return;
+    if (button) button.disabled = true;
+
+    fetch("/album/photos/" + encodeURIComponent(id) + "/favorite", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    })
+      .then(function (response) {
+        return response.json().catch(function () {
+          return { ok: false, error: "Couldn't update favorite. Try again." };
+        });
+      })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          dispatchToast((data && data.error) || "Couldn't update favorite. Try again.", "error");
+          return;
+        }
+        var current = document.querySelector('.album-tile[data-photo-id="' + String(data.id) + '"]');
+        if (current && data.tile_html) {
+          current.outerHTML = data.tile_html;
+          var updated = document.querySelector('.album-tile[data-photo-id="' + String(data.id) + '"]');
+          if (viewerReturnFocus === current && updated) viewerReturnFocus = updated;
+        }
+        syncViewerAfterEdit(data.id);
+      })
+      .catch(function () {
+        dispatchToast("Couldn't update favorite. Check the connection and try again.", "error");
+      })
+      .then(function () {
+        if (button && button.isConnected) button.disabled = false;
+      });
   }
 
   function deleteViewerPhoto(form) {

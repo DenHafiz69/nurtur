@@ -52,7 +52,7 @@ func (s *Server) handleAlbumPage(w http.ResponseWriter, r *http.Request) {
 		s.badRequest(w, "That album link isn't valid.")
 		return
 	}
-	page, err := s.buildAlbum(r.Context(), cursor)
+	page, err := s.buildAlbum(r.Context(), cursor, albumFilterFromRequest(r))
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -78,7 +78,7 @@ func (s *Server) handleAlbumPartial(w http.ResponseWriter, r *http.Request) {
 		s.badRequest(w, "That album link isn't valid.")
 		return
 	}
-	page, err := s.buildAlbum(r.Context(), cursor)
+	page, err := s.buildAlbum(r.Context(), cursor, albumFilterFromRequest(r))
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -93,12 +93,48 @@ func (s *Server) handleAlbumPartial(w http.ResponseWriter, r *http.Request) {
 	s.writeFragments(w, r, http.StatusOK, "album-days", data, false, nil, "", false, "", "")
 }
 
+func albumFilterFromRequest(r *http.Request) store.AlbumFilter {
+	q := r.URL.Query()
+	filter := strings.TrimSpace(q.Get("filter"))
+	tag := strings.TrimSpace(q.Get("tag"))
+	return store.AlbumFilter{
+		FavoritesOnly: filter == "favorites",
+		Tag:           tag,
+	}
+}
+
+func albumFilterQuery(filter store.AlbumFilter) string {
+	var parts []string
+	if filter.FavoritesOnly {
+		parts = append(parts, "filter=favorites")
+	}
+	if filter.Tag != "" {
+		parts = append(parts, "tag="+url.QueryEscape(filter.Tag))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "&" + strings.Join(parts, "&")
+}
+
+func (s *Server) babyBirthDate(ctx context.Context) (time.Time, error) {
+	profile, err := s.currentBabyProfile(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return profile.BirthDate, nil
+}
+
 // buildAlbum loads whole local days, newest first, until the photo budget is
 // met. It jumps straight to the next day that actually has photos, so an old
 // capture date never traps the reader behind pages of empty calendar days.
 // Paginating by day means a date heading never splits across pages.
-func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumPageView, error) {
+func (s *Server) buildAlbum(ctx context.Context, before time.Time, filter store.AlbumFilter) (*view.AlbumPageView, error) {
 	now := s.clock.Now().UTC()
+	birthDate, err := s.babyBirthDate(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	var dayEnd time.Time
 	if before.IsZero() {
@@ -117,7 +153,7 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 		// Find the newest photo before this page's boundary. Its local day is
 		// the next day to render; empty days in between are skipped in one
 		// query instead of one request per week.
-		newest, err := s.store.ListAlbumPhotos(ctx, dayEnd, 1)
+		newest, err := s.store.ListAlbumPhotosFiltered(ctx, dayEnd, filter, 1)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +165,7 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 			dayEndOfDay = before.UTC()
 		}
 
-		photos, err := s.store.ListAlbumPhotosBetween(ctx, dayStart, dayEndOfDay, albumDayLoadCap)
+		photos, err := s.store.ListAlbumPhotosBetweenFiltered(ctx, dayStart, dayEndOfDay, filter, albumDayLoadCap)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +177,7 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 				Start:     dayStart,
 			}
 			for _, photo := range photos {
-				group.Rows = append(group.Rows, s.albumRow(photo))
+				group.Rows = append(group.Rows, s.albumRow(photo, birthDate))
 			}
 			page.Days = append(page.Days, group)
 			loaded += len(photos)
@@ -154,24 +190,43 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time) (*view.AlbumP
 		dayEnd = dayStart
 	}
 
-	total, err := s.store.CountAlbumPhotos(ctx)
+	total, err := s.store.CountAlbumPhotosFiltered(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	hasMore, err := s.store.HasAlbumPhotosBefore(ctx, nextBoundary)
+	totalAll, err := s.store.CountAlbumPhotos(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tags, err := s.store.ListAlbumTags(ctx)
+	if err != nil {
+		return nil, err
+	}
+	hasMore, err := s.store.HasAlbumPhotosBeforeFiltered(ctx, nextBoundary, filter)
 	if err != nil {
 		return nil, err
 	}
 	page.Count = total
 	page.HasMore = hasMore
 	page.HasDays = len(page.Days) > 0
+	page.Tags = tags
+	page.HasFilters = totalAll > 0 || filter.FavoritesOnly || filter.Tag != ""
+	page.FilterQuery = albumFilterQuery(filter)
+	switch {
+	case filter.FavoritesOnly:
+		page.Filter = "favorites"
+	case filter.Tag != "":
+		page.Filter = "tag"
+		page.ActiveTag = filter.Tag
+	}
 	if hasMore {
 		page.NextCursor = nextBoundary.UTC().Format(time.RFC3339)
 	}
 	return page, nil
 }
 
-func (s *Server) albumRow(photo album.Photo) view.AlbumRow {
+func (s *Server) albumRow(photo album.Photo, birthDate time.Time) view.AlbumRow {
+	now := s.clock.Now().UTC()
 	timeLabel := view.FormatClock(photo.TakenAt, s.loc)
 	alt := strings.TrimSpace(photo.Caption)
 	if alt == "" {
@@ -181,7 +236,7 @@ func (s *Server) albumRow(photo album.Photo) view.AlbumRow {
 		ID:          photo.ID,
 		TakenAt:     photo.TakenAt,
 		TimeLabel:   timeLabel,
-		FullLabel:   view.PhotoDateTime(photo.TakenAt, s.clock.Now().UTC(), s.loc),
+		FullLabel:   view.PhotoDateTime(photo.TakenAt, now, s.loc),
 		Alt:         alt,
 		ThumbURL:    fmt.Sprintf("/album/photos/%d/thumb", photo.ID),
 		FullURL:     fmt.Sprintf("/album/photos/%d/full", photo.ID),
@@ -189,6 +244,10 @@ func (s *Server) albumRow(photo album.Photo) view.AlbumRow {
 		Height:      photo.Height,
 		AspectRatio: albumAspect(photo.Width, photo.Height),
 		Caption:     photo.Caption,
+		Favorite:    photo.Favorite,
+		Tag:         photo.Tag,
+		AgeLabel:    view.FormatBabyAge(birthDate, photo.TakenAt, s.loc),
+		RecapLabel:  view.PhotoRecapLabel(photo.TakenAt, now, s.loc),
 	}
 }
 
@@ -364,7 +423,12 @@ func (s *Server) albumUploadSuccess(w http.ResponseWriter, r *http.Request, want
 		return
 	}
 
-	row := s.albumRow(photo)
+	birthDate, err := s.babyBirthDate(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	row := s.albumRow(photo, birthDate)
 	var tile bytes.Buffer
 	if err := s.renderer.Execute(&tile, "album-tile", row); err != nil {
 		s.serverError(w, r, err)
@@ -417,7 +481,7 @@ func (s *Server) albumUploadError(w http.ResponseWriter, r *http.Request, wantsJ
 		return
 	}
 	data.View = "album"
-	page, err := s.buildAlbum(r.Context(), time.Time{})
+	page, err := s.buildAlbum(r.Context(), time.Time{}, store.AlbumFilter{})
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -676,6 +740,10 @@ type albumEditResponse struct {
 	TimeLabel  string            `json:"time_label,omitempty"`
 	FullLabel  string            `json:"full_label,omitempty"`
 	Caption    string            `json:"caption,omitempty"`
+	Favorite   bool              `json:"favorite"`
+	Tag        string            `json:"tag,omitempty"`
+	AgeLabel   string            `json:"age_label,omitempty"`
+	RecapLabel string            `json:"recap_label,omitempty"`
 	TileHTML   string            `json:"tile_html,omitempty"`
 	DayKey     string            `json:"day_key,omitempty"`
 	DayLabel   string            `json:"day_label,omitempty"`
@@ -686,6 +754,14 @@ type albumEditResponse struct {
 	TotalCount int               `json:"total_count"`
 	Error      string            `json:"error,omitempty"`
 	Errors     map[string]string `json:"errors,omitempty"`
+}
+
+type albumFavoriteResponse struct {
+	OK       bool   `json:"ok"`
+	ID       int64  `json:"id,omitempty"`
+	Favorite bool   `json:"favorite"`
+	TileHTML string `json:"tile_html,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 type albumDeleteResponse struct {
@@ -724,6 +800,10 @@ func (s *Server) buildAlbumEdit(photo album.Photo) *view.AlbumEditView {
 		TimeInput:  photo.TakenAt.In(s.loc).Format("2006-01-02T15:04:05"),
 		Caption:    photo.Caption,
 		CaptionMax: album.MaxCaption,
+		Favorite:   photo.Favorite,
+		Tag:        photo.Tag,
+		TagMax:     album.MaxTag,
+		TagPresets: album.MilestoneTags,
 		FullLabel:  view.PhotoDateTime(photo.TakenAt, now, s.loc),
 	}
 }
@@ -754,7 +834,7 @@ func (s *Server) handleAlbumEditPage(w http.ResponseWriter, r *http.Request) {
 		s.writeFragments(w, r, http.StatusOK, "album-edit", data, false, nil, "", false, "", "")
 		return
 	}
-	page, err := s.buildAlbum(r.Context(), time.Time{})
+	page, err := s.buildAlbum(r.Context(), time.Time{}, store.AlbumFilter{})
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -792,6 +872,11 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 	edit := s.buildAlbumEdit(photo)
 	edit.TimeInput = strings.TrimSpace(r.FormValue("taken_at"))
 	edit.Caption = strings.TrimSpace(r.FormValue("caption"))
+	edit.Tag = strings.TrimSpace(r.FormValue("tag"))
+	if r.Form.Has("favorite") || r.Form.Has("favorite_present") {
+		fav := strings.TrimSpace(r.FormValue("favorite"))
+		edit.Favorite = fav == "1" || fav == "true" || fav == "on"
+	}
 
 	takenAt, err := parseLocalDateTime(edit.TimeInput, s.loc)
 	if err != nil {
@@ -814,8 +899,18 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	if err := album.ValidateTag(edit.Tag); err != nil {
+		var validation *album.ValidationError
+		if errors.As(err, &validation) {
+			edit.TagErr = validation.Message
+			s.albumEditError(w, r, edit, http.StatusUnprocessableEntity, "", map[string]string{"tag": validation.Message})
+			return
+		}
+		s.serverError(w, r, err)
+		return
+	}
 
-	updated, err := s.store.UpdateAlbumPhoto(r.Context(), id, takenAt, edit.Caption)
+	updated, err := s.store.UpdateAlbumPhotoDetails(r.Context(), id, takenAt, edit.Caption, edit.Tag, edit.Favorite)
 	if errors.Is(err, album.ErrNotFound) {
 		s.albumEditError(w, r, nil, http.StatusNotFound, "That photo isn't here anymore.", nil)
 		return
@@ -830,7 +925,12 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row := s.albumRow(updated)
+	birthDate, err := s.babyBirthDate(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	row := s.albumRow(updated, birthDate)
 	var tile bytes.Buffer
 	if err := s.renderer.Execute(&tile, "album-tile", row); err != nil {
 		s.serverError(w, r, err)
@@ -854,6 +954,10 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 		TimeLabel:  row.TimeLabel,
 		FullLabel:  row.FullLabel,
 		Caption:    updated.Caption,
+		Favorite:   updated.Favorite,
+		Tag:        updated.Tag,
+		AgeLabel:   row.AgeLabel,
+		RecapLabel: row.RecapLabel,
 		TileHTML:   tile.String(),
 		DayKey:     s.albumDayKey(updated.TakenAt),
 		DayLabel:   s.albumDayLabel(updated.TakenAt),
@@ -862,6 +966,56 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 		OutOfRange: outOfRange,
 		DayURL:     "/album?before=" + url.QueryEscape(end.UTC().Format(time.RFC3339)) + "#album-day-" + s.albumDayKey(updated.TakenAt),
 		TotalCount: total,
+	})
+}
+
+func (s *Server) handleAlbumFavorite(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.albumPhotoID(w, r)
+	if !ok {
+		return
+	}
+	photo, err := s.store.GetAlbumPhoto(r.Context(), id)
+	if errors.Is(err, album.ErrNotFound) {
+		if wantsAlbumJSON(r) {
+			writeAlbumMutationJSON(w, http.StatusNotFound, albumFavoriteResponse{Error: "That photo isn't here anymore."})
+			return
+		}
+		s.notFound(w)
+		return
+	}
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	nextFav := !photo.Favorite
+	if raw := strings.TrimSpace(r.FormValue("favorite")); raw != "" {
+		nextFav = raw == "1" || raw == "true"
+	}
+	updated, err := s.store.SetAlbumPhotoFavorite(r.Context(), id, nextFav)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if !wantsAlbumJSON(r) {
+		http.Redirect(w, r, fmt.Sprintf("/album#album-photo-%d", updated.ID), http.StatusSeeOther)
+		return
+	}
+	birthDate, err := s.babyBirthDate(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	row := s.albumRow(updated, birthDate)
+	var tile bytes.Buffer
+	if err := s.renderer.Execute(&tile, "album-tile", row); err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	writeAlbumMutationJSON(w, http.StatusOK, albumFavoriteResponse{
+		OK:       true,
+		ID:       updated.ID,
+		Favorite: updated.Favorite,
+		TileHTML: tile.String(),
 	})
 }
 
@@ -886,7 +1040,7 @@ func (s *Server) albumEditError(w http.ResponseWriter, r *http.Request, edit *vi
 	edit.TimeErr = fields["taken_at"]
 	edit.CaptionErr = fields["caption"]
 	data.AlbumEdit = edit
-	page, err := s.buildAlbum(r.Context(), time.Time{})
+	page, err := s.buildAlbum(r.Context(), time.Time{}, store.AlbumFilter{})
 	if err != nil {
 		s.serverError(w, r, err)
 		return
@@ -986,8 +1140,13 @@ func (s *Server) handleAlbumRestore(w http.ResponseWriter, r *http.Request) {
 		DateLabel: view.DayLabelFull(start, s.clock.Now().UTC(), s.loc),
 		Start:     start,
 	}
+	birthDate, err := s.babyBirthDate(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 	for _, item := range photos {
-		day.Rows = append(day.Rows, s.albumRow(item))
+		day.Rows = append(day.Rows, s.albumRow(item, birthDate))
 	}
 	toast := &view.Toast{Message: "Photo restored.", Kind: "success"}
 	if !restored {

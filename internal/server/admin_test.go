@@ -467,3 +467,33 @@ func TestAdminSoftDeleteRestoreAndPurge(t *testing.T) {
 		t.Fatal("expected account to be permanently deleted after 30 days")
 	}
 }
+
+func TestPublicBaseURLUsesLocalOriginForLoopbackRequests(t *testing.T) {
+	env := adminEnv(t)
+
+	cases := []struct {
+		name          string
+		host          string
+		forwardedHost string
+		want          string
+	}{
+		{name: "localhost", host: "localhost:8080", want: "http://localhost:8080"},
+		{name: "ipv4 loopback", host: "127.0.0.1:8080", want: "http://127.0.0.1:8080"},
+		{name: "ipv6 loopback", host: "[::1]:8080", want: "http://[::1]:8080"},
+		{name: "prod host uses PublicURL", host: "nurtur.example.com", want: "https://nurtur.test"},
+		{name: "proxied host uses PublicURL", host: "localhost:8080", forwardedHost: "nurtur.example.com", want: "https://nurtur.test"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/admin/invites", nil)
+			req.Host = tc.host
+			if tc.forwardedHost != "" {
+				req.Header.Set("X-Forwarded-Host", tc.forwardedHost)
+			}
+			if got := env.server.publicBaseURL(req); got != tc.want {
+				t.Fatalf("publicBaseURL = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

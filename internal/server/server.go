@@ -223,8 +223,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /album/photos/{id}", s.handleAlbumUpdate)
 	mux.HandleFunc("POST /album/photos/{id}", s.handleAlbumUpdate) // no-JS fallback
 	mux.HandleFunc("DELETE /album/photos/{id}", s.handleAlbumDelete)
-	mux.HandleFunc("POST /album/photos/{id}/delete", s.handleAlbumDelete)   // no-JS fallback
-	mux.HandleFunc("POST /album/photos/{id}/restore", s.handleAlbumRestore) // undo
+	mux.HandleFunc("POST /album/photos/{id}/delete", s.handleAlbumDelete)     // no-JS fallback
+	mux.HandleFunc("POST /album/photos/{id}/restore", s.handleAlbumRestore)   // undo
+	mux.HandleFunc("POST /album/photos/{id}/favorite", s.handleAlbumFavorite) // viewer star toggle
 
 	mux.HandleFunc("GET /timeline", s.handleTimelinePage)
 	mux.HandleFunc("GET /timeline/partial", s.handleTimelinePartial)
