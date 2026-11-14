@@ -12,8 +12,11 @@
   <meta property="og:description" content="One thumb, one quiet log. Nursing, bottles, pumping, diapers, sleep, and solids, made for the 3 a.m. version of you.">
   <meta property="og:image" content="/static/img/icon-512.png">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="manifest" href="/static/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/static/img/pip-face.svg">
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+  {{template "pwa-ios-dialog" .}}
+
   <script nonce="{{.Nonce}}">
     (function () {
       try {
@@ -94,6 +97,10 @@
             <span class="landing-cta-icon" aria-hidden="true">{{icon "arrow-right"}}</span>
           </a>
           <a class="btn btn-ghost landing-cta" href="/login?mode=signin">Sign in</a>
+          <button type="button" class="btn btn-ghost landing-cta" data-pwa-install data-pwa-install-btn hidden>
+            {{icon "download"}}
+            <span>Install app</span>
+          </button>
         </div>
         <ul class="landing-trust" role="list">
           <li>{{icon "check"}} No login needed for demo</li>
@@ -299,6 +306,8 @@
     <p class="landing-footer-fine">Made for the long nights, the short naps, and the one free hand. Nurtur is a logbook, not medical advice. Created with ❤️ by <a href="https://nedays.dev" target="_blank" rel="noopener noreferrer">Nedays System</a>.</p>
   </footer>
 
+  {{template "pwa-ios-dialog" .}}
+
   <script nonce="{{.Nonce}}">
     (function () {
       var root = document.documentElement;
@@ -343,5 +352,6 @@
       }
     })();
   </script>
+  <script src="{{asset "/static/js/pwa-install.js"}}"></script>
 </body>
 </html>{{end}}

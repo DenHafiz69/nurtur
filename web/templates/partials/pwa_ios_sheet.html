@@ -1,0 +1,19 @@
+{{define "pwa-ios-dialog"}}
+<dialog id="pwa-ios-dialog" class="sheet" aria-labelledby="pwa-ios-title">
+  <div class="sheet-inner">
+    <div class="sheet-grab" aria-hidden="true"><div class="sheet-handle"></div></div>
+    <div class="sheet-head">
+      <h2 id="pwa-ios-title">Install on iPhone or iPad</h2>
+      <button type="button" class="icon-btn" data-pwa-ios-close aria-label="Close">{{icon "close"}}</button>
+    </div>
+    <p class="sheet-copy">Safari doesn't allow one-tap install buttons, so it takes two quick taps:</p>
+    <ol class="pwa-ios-steps">
+      <li>Tap the <strong>Share</strong> button in Safari's toolbar (the square with an arrow pointing up).</li>
+      <li>Scroll down and tap <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.</li>
+    </ol>
+    <div class="sheet-actions pwa-ios-actions">
+      <button type="button" class="btn btn-primary" data-pwa-ios-close>Got it</button>
+    </div>
+  </div>
+</dialog>
+{{end}}

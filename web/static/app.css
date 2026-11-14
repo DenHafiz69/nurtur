@@ -1923,6 +1923,22 @@ input[type="number"] {
   cursor: not-allowed;
 }
 
+.pwa-ios-steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.pwa-ios-steps li + li {
+  margin-top: 8px;
+}
+
+.pwa-ios-actions {
+  grid-template-columns: 1fr;
+}
+
 .btn-sleep-start {
   background: var(--lilac);
 }

@@ -128,11 +128,14 @@
       {{template "changelog-sheet" .}}
     </dialog>
     {{end}}
+
+    {{template "pwa-ios-dialog" .}}
   </div>
 
   <script src="{{asset "/static/htmx.min.js"}}"></script>
   <script src="{{asset "/static/js/timer.js"}}"></script>
   <script src="{{asset "/static/js/album.js"}}"></script>
+  <script src="{{asset "/static/js/pwa-install.js"}}"></script>
 </body>
 </html>{{end}}
 

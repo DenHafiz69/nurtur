@@ -116,6 +116,12 @@
     <p class="settings-note" data-install-hint>To have a ping open the app instead of a browser tab, add Nurtur to your home screen and open it from there.</p>
   </section>
 
+  <section class="settings-card" aria-labelledby="settings-install" data-pwa-install hidden>
+    <h3 id="settings-install" class="settings-title">Install app</h3>
+    <p class="settings-note">Add Nurtur to your home screen for full-screen, one-tap access.</p>
+    <button type="button" class="btn btn-primary settings-wide" data-pwa-install-btn>{{icon "download"}}<span>Install app</span></button>
+  </section>
+
   <section class="settings-card" aria-labelledby="settings-theme">
     <h3 id="settings-theme" class="settings-title">Theme</h3>
     <p class="settings-note">{{.Settings.ThemeNote}}</p>
