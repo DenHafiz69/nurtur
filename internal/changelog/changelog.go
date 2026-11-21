@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.8",
+		Date:    "Nov 21, 2026",
+		Title:   "Download all album photos as ZIP",
+		Summary: "Export your album photos right from Settings, automatically split into under-100 MB archives when your library grows.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"Download all live album photos as a ZIP archive from Settings → Backup.",
+					"Large photo libraries are automatically split into multiple ZIP parts, each under 100 MB.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.7",
 		Date:    "Nov 14, 2026",
 		Title:   "Album favorites, milestones, and age badges",

@@ -332,6 +332,18 @@ type SettingsView struct {
 	Pending    string
 	Degraded   bool
 	ThemeNote  string
+
+	PhotoCount       int
+	PhotoExportParts []PhotoExportPart
+}
+
+// PhotoExportPart describes one <100 MB ZIP archive slice of album photos.
+type PhotoExportPart struct {
+	Number    int
+	Total     int
+	Count     int
+	SizeLabel string
+	URL       string
 }
 
 // Toast is a transient mutation result. An action turns it into a quick

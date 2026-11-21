@@ -1,8 +1,10 @@
 package server
 
 import (
+	"archive/zip"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -12,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"nurtur/internal/album"
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
 	"nurtur/internal/sleep"
@@ -538,4 +541,140 @@ func sqlTimePtr(t *time.Time) string {
 		return "NULL"
 	}
 	return sqlText(view.ISO(*t))
+}
+
+const (
+	// maxPhotoZipBytes keeps each downloaded photo archive strictly under 100 MB.
+	maxPhotoZipBytes = 100 * 1000 * 1000
+	zipEOCDOverhead  = 22
+	zipEntryOverhead = 128
+)
+
+type photoZipEntry struct {
+	photo    album.Photo
+	filename string
+}
+
+type photoZipPart struct {
+	partNumber     int
+	entries        []photoZipEntry
+	estimatedBytes int64
+}
+
+func partitionPhotoZipParts(photos []album.Photo, loc *time.Location, maxBytes int64) []photoZipPart {
+	if maxBytes <= 0 {
+		maxBytes = maxPhotoZipBytes
+	}
+	if loc == nil {
+		loc = time.UTC
+	}
+
+	var parts []photoZipPart
+	current := photoZipPart{
+		partNumber:     1,
+		estimatedBytes: zipEOCDOverhead,
+	}
+
+	for _, p := range photos {
+		if p.DeletedAt != nil {
+			continue
+		}
+		filename := fmt.Sprintf("nurtur-%s-%d.%s", p.TakenAt.In(loc).Format("2006-01-02-1504"), p.ID, albumFileExtension(p.ContentType))
+		size := max(p.Bytes, 0)
+		entryBytes := size + zipEntryOverhead + int64(2*len(filename))
+
+		if len(current.entries) > 0 && current.estimatedBytes+entryBytes > maxBytes {
+			parts = append(parts, current)
+			current = photoZipPart{
+				partNumber:     len(parts) + 1,
+				estimatedBytes: zipEOCDOverhead,
+			}
+		}
+		current.entries = append(current.entries, photoZipEntry{
+			photo:    p,
+			filename: filename,
+		})
+		current.estimatedBytes += entryBytes
+	}
+
+	if len(current.entries) > 0 {
+		parts = append(parts, current)
+	}
+	return parts
+}
+
+func (s *Server) handleExportPhotosZip(w http.ResponseWriter, r *http.Request) {
+	if s.album == nil {
+		s.serverError(w, r, fmt.Errorf("server: album storage is not configured"))
+		return
+	}
+	photos, err := s.store.AllAlbumPhotos(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+
+	parts := partitionPhotoZipParts(photos, s.loc, maxPhotoZipBytes)
+	dateStr := s.clock.Now().In(s.loc).Format("2006-01-02")
+
+	rawPart := strings.TrimSpace(r.URL.Query().Get("part"))
+	if len(parts) == 0 {
+		if rawPart != "" && rawPart != "1" {
+			s.notFound(w)
+			return
+		}
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="nurtur-photos-%s.zip"`, dateStr))
+		w.Header().Set("Cache-Control", "no-store")
+		zw := zip.NewWriter(w)
+		_ = zw.Close()
+		return
+	}
+
+	partNum := 1
+	if rawPart != "" {
+		parsed, err := strconv.Atoi(rawPart)
+		if err != nil || parsed < 1 || parsed > len(parts) {
+			s.notFound(w)
+			return
+		}
+		partNum = parsed
+	}
+
+	selected := parts[partNum-1]
+	zipName := fmt.Sprintf("nurtur-photos-%s.zip", dateStr)
+	if len(parts) > 1 {
+		zipName = fmt.Sprintf("nurtur-photos-%s-part-%d-of-%d.zip", dateStr, partNum, len(parts))
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, zipName))
+	w.Header().Set("Cache-Control", "no-store")
+
+	zw := zip.NewWriter(w)
+	for _, entry := range selected.entries {
+		body, _, err := s.album.Get(r.Context(), entry.photo.FullKey)
+		if err != nil {
+			if !errors.Is(err, album.ErrNotFound) && s.log != nil {
+				s.log.Warn("export photos zip: read object failed", "photo_id", entry.photo.ID, "err", err)
+			}
+			continue
+		}
+		hdr := &zip.FileHeader{
+			Name:     entry.filename,
+			Method:   zip.Store,
+			Modified: entry.photo.TakenAt.In(s.loc),
+		}
+		fw, err := zw.CreateHeader(hdr)
+		if err != nil {
+			_ = body.Close()
+			break
+		}
+		_, copyErr := io.Copy(fw, body)
+		_ = body.Close()
+		if copyErr != nil {
+			break
+		}
+	}
+	_ = zw.Close()
 }

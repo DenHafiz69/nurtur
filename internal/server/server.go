@@ -245,6 +245,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /export.csv", s.handleExportCSV)
 	mux.HandleFunc("GET /export.json", s.handleExportJSON)
 	mux.HandleFunc("GET /export.sql", s.handleExportSQL)
+	mux.HandleFunc("GET /export/photos.zip", s.handleExportPhotosZip)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /login", s.handleLogin)

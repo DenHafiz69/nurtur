@@ -3758,6 +3758,20 @@ body.album-viewer-open .app-main {
   font-size: 14px;
 }
 
+.export-photos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft, rgba(128, 128, 128, 0.16));
+}
+
+.export-photo-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ---------- Login / offline ---------- */
 
 .auth-body {

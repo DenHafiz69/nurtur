@@ -153,6 +153,31 @@
       <a class="btn btn-ghost" href="/export.sql" download>{{icon "download"}}<span>SQL</span></a>
     </div>
     <p class="settings-note">The SQL file can be replayed into a fresh Turso database. See the README for the restore drill.</p>
+    {{if .Settings.PhotoExportParts}}
+    <div class="export-photos">
+      <p class="settings-note">
+        {{if eq (len .Settings.PhotoExportParts) 1}}
+        Download all {{.Settings.PhotoCount}} {{if eq .Settings.PhotoCount 1}}photo{{else}}photos{{end}} as a ZIP archive.
+        {{else}}
+        Your {{.Settings.PhotoCount}} photos are split into {{len .Settings.PhotoExportParts}} ZIP archives (under 100 MB each).
+        {{end}}
+      </p>
+      <div class="export-photo-links">
+        {{range .Settings.PhotoExportParts}}
+        <a class="btn btn-ghost settings-wide" href="{{.URL}}" download>
+          {{icon "download"}}
+          {{if eq .Total 1}}
+          <span>Photos ZIP ({{.SizeLabel}})</span>
+          {{else}}
+          <span>Photos part {{.Number}} of {{.Total}} ({{.Count}} {{if eq .Count 1}}photo{{else}}photos{{end}}, {{.SizeLabel}})</span>
+          {{end}}
+        </a>
+        {{end}}
+      </div>
+    </div>
+    {{else}}
+    <p class="settings-note">No album photos to download yet.</p>
+    {{end}}
   </section>
 
   <section class="settings-card" aria-labelledby="settings-whatsnew">

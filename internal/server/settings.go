@@ -539,6 +539,27 @@ func (s *Server) buildSettings(ctx context.Context) (*view.SettingsView, error) 
 		out.DBSize = "—"
 	}
 
+	if s.album != nil {
+		if photos, err := s.store.AllAlbumPhotos(ctx); err == nil {
+			parts := partitionPhotoZipParts(photos, s.loc, maxPhotoZipBytes)
+			totalParts := len(parts)
+			for _, part := range parts {
+				out.PhotoCount += len(part.entries)
+				exportURL := "/export/photos.zip"
+				if totalParts > 1 {
+					exportURL = fmt.Sprintf("/export/photos.zip?part=%d", part.partNumber)
+				}
+				out.PhotoExportParts = append(out.PhotoExportParts, view.PhotoExportPart{
+					Number:    part.partNumber,
+					Total:     totalParts,
+					Count:     len(part.entries),
+					SizeLabel: view.FormatBytes(part.estimatedBytes),
+					URL:       exportURL,
+				})
+			}
+		}
+	}
+
 	if s.worker == nil {
 		return out, nil
 	}
