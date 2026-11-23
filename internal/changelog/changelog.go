@@ -30,6 +30,21 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.5.9",
+		Date:    "Nov 23, 2026",
+		Title:   "Pre-upload photo captions & hashtags",
+		Summary: "Add a caption and hashtag right when you take or pick new album photos, with support for custom #hashtags.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"Caption and hashtag prompt right after taking or choosing new album photos, before uploading.",
+					"Custom #hashtag input alongside suggested hashtag chips (#first-smile, #monthly, #tummy-time, #first-bath, #outing, #family) in both upload and edit sheets.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.8",
 		Date:    "Nov 21, 2026",
 		Title:   "Download all album photos as ZIP",

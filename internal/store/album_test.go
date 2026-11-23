@@ -275,7 +275,7 @@ func TestAlbumFavoritesAndTags(t *testing.T) {
 	if _, err := st.SetAlbumPhotoFavorite(ctx, p1.ID, true); err != nil {
 		t.Fatalf("SetAlbumPhotoFavorite: %v", err)
 	}
-	if _, err := st.UpdateAlbumPhotoDetails(ctx, p2.ID, p2.TakenAt, "First smile!", "First smile", false); err != nil {
+	if _, err := st.UpdateAlbumPhotoDetails(ctx, p2.ID, p2.TakenAt, "First smile!", "#first-smile", false); err != nil {
 		t.Fatalf("UpdateAlbumPhotoDetails: %v", err)
 	}
 
@@ -288,12 +288,12 @@ func TestAlbumFavoritesAndTags(t *testing.T) {
 		t.Fatalf("favs = %+v, err = %v", favs, err)
 	}
 
-	tagCount, err := st.CountAlbumPhotosFiltered(ctx, AlbumFilter{Tag: "First smile"})
+	tagCount, err := st.CountAlbumPhotosFiltered(ctx, AlbumFilter{Tag: "#first-smile"})
 	if err != nil || tagCount != 1 {
 		t.Fatalf("tagCount = %d, err = %v, want 1", tagCount, err)
 	}
 	tags, err := st.ListAlbumTags(ctx)
-	if err != nil || len(tags) != 1 || tags[0] != "First smile" {
+	if err != nil || len(tags) != 1 || tags[0] != "#first-smile" {
 		t.Fatalf("tags = %v, err = %v", tags, err)
 	}
 }

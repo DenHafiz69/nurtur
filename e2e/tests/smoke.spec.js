@@ -629,7 +629,7 @@ test.describe("Album capture dates", () => {
   });
 });
 
-async function uploadAlbumJpeg(page, buffer) {
+async function uploadAlbumJpeg(page, buffer, details = {}) {
   await page.locator("[data-album-add]").first().click();
   await expect(page.locator("#album-chooser")).toHaveAttribute("open", "");
   const [chooser] = await Promise.all([
@@ -641,6 +641,16 @@ async function uploadAlbumJpeg(page, buffer) {
     mimeType: "image/jpeg",
     buffer
   });
+  const metaDialog = page.locator("#album-upload-meta");
+  await expect(metaDialog).toHaveAttribute("open", "");
+  if (details.caption) {
+    await metaDialog.locator('textarea[name="caption"]').fill(details.caption);
+  }
+  if (details.tag) {
+    await metaDialog.locator('input[name="tag"]').fill(details.tag);
+  }
+  await metaDialog.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(metaDialog).not.toHaveAttribute("open", "");
 }
 
 // seedAlbumJpeg posts directly to the album API so a browsing test can build

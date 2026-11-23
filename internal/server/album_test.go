@@ -522,7 +522,7 @@ func TestAlbumEnhancementsFilterFavoriteTagAndViewerMeta(t *testing.T) {
 	editRec := env.albumJSON(t, http.MethodPatch, fmt.Sprintf("/album/photos/%d", pToday.ID), url.Values{
 		"taken_at":         {pToday.TakenAt.In(env.server.loc).Format("2006-01-02T15:04:05")},
 		"caption":          {"Big grin"},
-		"tag":              {"First smile"},
+		"tag":              {"#first-smile"},
 		"favorite_present": {"1"},
 	})
 	if editRec.Code != http.StatusOK {
@@ -532,7 +532,7 @@ func TestAlbumEnhancementsFilterFavoriteTagAndViewerMeta(t *testing.T) {
 	if err := json.Unmarshal(editRec.Body.Bytes(), &editResp); err != nil {
 		t.Fatalf("decode edit response: %v", err)
 	}
-	if editResp.Tag != "First smile" || editResp.AgeLabel == "" {
+	if editResp.Tag != "#first-smile" || editResp.AgeLabel == "" {
 		t.Fatalf("unexpected edit response: %+v", editResp)
 	}
 
@@ -549,7 +549,7 @@ func TestAlbumEnhancementsFilterFavoriteTagAndViewerMeta(t *testing.T) {
 	}
 
 	// Tag filter shows only photos with that milestone tag.
-	tagPage := env.do(t, http.MethodGet, "/album?tag=First+smile", nil, false)
+	tagPage := env.do(t, http.MethodGet, "/album?tag=%23first-smile", nil, false)
 	tagBody := tagPage.Body.String()
 	if !strings.Contains(tagBody, fmt.Sprintf(`data-photo-id="%d"`, pToday.ID)) ||
 		strings.Contains(tagBody, fmt.Sprintf(`data-photo-id="%d"`, pMonthAgo.ID)) {
@@ -1131,4 +1131,69 @@ func testAlbumJPEG(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func TestAlbumUploadWithCaptionAndHashtag(t *testing.T) {
+	env := newTestEnv(t)
+	ctx := context.Background()
+	webp := testAlbumWebP(t)
+
+	// Upload with caption and custom hashtag (without leading # -> normalized to #beach).
+	rec := env.uploadPhoto(t, albumUploadForm{
+		full:     webp,
+		thumb:    webp,
+		uploadID: "0123456789abcdef0123456789abcde0",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "manual",
+		extra: map[string]string{
+			"caption": "Sandy toes",
+			"tag":     "beach",
+		},
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload with caption & hashtag = %d\n%s", rec.Code, rec.Body.String())
+	}
+
+	var resp albumUploadResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if !strings.Contains(resp.TileHTML, "#beach") {
+		t.Fatalf("tile HTML missing #beach:\n%s", resp.TileHTML)
+	}
+
+	stored, err := env.store.GetAlbumPhoto(ctx, resp.ID)
+	if err != nil {
+		t.Fatalf("GetAlbumPhoto: %v", err)
+	}
+	if stored.Caption != "Sandy toes" || stored.Tag != "#beach" {
+		t.Fatalf("stored = caption:%q tag:%q, want Sandy toes / #beach", stored.Caption, stored.Tag)
+	}
+
+	// Album page includes the upload details dialog and the #beach filter chip.
+	page := env.do(t, http.MethodGet, "/album", nil, false)
+	if page.Code != http.StatusOK {
+		t.Fatalf("GET /album = %d", page.Code)
+	}
+	pageBody := page.Body.String()
+	for _, want := range []string{`id="album-upload-meta"`, `data-album-upload-meta-form`, `#beach`} {
+		if !strings.Contains(pageBody, want) {
+			t.Fatalf("album page missing %q", want)
+		}
+	}
+
+	// Invalid bare "#" tag is rejected with 422.
+	badRec := env.uploadPhoto(t, albumUploadForm{
+		full:     webp,
+		thumb:    webp,
+		uploadID: "0123456789abcdef0123456789abcde1",
+		takenAt:  testNow.Format(time.RFC3339),
+		source:   "manual",
+		extra: map[string]string{
+			"tag": "#",
+		},
+	})
+	if badRec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("bare # tag status = %d, want 422", badRec.Code)
+	}
 }

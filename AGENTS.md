@@ -1,7 +1,7 @@
 ## Git workflow
 
 - Commit completed work normally.
-- Never create a git tag unless the user explicitly asks for one.
+- When asked to push a versioned change (where `internal/changelog/changelog.go` was bumped), also create and push the matching `v<version>` git tag so CI publishes the semver and `stable` Docker images. Do not create tags for unversioned commits unless asked.
 - Never `git push` commits or tags unless the user explicitly asks you to push.
 - Do not assume a commit should be published just because it was requested.
 - Before merging to `main`, run `gosec ./...`, `nilaway ./...`, and `staticcheck ./...`, and fix every reported issue first.

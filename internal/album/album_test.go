@@ -147,3 +147,35 @@ func TestTakenAtFromSources(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeAndValidateTag(t *testing.T) {
+	cases := []struct {
+		raw     string
+		want    string
+		wantErr bool
+	}{
+		{"", "", false},
+		{"   ", "", false},
+		{"#first-smile", "#first-smile", false},
+		{"family time", "#family-time", false},
+		{"#family time", "#family-time", false},
+		{"# family   time ", "#family-time", false},
+		{"beach", "#beach", false},
+		{"#beach", "#beach", false},
+		{"#", "#", true},
+		{strings.Repeat("a", MaxTag+1), "#" + strings.Repeat("a", MaxTag+1), true},
+	}
+	for _, tc := range cases {
+		got := NormalizeTag(tc.raw)
+		if got != tc.want {
+			t.Errorf("NormalizeTag(%q) = %q, want %q", tc.raw, got, tc.want)
+		}
+		err := ValidateTag(got)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("ValidateTag(%q) err = %v, wantErr=%v", got, err, tc.wantErr)
+		}
+	}
+	if err := ValidateTag("#family time"); err == nil {
+		t.Errorf("ValidateTag(%q) = nil, want space error", "#family time")
+	}
+}

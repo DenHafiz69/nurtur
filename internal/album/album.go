@@ -186,19 +186,39 @@ func ValidateEdit(takenAt time.Time, caption string, now time.Time) error {
 	return nil
 }
 
-// MilestoneTags is the calm preset list of milestone chips offered in the edit sheet.
+// MilestoneTags is the calm preset list of hashtags offered in the upload and edit sheets.
 var MilestoneTags = []string{
-	"First smile",
-	"Monthly",
-	"Tummy time",
-	"First bath",
-	"Outing",
-	"Family",
+	"#first-smile",
+	"#monthly",
+	"#tummy-time",
+	"#first-bath",
+	"#outing",
+	"#family",
 }
 
-// ValidateTag checks that a milestone tag fits within MaxTag runes.
+// NormalizeTag trims a hashtag, joins any spaces with "-", and ensures it starts with #.
+func NormalizeTag(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	body := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+	if body == "" {
+		return "#"
+	}
+	return "#" + strings.Join(strings.Fields(body), "-")
+}
+
+// ValidateTag checks that a hashtag is non-empty after #, has no spaces, and fits within MaxTag runes.
 func ValidateTag(tag string) error {
-	if utf8.RuneCountInString(strings.TrimSpace(tag)) > MaxTag {
+	trimmed := strings.TrimSpace(tag)
+	if trimmed == "#" {
+		return &ValidationError{Field: "tag", Message: "Add a word after # or leave it blank."}
+	}
+	if strings.ContainsAny(trimmed, " \t\n\r") {
+		return &ValidationError{Field: "tag", Message: "Hashtags cannot contain spaces."}
+	}
+	if utf8.RuneCountInString(trimmed) > MaxTag {
 		return &ValidationError{Field: "tag", Message: fmt.Sprintf("Keep the tag under %d characters.", MaxTag)}
 	}
 	return nil

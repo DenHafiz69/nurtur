@@ -246,6 +246,8 @@ type AlbumPageView struct {
 	Filter      string
 	ActiveTag   string
 	Tags        []string
+	TagPresets  []string
+	CaptionMax  int
 	HasFilters  bool
 	FilterQuery string
 }

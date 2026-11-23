@@ -210,6 +210,8 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time, filter store.
 	page.HasMore = hasMore
 	page.HasDays = len(page.Days) > 0
 	page.Tags = tags
+	page.TagPresets = album.MilestoneTags
+	page.CaptionMax = album.MaxCaption
 	page.HasFilters = totalAll > 0 || filter.FavoritesOnly || filter.Tag != ""
 	page.FilterQuery = albumFilterQuery(filter)
 	switch {
@@ -285,6 +287,7 @@ type albumUploadInput struct {
 	takenAt    string
 	source     string
 	caption    string
+	tag        string
 	loadedFrom string
 }
 
@@ -331,6 +334,11 @@ func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(input.caption) != "" && len([]rune(strings.TrimSpace(input.caption))) > album.MaxCaption {
 		s.albumUploadError(w, r, wantsJSON, http.StatusUnprocessableEntity,
 			fmt.Sprintf("Keep the caption under %d characters.", album.MaxCaption))
+		return
+	}
+	tag := album.NormalizeTag(input.tag)
+	if err := album.ValidateTag(tag); err != nil {
+		s.albumUploadError(w, r, wantsJSON, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	if !album.ValidUploadID(input.uploadID) {
@@ -387,6 +395,7 @@ func (s *Server) handleAlbumUpload(w http.ResponseWriter, r *http.Request) {
 		TakenAt:       takenAt,
 		TakenAtSource: source,
 		Caption:       strings.TrimSpace(input.caption),
+		Tag:           tag,
 		Width:         width,
 		Height:        height,
 		Bytes:         int64(len(input.full)),
@@ -539,7 +548,7 @@ func parseAlbumUpload(r *http.Request) (*albumUploadInput, error) {
 			case "photo":
 				single = body
 			}
-		case "upload_id", "taken_at", "taken_at_source", "caption", "loaded_before":
+		case "upload_id", "taken_at", "taken_at_source", "caption", "tag", "loaded_before":
 			body, err := readAlbumPart(part, albumFieldLimit)
 			_ = part.Close()
 			if err != nil {
@@ -555,6 +564,8 @@ func parseAlbumUpload(r *http.Request) (*albumUploadInput, error) {
 				input.source = value
 			case "caption":
 				input.caption = value
+			case "tag":
+				input.tag = value
 			case "loaded_before":
 				input.loadedFrom = value
 			}
@@ -872,7 +883,7 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 	edit := s.buildAlbumEdit(photo)
 	edit.TimeInput = strings.TrimSpace(r.FormValue("taken_at"))
 	edit.Caption = strings.TrimSpace(r.FormValue("caption"))
-	edit.Tag = strings.TrimSpace(r.FormValue("tag"))
+	edit.Tag = album.NormalizeTag(r.FormValue("tag"))
 	if r.Form.Has("favorite") || r.Form.Has("favorite_present") {
 		fav := strings.TrimSpace(r.FormValue("favorite"))
 		edit.Favorite = fav == "1" || fav == "true" || fav == "on"

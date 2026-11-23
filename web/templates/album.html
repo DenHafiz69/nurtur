@@ -28,6 +28,14 @@
     <span class="field-label">Add a photo</span>
     <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required>
   </label>
+  <label class="field">
+    <span class="field-label">Caption</span>
+    <input type="text" name="caption" maxlength="{{.Album.CaptionMax}}" placeholder="A little note about this moment">
+  </label>
+  <label class="field">
+    <span class="field-label">Hashtag</span>
+    <input type="text" name="tag" maxlength="32" placeholder="#first-smile or #family-time">
+  </label>
   <p class="sheet-copy">Without JavaScript, the photo is stored as-is. Date and time come from the upload.</p>
   <button type="submit" class="btn btn-primary">Upload photo</button>
 </form>
@@ -79,6 +87,38 @@
 <input id="album-camera-input" type="file" accept="image/*" capture="environment" hidden>
 <input id="album-library-input" type="file" accept="image/*" multiple hidden>
 
+<dialog id="album-upload-meta" class="sheet" data-keep-content aria-labelledby="album-upload-meta-title">
+  <div class="sheet-inner">
+    <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+    <div class="sheet-head">
+      <h2 id="album-upload-meta-title">Add details</h2>
+      <button type="button" class="icon-btn" data-album-upload-cancel aria-label="Cancel upload">{{icon "close"}}</button>
+    </div>
+    <p class="sheet-copy" data-album-upload-summary></p>
+    <form class="sheet-form" data-album-upload-meta-form>
+      <label class="field">
+        <span class="field-label">Caption</span>
+        <textarea name="caption" rows="2" maxlength="{{.Album.CaptionMax}}" placeholder="A little note about this moment"></textarea>
+      </label>
+      <div class="field">
+        <label class="field">
+          <span class="field-label">Hashtag</span>
+          <input type="text" name="tag" maxlength="32" placeholder="#first-smile or #family-time" data-album-tag-input>
+        </label>
+        <div class="album-tag-choices" role="group" aria-label="Suggested hashtags">
+          {{range .Album.TagPresets}}
+          <button type="button" class="album-tag-chip" data-album-tag-preset="{{.}}">{{.}}</button>
+          {{end}}
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost" data-album-upload-cancel>Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
 <dialog id="album-viewer" class="album-viewer" aria-labelledby="album-viewer-date">
   <div class="album-viewer-inner" data-album-viewer>
     <header class="album-viewer-head">
@@ -127,17 +167,13 @@
       <span class="field-error" role="alert" data-album-edit-error="caption">{{.AlbumEdit.CaptionErr}}</span>
     </label>
     <div class="field">
-      <span class="field-label">Milestone</span>
-      <div class="album-tag-choices" role="radiogroup" aria-label="Milestone">
-        <label class="album-tag-choice">
-          <input type="radio" name="tag" value=""{{if eq .AlbumEdit.Tag ""}} checked{{end}}>
-          <span>None</span>
-        </label>
+      <label class="field">
+        <span class="field-label">Hashtag</span>
+        <input type="text" name="tag" value="{{.AlbumEdit.Tag}}" maxlength="32" placeholder="#first-smile or #family-time" data-album-tag-input>
+      </label>
+      <div class="album-tag-choices" role="group" aria-label="Suggested hashtags">
         {{range .AlbumEdit.TagPresets}}
-        <label class="album-tag-choice">
-          <input type="radio" name="tag" value="{{.}}"{{if eq $.AlbumEdit.Tag .}} checked{{end}}>
-          <span>{{.}}</span>
-        </label>
+        <button type="button" class="album-tag-chip{{if eq $.AlbumEdit.Tag .}} is-active{{end}}" data-album-tag-preset="{{.}}">{{.}}</button>
         {{end}}
       </div>
       <span class="field-error" role="alert" data-album-edit-error="tag">{{.AlbumEdit.TagErr}}</span>

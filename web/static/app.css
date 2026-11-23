@@ -3373,6 +3373,32 @@ html:not(.js) [data-album-add] {
   outline-offset: 2px;
 }
 
+.album-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.album-tag-chip.is-active {
+  border-color: var(--coral);
+  background: var(--coral);
+  color: var(--on-coral);
+}
+
+.album-tag-chip:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+}
+
 .album-fav-toggle {
   display: inline-flex;
   align-items: center;

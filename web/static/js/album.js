@@ -20,6 +20,7 @@
 
   var active = 0;
   var queue = [];
+  var pendingFiles = [];
   var viewerItems = [];
   var viewerIndex = -1;
   var viewerReturnFocus = null;
@@ -72,20 +73,133 @@
     }
   });
 
+  function syncTagPresets(scope, value) {
+    if (!scope) return;
+    var trimmed = (value || "").trim();
+    var chips = scope.querySelectorAll("[data-album-tag-preset]");
+    for (var i = 0; i < chips.length; i++) {
+      var preset = chips[i].getAttribute("data-album-tag-preset") || "";
+      chips[i].classList.toggle("is-active", trimmed !== "" && trimmed.toLowerCase() === preset.toLowerCase());
+    }
+  }
+
+  function openUploadMeta(files) {
+    var dialog = find("album-upload-meta");
+    if (!dialog) {
+      files.forEach(function (file) { enqueue(file, null); });
+      return;
+    }
+    var summary = dialog.querySelector("[data-album-upload-summary]");
+    if (summary) {
+      summary.textContent = files.length === 1
+        ? "1 photo ready to upload."
+        : files.length + " photos ready to upload.";
+    }
+    var form = dialog.querySelector("[data-album-upload-meta-form]");
+    if (form) {
+      form.reset();
+      syncTagPresets(form, "");
+    }
+    if (!dialog.open) {
+      if (typeof dialog.showModal === "function") {
+        try {
+          dialog.showModal();
+        } catch (e) {
+          dialog.setAttribute("open", "");
+        }
+      } else {
+        dialog.setAttribute("open", "");
+      }
+    }
+    var captionField = dialog.querySelector('textarea[name="caption"]');
+    if (captionField) captionField.focus();
+  }
+
+  function closeUploadMeta(clearPending) {
+    var dialog = find("album-upload-meta");
+    if (dialog) {
+      if (dialog.open && typeof dialog.close === "function") {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    }
+    if (clearPending) pendingFiles = [];
+  }
+
   document.addEventListener("change", function (event) {
     var target = event.target;
     if (!target || !target.files) return;
     if (target.id !== "album-camera-input" && target.id !== "album-library-input") return;
     var files = Array.prototype.slice.call(target.files);
     target.value = "";
-    files.forEach(enqueue);
+    if (!files.length) return;
+    pendingFiles = files;
+    openUploadMeta(files);
   });
 
   document.addEventListener("click", function (event) {
     var dialog = event.target;
     if (dialog && dialog.id === "album-chooser" && dialog.open) {
       dialog.close();
+      return;
     }
+    if (dialog && dialog.id === "album-upload-meta" && dialog.open) {
+      closeUploadMeta(true);
+      return;
+    }
+    var cancelBtn = event.target.closest ? event.target.closest("[data-album-upload-cancel]") : null;
+    if (cancelBtn) {
+      event.preventDefault();
+      closeUploadMeta(true);
+      return;
+    }
+    var chip = event.target.closest ? event.target.closest("[data-album-tag-preset]") : null;
+    if (chip) {
+      event.preventDefault();
+      var scope = chip.closest("form") || chip.closest(".sheet-inner");
+      var input = scope ? scope.querySelector("[data-album-tag-input]") : null;
+      if (input) {
+        var preset = chip.getAttribute("data-album-tag-preset") || "";
+        input.value = input.value.trim().toLowerCase() === preset.toLowerCase() ? "" : preset;
+        syncTagPresets(scope, input.value);
+      }
+    }
+  });
+
+  document.addEventListener("input", function (event) {
+    var input = event.target && event.target.matches && event.target.matches("[data-album-tag-input]")
+      ? event.target
+      : null;
+    if (!input) return;
+    var scope = input.closest("form") || input.closest(".sheet-inner");
+    syncTagPresets(scope, input.value);
+  });
+
+  document.addEventListener("cancel", function (event) {
+    if (event.target && event.target.id === "album-upload-meta") {
+      pendingFiles = [];
+    }
+  }, true);
+
+  document.addEventListener("submit", function (event) {
+    var form = event.target && event.target.matches && event.target.matches("[data-album-upload-meta-form]")
+      ? event.target
+      : null;
+    if (!form) return;
+    event.preventDefault();
+    var captionEl = form.querySelector('textarea[name="caption"]');
+    var tagEl = form.querySelector('input[name="tag"]');
+    var details = {
+      caption: captionEl ? captionEl.value.trim() : "",
+      tag: tagEl ? tagEl.value.trim() : ""
+    };
+    var files = pendingFiles.slice();
+    pendingFiles = [];
+    closeUploadMeta(false);
+    files.forEach(function (file) {
+      enqueue(file, details);
+    });
   });
 
   /* ---------- Viewer ---------- */
@@ -615,7 +729,7 @@
 
   /* ---------- Queue ---------- */
 
-  function enqueue(file) {
+  function enqueue(file, details) {
     if (!file) return;
     if (!isAlbumPage()) return;
     if (pendingUploads() >= MAX_PENDING) {
@@ -625,6 +739,8 @@
     var job = {
       file: file,
       uploadID: newUploadID(),
+      caption: details && details.caption ? details.caption : "",
+      tag: details && details.tag ? details.tag : "",
       state: "queued",
       prepared: false,
       cancelled: false,
@@ -1015,6 +1131,8 @@
       form.append("upload_id", job.uploadID);
       form.append("taken_at", job.meta.takenAt.toISOString());
       form.append("taken_at_source", job.meta.source);
+      if (job.caption) form.append("caption", job.caption);
+      if (job.tag) form.append("tag", job.tag);
       form.append("full", job.full, uploadName("full", job.full.type));
       form.append("thumb", job.thumb, uploadName("thumb", job.thumb.type));
       var oldest = oldestLoadedStart();
