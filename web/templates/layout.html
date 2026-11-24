@@ -137,6 +137,7 @@
   <script src="{{asset "/static/htmx.min.js"}}"></script>
   <script src="{{asset "/static/js/timer.js"}}"></script>
   <script src="{{asset "/static/js/album.js"}}"></script>
+  <script src="{{asset "/static/js/insights.js"}}"></script>
   <script src="{{asset "/static/js/pwa-install.js"}}"></script>
 </body>
 </html>{{end}}
@@ -145,6 +146,7 @@
 
 {{define "main-content"}}
   {{if eq .View "timeline"}}{{template "timeline-page" .}}
+  {{else if eq .View "insights"}}{{template "insights-page" .}}
   {{else if eq .View "album"}}{{template "album-page" .}}
   {{else if eq .View "settings"}}{{template "settings-page" .}}
   {{else if eq .View "changelog"}}{{template "changelog-page" .}}

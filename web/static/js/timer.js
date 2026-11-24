@@ -238,6 +238,8 @@
         return "album";
       case "/timeline":
         return "timeline";
+      case "/insights":
+        return "insights";
       case "/settings":
         return "settings";
       case "/changelog":

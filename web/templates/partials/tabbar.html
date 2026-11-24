@@ -12,6 +12,9 @@
   <a class="tabbar-link{{if eq .View "timeline"}} is-active{{end}}" href="/timeline"{{if eq .View "timeline"}} aria-current="page"{{end}}>
     {{icon "history"}}<span>History</span>
   </a>
+  <a class="tabbar-link{{if eq .View "insights"}} is-active{{end}}" href="/insights"{{if eq .View "insights"}} aria-current="page"{{end}}>
+    {{icon "trends"}}<span>Trends</span>
+  </a>
   <a class="tabbar-link{{if eq .View "settings"}} is-active{{end}}" href="/settings"{{if eq .View "settings"}} aria-current="page"{{end}}>
     {{icon "settings"}}<span>Settings</span>
   </a>

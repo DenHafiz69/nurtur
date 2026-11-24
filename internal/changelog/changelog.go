@@ -30,6 +30,24 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.7.0",
+		Date:    "Nov 25, 2026",
+		Title:   "Trends tab with growth charts, WHO curves, and daily rhythms",
+		Summary: "See weight, height, and head circumference over time with WHO percentile bands, alongside 7/14/30-day milk, nursing, sleep, diaper, and 24-hour pattern insights.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"New Trends tab in the bottom bar with interactive 7d, 14d, and 30d views.",
+					"Growth progression charts for weight, height, and head circumference plotted against calendar dates with WHO 0–24 month percentile bands.",
+					"Milk & feeding averages (daily milk volume with breast/formula split, nursing counts & L/R balance, and pumping output).",
+					"Sleep rhythms with day/night split bars, longest uninterrupted night stretch, average wake window, and a 24-hour routine pattern strip.",
+					"Diaper output averages, solids explorer with reaction callouts, and a one-tap copyable checkup snapshot for pediatrician visits.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.6.0",
 		Date:    "Nov 24, 2026",
 		Title:   "Growth tracker, smart hashtag suggestions, and floating captions",

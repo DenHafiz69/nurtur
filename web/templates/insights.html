@@ -1,0 +1,407 @@
+{{define "insights-page"}}
+{{template "insights-body" .}}
+{{end}}
+
+{{define "insights-body"}}
+{{with .Insights}}
+<section id="insights-body" class="insights-page" aria-labelledby="insights-heading">
+  <div class="insights-head">
+    <div>
+      <h1 id="insights-heading" class="page-title">Trends</h1>
+      <p class="page-subtitle">{{.RangeLabel}} · growth, feeding &amp; sleep rhythms</p>
+    </div>
+    <nav class="insights-range" aria-label="Time range">
+      <a class="insights-pill{{if eq .RangeDays 7}} is-active{{end}}"
+         href="/insights?range=7d&amp;growth={{.GrowthMetric}}"
+         hx-get="/insights/partial?range=7d&amp;growth={{.GrowthMetric}}"
+         hx-target="#insights-body"
+         hx-swap="outerHTML"
+         hx-push-url="/insights?range=7d&amp;growth={{.GrowthMetric}}">7d</a>
+      <a class="insights-pill{{if eq .RangeDays 14}} is-active{{end}}"
+         href="/insights?range=14d&amp;growth={{.GrowthMetric}}"
+         hx-get="/insights/partial?range=14d&amp;growth={{.GrowthMetric}}"
+         hx-target="#insights-body"
+         hx-swap="outerHTML"
+         hx-push-url="/insights?range=14d&amp;growth={{.GrowthMetric}}">14d</a>
+      <a class="insights-pill{{if eq .RangeDays 30}} is-active{{end}}"
+         href="/insights?range=30d&amp;growth={{.GrowthMetric}}"
+         hx-get="/insights/partial?range=30d&amp;growth={{.GrowthMetric}}"
+         hx-target="#insights-body"
+         hx-swap="outerHTML"
+         hx-push-url="/insights?range=30d&amp;growth={{.GrowthMetric}}">30d</a>
+    </nav>
+  </div>
+
+  <div class="insights-stack">
+  {{/* ---- 1. Growth Progression + WHO Percentiles ---- */}}
+  <article class="insights-card" aria-labelledby="insights-growth-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-growth-title" class="insights-card-title">Growth</h2>
+        {{if .Growth.HasData}}
+        <p class="insights-card-sub">Latest {{.Growth.LatestValue}} · {{.Growth.LatestDate}}</p>
+        {{else}}
+        <p class="insights-card-sub">Weight, height &amp; head circumference over time</p>
+        {{end}}
+      </div>
+      <a class="insights-action-btn" href="/growth/sheet" hx-get="/growth/sheet" hx-target="#action-dialog" hx-swap="innerHTML">+ Log</a>
+    </div>
+
+    <div class="insights-segment" role="tablist" aria-label="Growth metric">
+      <a class="insights-seg-btn{{if eq .GrowthMetric "weight"}} is-active{{end}}"
+         href="/insights?range={{.RangeDays}}d&amp;growth=weight"
+         hx-get="/insights/partial?range={{.RangeDays}}d&amp;growth=weight"
+         hx-target="#insights-body" hx-swap="outerHTML"
+         hx-push-url="/insights?range={{.RangeDays}}d&amp;growth=weight">Weight</a>
+      <a class="insights-seg-btn{{if eq .GrowthMetric "height"}} is-active{{end}}"
+         href="/insights?range={{.RangeDays}}d&amp;growth=height"
+         hx-get="/insights/partial?range={{.RangeDays}}d&amp;growth=height"
+         hx-target="#insights-body" hx-swap="outerHTML"
+         hx-push-url="/insights?range={{.RangeDays}}d&amp;growth=height">Height</a>
+      <a class="insights-seg-btn{{if eq .GrowthMetric "head"}} is-active{{end}}"
+         href="/insights?range={{.RangeDays}}d&amp;growth=head"
+         hx-get="/insights/partial?range={{.RangeDays}}d&amp;growth=head"
+         hx-target="#insights-body" hx-swap="outerHTML"
+         hx-push-url="/insights?range={{.RangeDays}}d&amp;growth=head">Head</a>
+    </div>
+
+    {{if .Growth.HasData}}
+    <div class="insights-kpi-row">
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Latest</span>
+        <strong class="insights-kpi-value">{{.Growth.LatestValue}}</strong>
+      </div>
+      {{if .Growth.DeltaLabel}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Change</span>
+        <strong class="insights-kpi-value">{{.Growth.DeltaLabel}}</strong>
+      </div>
+      {{end}}
+      {{if .Growth.PercentileLabel}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">WHO</span>
+        <strong class="insights-kpi-value">{{.Growth.PercentileLabel}}</strong>
+      </div>
+      {{end}}
+    </div>
+
+    <div class="insights-chart-wrap" data-insights-chart>
+      <div class="insights-tooltip" data-insights-tooltip hidden></div>
+      <svg class="insights-svg" viewBox="0 0 {{.Growth.Chart.Width}} {{.Growth.Chart.Height}}" role="img" aria-label="{{.Growth.MetricLabel}} progression over time">
+        {{range .Growth.Chart.YTicks}}
+        <line class="chart-grid" x1="{{$.Insights.Growth.Chart.PlotLeft}}" y1="{{.Pos}}" x2="{{$.Insights.Growth.Chart.PlotRight}}" y2="{{.Pos}}"/>
+        <text class="chart-axis-text chart-y-text" x="36" y="{{.Pos}}">{{.Label}}</text>
+        {{end}}
+        {{if .Growth.Chart.HasWHO}}
+        <polygon class="chart-who-outer" points="{{.Growth.Chart.BandOuterPoints}}"/>
+        <polygon class="chart-who-inner" points="{{.Growth.Chart.BandInnerPoints}}"/>
+        <polyline class="chart-who-median" points="{{.Growth.Chart.MedianPoints}}"/>
+        {{end}}
+        {{if .Growth.Chart.AreaPoints}}
+        <polygon class="chart-area" points="{{.Growth.Chart.AreaPoints}}"/>
+        {{end}}
+        {{if .Growth.Chart.LinePoints}}
+        <polyline class="chart-line" points="{{.Growth.Chart.LinePoints}}"/>
+        {{end}}
+        {{range .Growth.Chart.Points}}
+        <circle class="chart-dot" cx="{{.X}}" cy="{{.Y}}" r="4.5" tabindex="0"
+                data-tip-title="{{.TipTitle}}" data-tip-value="{{.TipValue}}"{{if .TipSub}} data-tip-sub="{{.TipSub}}"{{end}}>
+          <title>{{.TipTitle}}: {{.TipValue}}{{if .TipSub}} ({{.TipSub}}){{end}}</title>
+        </circle>
+        {{end}}
+        {{range .Growth.Chart.XTicks}}
+        <text class="chart-axis-text chart-x-text" x="{{.Pos}}" y="168">{{.Label}}</text>
+        {{end}}
+      </svg>
+    </div>
+    {{if .Growth.WHONote}}
+    <p class="insights-footnote">{{.Growth.WHONote}}</p>
+    {{end}}
+    {{else}}
+    <p class="insights-empty">No {{.Growth.MetricLabel}} measurements yet. Tap <strong>+ Log</strong> to start plotting growth.</p>
+    {{end}}
+  </article>
+
+  {{/* ---- 2. Milk & Feeding ---- */}}
+  <article class="insights-card" aria-labelledby="insights-feeding-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-feeding-title" class="insights-card-title">Milk &amp; feeding</h2>
+        <p class="insights-card-sub">{{.RangeLabel}} daily averages</p>
+      </div>
+    </div>
+
+    {{if or .Feeding.HasBottles .Feeding.HasFeeds .Feeding.HasPumps}}
+    <div class="insights-kpi-row">
+      {{if .Feeding.HasBottles}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg milk</span>
+        <strong class="insights-kpi-value">{{.Feeding.AvgMilkPerDay}}</strong>
+        {{if .Feeding.MilkSplitLabel}}<span class="insights-kpi-sub">{{.Feeding.MilkSplitLabel}}</span>{{end}}
+      </div>
+      {{end}}
+      {{if .Feeding.HasFeeds}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg nursing</span>
+        <strong class="insights-kpi-value">{{.Feeding.AvgFeedsPerDay}}</strong>
+        <span class="insights-kpi-sub">{{.Feeding.AvgNursePerDay}} · {{.Feeding.AvgFeedDuration}}</span>
+      </div>
+      {{end}}
+      {{if and .Feeding.ShowPumps .Feeding.HasPumps}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg pumped</span>
+        <strong class="insights-kpi-value">{{.Feeding.AvgPumpPerDay}}</strong>
+        {{if .Feeding.NetPumpLabel}}<span class="insights-kpi-sub">{{.Feeding.NetPumpLabel}}</span>{{end}}
+      </div>
+      {{end}}
+    </div>
+
+    {{if .Feeding.HasBalance}}
+    <div class="insights-balance" aria-label="Nursing side balance: {{.Feeding.LeftPct}}% left, {{.Feeding.RightPct}}% right">
+      <div class="insights-balance-head">
+        <span>Left {{.Feeding.LeftPct}}%</span>
+        <span>Right {{.Feeding.RightPct}}%</span>
+      </div>
+      <div class="insights-balance-track">
+        <div class="insights-balance-left" style="width: {{.Feeding.LeftPct}}%"></div>
+      </div>
+    </div>
+    {{end}}
+
+    {{if .Feeding.MilkChart}}
+    <div class="insights-subchart">
+      <div class="insights-legend">
+        <span class="legend-item"><i class="legend-dot is-milk-breast"></i>{{.Feeding.MilkChart.PrimaryLegend}}</span>
+        {{if .Feeding.MilkChart.HasSecondary}}<span class="legend-item"><i class="legend-dot is-milk-formula"></i>{{.Feeding.MilkChart.SecondaryLegend}}</span>{{end}}
+        {{if .Feeding.MilkChart.HasAvg}}<span class="legend-avg">{{.Feeding.MilkChart.AvgLabel}}</span>{{end}}
+      </div>
+      {{template "insights-bar-chart" .Feeding.MilkChart}}
+    </div>
+    {{end}}
+
+    {{if .Feeding.NurseChart}}
+    <div class="insights-subchart">
+      <div class="insights-legend">
+        <span class="legend-item"><i class="legend-dot is-nurse"></i>Daily nursing time</span>
+        {{if .Feeding.NurseChart.HasAvg}}<span class="legend-avg">{{.Feeding.NurseChart.AvgLabel}}</span>{{end}}
+      </div>
+      {{template "insights-bar-chart" .Feeding.NurseChart}}
+    </div>
+    {{end}}
+    {{else}}
+    <p class="insights-empty">No feeds or bottles logged in the {{.RangeLabel}}.</p>
+    {{end}}
+  </article>
+
+  {{/* ---- 3. Sleep Rhythms ---- */}}
+  <article class="insights-card" aria-labelledby="insights-sleep-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-sleep-title" class="insights-card-title">Sleep rhythms</h2>
+        <p class="insights-card-sub">Day vs. night split &amp; longest stretch</p>
+      </div>
+    </div>
+
+    {{if .Sleep.HasData}}
+    <div class="insights-kpi-row">
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg total</span>
+        <strong class="insights-kpi-value">{{.Sleep.AvgTotalPerDay}}</strong>
+        <span class="insights-kpi-sub">{{.Sleep.AvgNightPerDay}} night · {{.Sleep.AvgDayPerDay}} day</span>
+      </div>
+      {{if .Sleep.LongestStretch}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Longest night</span>
+        <strong class="insights-kpi-value">{{.Sleep.LongestStretch}}</strong>
+        <span class="insights-kpi-sub">{{.Sleep.LongestDate}}</span>
+      </div>
+      {{end}}
+      {{if .Sleep.AvgWakeWindow}}
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg wake</span>
+        <strong class="insights-kpi-value">{{.Sleep.AvgWakeWindow}}</strong>
+      </div>
+      {{end}}
+    </div>
+
+    <div class="insights-subchart is-sleep">
+      <div class="insights-legend">
+        <span class="legend-item"><i class="legend-dot is-sleep-night"></i>Night</span>
+        <span class="legend-item"><i class="legend-dot is-sleep-day"></i>Day naps</span>
+        {{if .Sleep.Chart.HasAvg}}<span class="legend-avg">{{.Sleep.Chart.AvgLabel}}</span>{{end}}
+      </div>
+      {{template "insights-bar-chart" .Sleep.Chart}}
+    </div>
+    {{else}}
+    <p class="insights-empty">No sleep logged in the {{.RangeLabel}}.</p>
+    {{end}}
+  </article>
+
+  {{/* ---- 4. 24-Hour Routine Map ---- */}}
+  {{if .Pattern.HasData}}
+  <article class="insights-card" aria-labelledby="insights-pattern-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-pattern-title" class="insights-card-title">24-hour pattern</h2>
+        <p class="insights-card-sub">Sleep blocks &amp; feed dots across the clock</p>
+      </div>
+    </div>
+    <div class="insights-legend">
+      <span class="legend-item"><i class="legend-dot is-sleep-night"></i>Night sleep</span>
+      <span class="legend-item"><i class="legend-dot is-sleep-day"></i>Nap</span>
+      <span class="legend-item"><i class="legend-dot is-nurse"></i>Feed / bottle</span>
+    </div>
+    <div class="pattern-grid" data-insights-chart>
+      <div class="insights-tooltip" data-insights-tooltip hidden></div>
+      <div class="pattern-hours" aria-hidden="true">
+        <span></span>
+        <div class="pattern-hour-marks">
+          <span>00</span><span>06</span><span>12</span><span>18</span><span>24</span>
+        </div>
+      </div>
+      {{range .Pattern.Days}}
+      <div class="pattern-row">
+        <span class="pattern-day">{{.Label}}</span>
+        <div class="pattern-track">
+          <span class="pattern-tick" style="left:25%"></span>
+          <span class="pattern-tick" style="left:50%"></span>
+          <span class="pattern-tick" style="left:75%"></span>
+          {{range .Blocks}}
+          <span class="pattern-block is-{{.Kind}}" style="left:{{.LeftPct}}%;width:{{.WidthPct}}%"
+                tabindex="0" data-tip-title="{{.Tip}}" data-tip-value="" title="{{.Tip}}"></span>
+          {{end}}
+          {{range .Markers}}
+          <span class="pattern-dot is-{{.Kind}}" style="left:{{.LeftPct}}%"
+                tabindex="0" data-tip-title="{{.Tip}}" data-tip-value="" title="{{.Tip}}"></span>
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </article>
+  {{end}}
+
+  {{/* ---- 5. Diaper Output ---- */}}
+  <article class="insights-card" aria-labelledby="insights-diaper-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-diaper-title" class="insights-card-title">Diapers</h2>
+        <p class="insights-card-sub">Daily wet &amp; dirty averages</p>
+      </div>
+    </div>
+
+    {{if .Diapers.HasData}}
+    <div class="insights-kpi-row">
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg wet</span>
+        <strong class="insights-kpi-value">{{.Diapers.AvgWetPerDay}}</strong>
+      </div>
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Avg dirty</span>
+        <strong class="insights-kpi-value">{{.Diapers.AvgDirtyPerDay}}</strong>
+      </div>
+      <div class="insights-kpi">
+        <span class="insights-kpi-label">Total</span>
+        <strong class="insights-kpi-value">{{.Diapers.AvgTotalPerDay}}</strong>
+      </div>
+    </div>
+    {{if .Diapers.LastDirtyNote}}
+    <p class="insights-footnote">{{.Diapers.LastDirtyNote}}</p>
+    {{end}}
+    <div class="insights-subchart is-diaper">
+      <div class="insights-legend">
+        <span class="legend-item"><i class="legend-dot is-wet"></i>Wet</span>
+        <span class="legend-item"><i class="legend-dot is-dirty"></i>Dirty</span>
+        {{if .Diapers.Chart.HasAvg}}<span class="legend-avg">{{.Diapers.Chart.AvgLabel}}</span>{{end}}
+      </div>
+      {{template "insights-bar-chart" .Diapers.Chart}}
+    </div>
+    {{else}}
+    <p class="insights-empty">No diapers logged in the {{.RangeLabel}}.</p>
+    {{end}}
+  </article>
+
+  {{/* ---- 6. Solids Explorer ---- */}}
+  {{if .Solids}}
+  <article class="insights-card" aria-labelledby="insights-solids-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-solids-title" class="insights-card-title">Solids</h2>
+        <p class="insights-card-sub">{{.Solids.UniqueFoods}} foods · {{.Solids.TotalMeals}} meals</p>
+      </div>
+    </div>
+    {{if .Solids.HasData}}
+    <div class="insights-chip-list">
+      {{range .Solids.TopFoods}}
+      <span class="insights-food-chip">{{.Food}} <em>×{{.Count}}</em></span>
+      {{end}}
+    </div>
+    {{if .Solids.Reactions}}
+    <div class="insights-reactions">
+      <strong>Flagged reactions:</strong>
+      {{range .Solids.Reactions}}
+      <span class="insights-reaction-pill">{{.Food}} ({{.Reaction}})</span>
+      {{end}}
+    </div>
+    {{end}}
+    {{else}}
+    <p class="insights-empty">No solid meals logged in the {{.RangeLabel}}.</p>
+    {{end}}
+  </article>
+  {{end}}
+
+  {{/* ---- 7. Pediatrician Checkup Snapshot ---- */}}
+  {{if .Snapshot.Items}}
+  <article class="insights-card insights-snapshot" aria-labelledby="insights-snapshot-title">
+    <div class="insights-card-head">
+      <div>
+        <h2 id="insights-snapshot-title" class="insights-card-title">Checkup snapshot</h2>
+        <p class="insights-card-sub">{{.Snapshot.RangeLabel}} summary for doctor visits</p>
+      </div>
+      <button type="button" class="insights-action-btn" data-copy-summary data-copy-text="{{.Snapshot.CopyText}}">
+        {{icon "copy"}}<span>Copy</span>
+      </button>
+    </div>
+    <dl class="snapshot-list">
+      {{range .Snapshot.Items}}
+      <div class="snapshot-row">
+        <dt>{{.Label}}</dt>
+        <dd>{{.Value}}</dd>
+      </div>
+      {{end}}
+    </dl>
+  </article>
+  {{end}}
+  </div>
+</section>
+{{end}}
+{{end}}
+
+{{define "insights-bar-chart"}}
+<div class="insights-chart-wrap" data-insights-chart>
+  <div class="insights-tooltip" data-insights-tooltip hidden></div>
+  <svg class="insights-svg" viewBox="0 0 {{.Width}} {{.Height}}" role="img" aria-label="{{.PrimaryLegend}} daily chart">
+    {{range .YTicks}}
+    <line class="chart-grid" x1="{{$.PlotLeft}}" y1="{{.Pos}}" x2="{{$.PlotRight}}" y2="{{.Pos}}"/>
+    <text class="chart-axis-text chart-y-text" x="32" y="{{.Pos}}">{{.Label}}</text>
+    {{end}}
+    {{range .Bars}}
+    <g class="chart-bar-group" tabindex="0" data-tip-title="{{.TipTitle}}" data-tip-value="{{.TipValue}}">
+      <title>{{.TipTitle}}: {{.TipValue}}</title>
+      {{if gt .PrimaryH 0.0}}
+      <rect class="chart-bar-primary" x="{{.X}}" y="{{.PrimaryY}}" width="{{.Width}}" height="{{.PrimaryH}}" rx="3"/>
+      {{end}}
+      {{if gt .SecondaryH 0.0}}
+      <rect class="chart-bar-secondary" x="{{.X}}" y="{{.SecondaryY}}" width="{{.Width}}" height="{{.SecondaryH}}" rx="3"/>
+      {{end}}
+      {{if .ShowLabel}}
+      <text class="chart-axis-text chart-x-text" x="{{.X}}" dx="6" y="140">{{.Label}}</text>
+      {{end}}
+    </g>
+    {{end}}
+    {{if .HasAvg}}
+    <line class="chart-avg-line" x1="{{.PlotLeft}}" y1="{{.AvgY}}" x2="{{.PlotRight}}" y2="{{.AvgY}}"/>
+    {{end}}
+  </svg>
+</div>
+{{end}}

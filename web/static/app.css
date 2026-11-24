@@ -1081,9 +1081,9 @@ html.js .dock-drawer:not([open]) .dock-toggle {
   position: relative;
   flex: none;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   border-top: 1.5px solid var(--line);
   background: var(--bg);
   box-shadow: 0 -6px 18px var(--dock-shadow);
@@ -6182,4 +6182,537 @@ body.album-viewer-open .app-main {
   border-color: var(--coral);
   background: var(--surface);
   color: var(--coral);
+}
+
+/* ---------- Trends / Insights ---------- */
+
+.insights-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+
+.insights-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.insights-range {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.insights-pill {
+  padding: 5px 11px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.insights-pill:hover {
+  color: var(--ink);
+}
+
+.insights-pill.is-active {
+  background: var(--coral);
+  color: var(--on-coral);
+}
+
+.insights-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.insights-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 4px 0 var(--shadow);
+}
+
+.insights-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.insights-card-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.insights-card-sub {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.insights-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.insights-action-btn .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.insights-segment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.insights-seg-btn {
+  padding: 6px 8px;
+  border-radius: 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.insights-seg-btn.is-active {
+  background: var(--surface);
+  color: var(--coral);
+  box-shadow: 0 2px 0 var(--shadow);
+}
+
+.insights-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.insights-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.insights-kpi-label {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.insights-kpi-value {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.insights-kpi-sub {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.insights-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.insights-balance-head {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.insights-balance-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sky);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.insights-balance-left {
+  height: 100%;
+  background: var(--coral);
+  border-radius: 999px 0 0 999px;
+}
+
+.insights-subchart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insights-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.legend-dot.is-milk-breast { background: var(--coral); }
+.legend-dot.is-milk-formula { background: var(--butter); border: 1px solid var(--line); }
+.legend-dot.is-nurse { background: var(--coral); }
+.legend-dot.is-sleep-night { background: var(--lilac); border: 1px solid var(--line); }
+.legend-dot.is-sleep-day { background: var(--sky); border: 1px solid var(--line); }
+.legend-dot.is-wet { background: var(--sky); border: 1px solid var(--line); }
+.legend-dot.is-dirty { background: var(--peach); border: 1px solid var(--line); }
+
+.legend-avg {
+  margin-left: auto;
+  color: var(--ink-soft-strong);
+  font-weight: 800;
+}
+
+.insights-chart-wrap {
+  position: relative;
+}
+
+.insights-tooltip {
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.insights-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.chart-axis-text {
+  fill: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chart-y-text {
+  text-anchor: end;
+  dominant-baseline: middle;
+}
+
+.chart-x-text {
+  text-anchor: middle;
+}
+
+.chart-who-outer {
+  fill: var(--sage);
+  opacity: 0.35;
+}
+
+.chart-who-inner {
+  fill: var(--sage);
+  opacity: 0.65;
+}
+
+.chart-who-median {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+
+.chart-area {
+  fill: var(--coral);
+  opacity: 0.12;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--coral);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-dot {
+  fill: var(--surface);
+  stroke: var(--coral);
+  stroke-width: 2.5;
+  cursor: pointer;
+}
+
+.chart-dot:hover,
+.chart-dot:focus {
+  fill: var(--coral);
+  outline: none;
+}
+
+.chart-bar-group {
+  cursor: pointer;
+}
+
+.chart-bar-primary {
+  fill: var(--coral);
+}
+
+.chart-bar-secondary {
+  fill: var(--butter);
+  stroke: var(--line);
+  stroke-width: 0.8;
+}
+
+.insights-subchart.is-sleep .chart-bar-primary {
+  fill: var(--lilac);
+  stroke: var(--line);
+  stroke-width: 0.8;
+}
+
+.insights-subchart.is-sleep .chart-bar-secondary {
+  fill: var(--sky);
+}
+
+.insights-subchart.is-diaper .chart-bar-primary {
+  fill: var(--sky);
+  stroke: var(--line);
+  stroke-width: 0.8;
+}
+
+.insights-subchart.is-diaper .chart-bar-secondary {
+  fill: var(--peach);
+}
+
+.chart-avg-line {
+  stroke: var(--ink-soft-strong);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.insights-footnote {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.insights-empty {
+  color: var(--ink-soft);
+  font-size: 14px;
+  padding: 6px 0;
+}
+
+/* 24-hour routine map */
+.pattern-grid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pattern-hours {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.pattern-hour-marks {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.pattern-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.pattern-day {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pattern-track {
+  position: relative;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.pattern-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.pattern-block {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.pattern-block.is-night-sleep {
+  background: var(--lilac);
+}
+
+.pattern-block.is-sleep {
+  background: var(--sky);
+}
+
+.pattern-dot {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--coral);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+/* Solids & checkup snapshot */
+.insights-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.insights-food-chip {
+  padding: 5px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.insights-food-chip em {
+  color: var(--ink-soft);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.insights-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.insights-reaction-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--peach);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.snapshot-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.snapshot-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.snapshot-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.snapshot-row dt {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.snapshot-row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: right;
 }

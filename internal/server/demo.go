@@ -10,6 +10,7 @@ import (
 	"nurtur/internal/clock"
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
+	"nurtur/internal/growth"
 	"nurtur/internal/intake"
 	"nurtur/internal/store"
 	"nurtur/internal/view"
@@ -176,6 +177,18 @@ func (s *Server) seedDemoEvents(
 	}
 	if _, _, err := s.store.CreateDiaper(ctx, diaper.Wet, diaperAt); err != nil {
 		return err
+	}
+	// Seed a few historical growth check-ins so the Trends tab shows a live curve.
+	growthPoints := []growth.Measurement{
+		{LoggedAt: now.AddDate(0, -3, 0), WeightG: 4300, HeightMM: 540, HeadMM: 368, Notes: "1 month checkup"},
+		{LoggedAt: now.AddDate(0, -2, 0), WeightG: 5200, HeightMM: 575, HeadMM: 386, Notes: "2 month checkup"},
+		{LoggedAt: now.AddDate(0, -1, 0), WeightG: 5950, HeightMM: 605, HeadMM: 400, Notes: "3 month checkup"},
+		{LoggedAt: now.AddDate(0, 0, -5), WeightG: 6450, HeightMM: 625, HeadMM: 410, Notes: "4 month checkup"},
+	}
+	for _, g := range growthPoints {
+		if _, err := s.store.CreateGrowth(ctx, g, now); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -39,6 +39,7 @@ type PageData struct {
 	Settings    *SettingsView
 	Album       *AlbumPageView
 	AlbumEdit   *AlbumEditView
+	Insights    *InsightsView
 	Row         *EventRow
 
 	// DeletedKey is the DOM id suffix for a deleted timeline row's placeholder.
@@ -633,4 +634,200 @@ type AdminAccountRow struct {
 	CreatedLabel string
 	DeletedLabel string
 	PurgeLabel   string
+}
+
+// InsightsView backs the /insights analytics tab.
+type InsightsView struct {
+	RangeDays    int
+	RangeLabel   string
+	GrowthMetric string
+
+	Growth   GrowthInsightsView
+	Feeding  FeedingInsightsView
+	Sleep    SleepInsightsView
+	Pattern  PatternStripView
+	Diapers  DiaperInsightsView
+	Solids   *SolidsInsightsView
+	Snapshot SnapshotInsightsView
+}
+
+// ChartPoint is one plotted point on an SVG line chart.
+type ChartPoint struct {
+	X        float64
+	Y        float64
+	TipTitle string
+	TipValue string
+	TipSub   string
+}
+
+// ChartTick is one axis label on an SVG chart.
+type ChartTick struct {
+	Pos   float64
+	Label string
+}
+
+// LineChart holds precomputed SVG coordinates for a line chart with optional WHO bands.
+type LineChart struct {
+	Width           int
+	Height          int
+	PlotLeft        float64
+	PlotRight       float64
+	PlotTop         float64
+	PlotBottom      float64
+	HasWHO          bool
+	BandOuterPoints string
+	BandInnerPoints string
+	MedianPoints    string
+	LinePoints      string
+	AreaPoints      string
+	Points          []ChartPoint
+	YTicks          []ChartTick
+	XTicks          []ChartTick
+}
+
+// ChartBar is one daily bar (optionally stacked with primary + secondary segments).
+type ChartBar struct {
+	X          float64
+	Width      float64
+	PrimaryY   float64
+	PrimaryH   float64
+	SecondaryY float64
+	SecondaryH float64
+	Label      string
+	ShowLabel  bool
+	TipTitle   string
+	TipValue   string
+}
+
+// BarChart holds precomputed SVG coordinates for a daily bar chart.
+type BarChart struct {
+	Width           int
+	Height          int
+	PlotLeft        float64
+	PlotRight       float64
+	PlotTop         float64
+	PlotBottom      float64
+	Bars            []ChartBar
+	HasAvg          bool
+	AvgY            float64
+	AvgLabel        string
+	YTicks          []ChartTick
+	PrimaryLegend   string
+	SecondaryLegend string
+	HasSecondary    bool
+}
+
+// GrowthInsightsView backs the growth progression card with WHO percentiles.
+type GrowthInsightsView struct {
+	Metric          string
+	MetricLabel     string
+	UnitLabel       string
+	Count           int
+	HasData         bool
+	LatestValue     string
+	LatestDate      string
+	DeltaLabel      string
+	PercentileLabel string
+	WHONote         string
+	Chart           LineChart
+}
+
+// FeedingInsightsView backs milk consumption, nursing, and pumping analytics.
+type FeedingInsightsView struct {
+	HasBottles      bool
+	HasFeeds        bool
+	HasPumps        bool
+	ShowPumps       bool
+	AvgMilkPerDay   string
+	MilkSplitLabel  string
+	AvgFeedsPerDay  string
+	AvgFeedDuration string
+	AvgNursePerDay  string
+	LeftPct         int
+	RightPct        int
+	HasBalance      bool
+	AvgPumpPerDay   string
+	NetPumpLabel    string
+	MilkChart       *BarChart
+	NurseChart      *BarChart
+}
+
+// SleepInsightsView backs sleep duration, day/night split, and longest stretch.
+type SleepInsightsView struct {
+	HasData        bool
+	AvgTotalPerDay string
+	AvgNightPerDay string
+	AvgDayPerDay   string
+	LongestStretch string
+	LongestDate    string
+	AvgWakeWindow  string
+	Chart          BarChart
+}
+
+// PatternBlock is a horizontal interval within a 24-hour day strip.
+type PatternBlock struct {
+	LeftPct  float64
+	WidthPct float64
+	Kind     string // "sleep", "night-sleep"
+	Tip      string
+}
+
+// PatternMarker is a point event (feed/bottle) on a 24-hour day strip.
+type PatternMarker struct {
+	LeftPct float64
+	Kind    string // "feed", "bottle"
+	Tip     string
+}
+
+// PatternDayRow is one local day in the 24-hour routine map.
+type PatternDayRow struct {
+	Label   string
+	DateKey string
+	Blocks  []PatternBlock
+	Markers []PatternMarker
+}
+
+// PatternStripView backs the 24-hour routine heatmap/strip card.
+type PatternStripView struct {
+	HasData bool
+	Days    []PatternDayRow
+}
+
+// DiaperInsightsView backs wet/dirty diaper output averages.
+type DiaperInsightsView struct {
+	HasData        bool
+	AvgTotalPerDay string
+	AvgWetPerDay   string
+	AvgDirtyPerDay string
+	LastDirtyNote  string
+	Chart          BarChart
+}
+
+// SolidFoodStat summarizes one food logged in the range.
+type SolidFoodStat struct {
+	Food     string
+	Count    int
+	Reaction string
+}
+
+// SolidsInsightsView backs the solids explorer card.
+type SolidsInsightsView struct {
+	HasData     bool
+	UniqueFoods int
+	TotalMeals  int
+	TopFoods    []SolidFoodStat
+	Reactions   []SolidFoodStat
+}
+
+// SnapshotInsightsView backs the copyable pediatrician checkup summary card.
+type SnapshotInsightsView struct {
+	RangeLabel string
+	Items      []SnapshotItem
+	CopyText   string
+}
+
+// SnapshotItem is one label/value pair in the pediatrician snapshot.
+type SnapshotItem struct {
+	Label string
+	Value string
 }
