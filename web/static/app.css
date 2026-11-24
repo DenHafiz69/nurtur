@@ -2086,6 +2086,7 @@ input[type="number"] {
 .chip-option {
   position: relative;
   display: inline-flex;
+  text-decoration: none;
 }
 
 .chip-option input {
@@ -2111,7 +2112,8 @@ input[type="number"] {
     border-color 120ms ease;
 }
 
-.chip-option input:checked + span {
+.chip-option input:checked + span,
+.chip-option.is-active span {
   border-color: var(--coral);
   background: var(--peach);
   font-weight: 800;
@@ -3316,11 +3318,29 @@ html:not(.js) [data-album-add] {
 }
 
 .album-viewer-caption {
-  margin: 4px 0 0;
-  color: rgba(255, 249, 245, 0.76);
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 2;
+  max-width: min(560px, calc(100% - 28px));
+  margin: 0;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 249, 245, 0.16);
+  border-radius: 12px;
+  background: rgba(20, 15, 24, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff9f5;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.album-viewer-caption[hidden] {
+  display: none;
 }
 
 .album-viewer-fav.is-active {

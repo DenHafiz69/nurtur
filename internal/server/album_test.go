@@ -1138,6 +1138,16 @@ func TestAlbumUploadWithCaptionAndHashtag(t *testing.T) {
 	ctx := context.Background()
 	webp := testAlbumWebP(t)
 
+	// Before any hashtags are used, suggested hashtags are hidden and no random presets appear.
+	emptyPage := env.do(t, http.MethodGet, "/album", nil, false)
+	if emptyPage.Code != http.StatusOK {
+		t.Fatalf("GET /album (empty) = %d", emptyPage.Code)
+	}
+	if !strings.Contains(emptyPage.Body.String(), `data-album-tag-choices hidden`) ||
+		strings.Contains(emptyPage.Body.String(), `data-album-tag-preset=`) {
+		t.Fatalf("empty album should not suggest unused preset tags")
+	}
+
 	// Upload with caption and custom hashtag (without leading # -> normalized to #beach).
 	rec := env.uploadPhoto(t, albumUploadForm{
 		full:     webp,
@@ -1176,10 +1186,19 @@ func TestAlbumUploadWithCaptionAndHashtag(t *testing.T) {
 		t.Fatalf("GET /album = %d", page.Code)
 	}
 	pageBody := page.Body.String()
-	for _, want := range []string{`id="album-upload-meta"`, `data-album-upload-meta-form`, `#beach`} {
+	for _, want := range []string{`id="album-upload-meta"`, `data-album-upload-meta-form`, `data-album-tag-preset="#beach"`, `#beach`} {
 		if !strings.Contains(pageBody, want) {
 			t.Fatalf("album page missing %q", want)
 		}
+	}
+
+	// Edit sheet also suggests previously used hashtags.
+	editPage := env.do(t, http.MethodGet, fmt.Sprintf("/album/photos/%d/edit", resp.ID), nil, false)
+	if editPage.Code != http.StatusOK {
+		t.Fatalf("GET edit = %d", editPage.Code)
+	}
+	if !strings.Contains(editPage.Body.String(), `data-album-tag-preset="#beach"`) {
+		t.Fatalf("edit sheet missing previously used #beach suggestion")
 	}
 
 	// Invalid bare "#" tag is rejected with 422.

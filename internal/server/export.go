@@ -110,6 +110,16 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 		CreatedAt string `json:"created_at"`
 		DeletedAt string `json:"deleted_at,omitempty"`
 	}
+	type growthJSON struct {
+		ID        int64  `json:"id"`
+		LoggedAt  string `json:"logged_at"`
+		WeightG   int    `json:"weight_g,omitempty"`
+		HeightMM  int    `json:"height_mm,omitempty"`
+		HeadMM    int    `json:"head_mm,omitempty"`
+		Notes     string `json:"notes,omitempty"`
+		CreatedAt string `json:"created_at"`
+		DeletedAt string `json:"deleted_at,omitempty"`
+	}
 
 	albums, err := s.store.AllAlbumPhotos(r.Context())
 	if err != nil {
@@ -131,6 +141,11 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	growths, err := s.store.AllGrowth(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 
 	payload := struct {
 		ExportedAt   string            `json:"exported_at"`
@@ -143,6 +158,7 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 		Bottles      []bottleJSON      `json:"bottles"`
 		Pumps        []pumpJSON        `json:"pumps"`
 		Solids       []solidJSON       `json:"solids"`
+		Growth       []growthJSON      `json:"growth"`
 		AlbumPhotos  []albumJSON       `json:"album_photos"`
 		Settings     map[string]string `json:"settings"`
 		PhotoStorage string            `json:"photo_storage"`
@@ -253,6 +269,18 @@ func (s *Server) handleExportJSON(w http.ResponseWriter, r *http.Request) {
 			DeletedAt: isoPtr(sol.DeletedAt),
 		})
 	}
+	for _, g := range growths {
+		payload.Growth = append(payload.Growth, growthJSON{
+			ID:        g.ID,
+			LoggedAt:  view.ISO(g.LoggedAt),
+			WeightG:   g.WeightG,
+			HeightMM:  g.HeightMM,
+			HeadMM:    g.HeadMM,
+			Notes:     g.Notes,
+			CreatedAt: view.ISO(g.CreatedAt),
+			DeletedAt: isoPtr(g.DeletedAt),
+		})
+	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="nurtur-%s.json"`, now.In(s.loc).Format("2006-01-02")))
@@ -285,6 +313,11 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
+	growths, err := s.store.AllGrowth(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="nurtur-%s.csv"`, now.In(s.loc).Format("2006-01-02")))
@@ -295,6 +328,7 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 		"kind", "id", "started_at", "ended_at", "left_minutes", "right_minutes",
 		"last_side", "type", "color", "consistency", "notes", "created_at", "deleted_at",
 		"amount_ml", "duration_minutes", "food", "portion", "reaction",
+		"weight_g", "height_mm", "head_mm",
 	})
 
 	for _, f := range feeds {
@@ -303,7 +337,7 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			"feed", strconv.FormatInt(f.ID, 10), view.ISO(f.StartedAt), isoPtr(f.EndedAt),
 			strconv.FormatInt(int64(left/time.Minute), 10), strconv.FormatInt(int64(right/time.Minute), 10),
 			string(f.LastSide), "", "", "", f.Notes, view.ISO(f.CreatedAt), isoPtr(f.DeletedAt),
-			"", "", "", "", "",
+			"", "", "", "", "", "", "", "",
 		})
 	}
 	for _, d := range diapers {
@@ -311,35 +345,43 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			"diaper", strconv.FormatInt(d.ID, 10), view.ISO(d.LoggedAt), "",
 			"", "", "", string(d.Kind), string(d.Color), string(d.Consistency), d.Notes,
 			view.ISO(d.CreatedAt), isoPtr(d.DeletedAt),
-			"", "", "", "", "",
+			"", "", "", "", "", "", "", "",
 		})
 	}
 	for _, session := range sleeps {
 		_ = out.Write([]string{
 			"sleep", strconv.FormatInt(session.ID, 10), view.ISO(session.StartedAt), isoPtr(session.EndedAt),
 			"", "", "", "", "", "", session.Notes, view.ISO(session.CreatedAt), isoPtr(session.DeletedAt),
-			"", "", "", "", "",
+			"", "", "", "", "", "", "", "",
 		})
 	}
 	for _, bt := range bottles {
 		_ = out.Write([]string{
 			"bottle", strconv.FormatInt(bt.ID, 10), view.ISO(bt.LoggedAt), "",
 			"", "", "", string(bt.MilkType), "", "", bt.Notes, view.ISO(bt.CreatedAt), isoPtr(bt.DeletedAt),
-			strconv.Itoa(bt.AmountML), "", "", "", "",
+			strconv.Itoa(bt.AmountML), "", "", "", "", "", "", "",
 		})
 	}
 	for _, p := range pumps {
 		_ = out.Write([]string{
 			"pump", strconv.FormatInt(p.ID, 10), view.ISO(p.LoggedAt), "",
 			"", "", string(p.Side), "", "", "", p.Notes, view.ISO(p.CreatedAt), isoPtr(p.DeletedAt),
-			strconv.Itoa(p.AmountML), strconv.Itoa(p.DurationMinutes), "", "", "",
+			strconv.Itoa(p.AmountML), strconv.Itoa(p.DurationMinutes), "", "", "", "", "", "",
 		})
 	}
 	for _, sol := range solids {
 		_ = out.Write([]string{
 			"solid", strconv.FormatInt(sol.ID, 10), view.ISO(sol.LoggedAt), "",
 			"", "", "", "", "", "", sol.Notes, view.ISO(sol.CreatedAt), isoPtr(sol.DeletedAt),
-			"", "", sol.Food, string(sol.Portion), string(sol.Reaction),
+			"", "", sol.Food, string(sol.Portion), string(sol.Reaction), "", "", "",
+		})
+	}
+	for _, g := range growths {
+		_ = out.Write([]string{
+			"growth", strconv.FormatInt(g.ID, 10), view.ISO(g.LoggedAt), "",
+			"", "", "", "", "", "", g.Notes, view.ISO(g.CreatedAt), isoPtr(g.DeletedAt),
+			"", "", "", "", "",
+			strconv.Itoa(g.WeightG), strconv.Itoa(g.HeightMM), strconv.Itoa(g.HeadMM),
 		})
 	}
 	out.Flush()
@@ -451,6 +493,15 @@ func (s *Server) handleExportSQL(w http.ResponseWriter, r *http.Request) {
 		for _, version := range versions {
 			fmt.Fprintf(&b, "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (%s, %s);\n",
 				sqlText(version), sqlText(now.Format(time.RFC3339)))
+		}
+	}
+
+	if growths, err := s.store.AllGrowth(r.Context()); err == nil {
+		for _, g := range growths {
+			fmt.Fprintf(&b,
+				"INSERT INTO growth (id, logged_at, weight_g, height_mm, head_mm, notes, created_at, deleted_at) VALUES (%d, %s, %d, %d, %d, %s, %s, %s);\n",
+				g.ID, sqlText(view.ISO(g.LoggedAt)), g.WeightG, g.HeightMM, g.HeadMM, sqlNullable(g.Notes), sqlText(view.ISO(g.CreatedAt)), sqlTimePtr(g.DeletedAt),
+			)
 		}
 	}
 

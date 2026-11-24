@@ -210,7 +210,7 @@ func (s *Server) buildAlbum(ctx context.Context, before time.Time, filter store.
 	page.HasMore = hasMore
 	page.HasDays = len(page.Days) > 0
 	page.Tags = tags
-	page.TagPresets = album.MilestoneTags
+	page.TagPresets = tags
 	page.CaptionMax = album.MaxCaption
 	page.HasFilters = totalAll > 0 || filter.FavoritesOnly || filter.Tag != ""
 	page.FilterQuery = albumFilterQuery(filter)
@@ -295,6 +295,7 @@ type albumUploadResponse struct {
 	OK         bool   `json:"ok"`
 	ID         int64  `json:"id,omitempty"`
 	TakenAt    string `json:"taken_at,omitempty"`
+	Tag        string `json:"tag,omitempty"`
 	TileHTML   string `json:"tile_html,omitempty"`
 	DayKey     string `json:"day_key,omitempty"`
 	DayLabel   string `json:"day_label,omitempty"`
@@ -463,6 +464,7 @@ func (s *Server) albumUploadSuccess(w http.ResponseWriter, r *http.Request, want
 		OK:         true,
 		ID:         photo.ID,
 		TakenAt:    view.ISO(photo.TakenAt),
+		Tag:        photo.Tag,
 		TileHTML:   tile.String(),
 		DayKey:     dayKey,
 		DayLabel:   dayLabel,
@@ -804,8 +806,9 @@ func (s *Server) albumPhotoID(w http.ResponseWriter, r *http.Request) (int64, bo
 	return id, true
 }
 
-func (s *Server) buildAlbumEdit(photo album.Photo) *view.AlbumEditView {
+func (s *Server) buildAlbumEdit(ctx context.Context, photo album.Photo) *view.AlbumEditView {
 	now := s.clock.Now().UTC()
+	tags, _ := s.store.ListAlbumTags(ctx)
 	return &view.AlbumEditView{
 		ID:         photo.ID,
 		TimeInput:  photo.TakenAt.In(s.loc).Format("2006-01-02T15:04:05"),
@@ -814,7 +817,7 @@ func (s *Server) buildAlbumEdit(photo album.Photo) *view.AlbumEditView {
 		Favorite:   photo.Favorite,
 		Tag:        photo.Tag,
 		TagMax:     album.MaxTag,
-		TagPresets: album.MilestoneTags,
+		TagPresets: tags,
 		FullLabel:  view.PhotoDateTime(photo.TakenAt, now, s.loc),
 	}
 }
@@ -840,7 +843,7 @@ func (s *Server) handleAlbumEditPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.View = "album"
-	data.AlbumEdit = s.buildAlbumEdit(photo)
+	data.AlbumEdit = s.buildAlbumEdit(r.Context(), photo)
 	if isHTMX(r) {
 		s.writeFragments(w, r, http.StatusOK, "album-edit", data, false, nil, "", false, "", "")
 		return
@@ -880,7 +883,7 @@ func (s *Server) handleAlbumUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	edit := s.buildAlbumEdit(photo)
+	edit := s.buildAlbumEdit(r.Context(), photo)
 	edit.TimeInput = strings.TrimSpace(r.FormValue("taken_at"))
 	edit.Caption = strings.TrimSpace(r.FormValue("caption"))
 	edit.Tag = album.NormalizeTag(r.FormValue("tag"))

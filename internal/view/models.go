@@ -89,6 +89,8 @@ type PageData struct {
 	PumpEdit     *PumpEditView
 	SolidSheet   *SolidSheetView
 	SolidEdit    *SolidEditView
+	GrowthSheet  *GrowthSheetView
+	GrowthEdit   *GrowthEditView
 
 	NextSide string // "left" or "right" recommended next nursing side
 	Trackers TrackerSettings
@@ -565,6 +567,31 @@ type SolidEditView struct {
 	Notes      string
 	Error      string
 	ErrorField string
+}
+
+// GrowthSheetView backs the growth measurement creation sheet.
+type GrowthSheetView struct {
+	Unit        string
+	WeightInput string
+	HeightInput string
+	HeadInput   string
+	TimeInput   string
+	Notes       string
+	Error       string
+	ErrorField  string
+}
+
+// GrowthEditView backs the growth measurement edit sheet.
+type GrowthEditView struct {
+	ID          int64
+	Unit        string
+	WeightInput string
+	HeightInput string
+	HeadInput   string
+	TimeInput   string
+	Notes       string
+	Error       string
+	ErrorField  string
 }
 
 // AdminPageData backs the standalone admin screen. The admin is not a

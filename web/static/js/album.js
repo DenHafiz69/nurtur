@@ -83,6 +83,25 @@
     }
   }
 
+  function rememberTagPreset(tag) {
+    var trimmed = (tag || "").trim();
+    if (!trimmed) return;
+    var container = document.querySelector("#album-upload-meta [data-album-tag-choices]");
+    if (!container) return;
+    var chips = container.querySelectorAll("[data-album-tag-preset]");
+    for (var i = 0; i < chips.length; i++) {
+      var existing = chips[i].getAttribute("data-album-tag-preset") || "";
+      if (existing.toLowerCase() === trimmed.toLowerCase()) return;
+    }
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "album-tag-chip";
+    btn.setAttribute("data-album-tag-preset", trimmed);
+    btn.textContent = trimmed;
+    container.appendChild(btn);
+    container.hidden = false;
+  }
+
   function openUploadMeta(files) {
     var dialog = find("album-upload-meta");
     if (!dialog) {
@@ -1159,6 +1178,7 @@
           } else {
             insertTile(data);
           }
+          if (data.tag) rememberTagPreset(data.tag);
           if (typeof data.total_count === "number") updateCount(data.total_count);
           resolve();
           return;

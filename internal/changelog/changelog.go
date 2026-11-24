@@ -30,6 +30,27 @@ type Section struct {
 // work out which notes an account has not seen yet.
 var releases = []Release{
 	{
+		Version: "v0.6.0",
+		Date:    "Nov 24, 2026",
+		Title:   "Growth tracker, smart hashtag suggestions, and floating captions",
+		Summary: "Track baby's weight, height, and head circumference, reuse your own album hashtags, and read photo captions floating over the image.",
+		Sections: []Section{
+			{
+				Title: "Added",
+				Items: []string{
+					"Growth tracker under Quick log → + Log past entry / manual for weight, height, and head circumference (kg/cm or lb/in), shown in History and included in JSON, CSV, and SQL exports.",
+				},
+			},
+			{
+				Title: "Improved",
+				Items: []string{
+					"Album upload and edit sheets now suggest hashtags you've previously used in your own library.",
+					"Photo captions now float cleanly at the bottom of the image in the photo viewer.",
+				},
+			},
+		},
+	},
+	{
 		Version: "v0.5.9",
 		Date:    "Nov 23, 2026",
 		Title:   "Pre-upload photo captions & hashtags",

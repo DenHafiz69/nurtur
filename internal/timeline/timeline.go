@@ -8,6 +8,7 @@ import (
 
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
+	"nurtur/internal/growth"
 	"nurtur/internal/intake"
 	"nurtur/internal/sleep"
 )
@@ -22,12 +23,13 @@ const (
 	Bottle Kind = "bottle"
 	Pump   Kind = "pump"
 	Solid  Kind = "solid"
+	Growth Kind = "growth"
 )
 
 // Valid reports whether k is a known event kind.
 func (k Kind) Valid() bool {
 	switch k {
-	case Feed, Diaper, Sleep, Bottle, Pump, Solid:
+	case Feed, Diaper, Sleep, Bottle, Pump, Solid, Growth:
 		return true
 	default:
 		return false
@@ -58,6 +60,8 @@ func (k Kind) Title() string {
 		return "Pump"
 	case Solid:
 		return "Solid"
+	case Growth:
+		return "Growth"
 	default:
 		return "Event"
 	}
@@ -75,6 +79,7 @@ type Entry struct {
 	Bottle *intake.Bottle
 	Pump   *intake.Pump
 	Solid  *intake.Solid
+	Growth *growth.Measurement
 }
 
 // DaySummary is the per-day aggregate shown under a timeline date header.

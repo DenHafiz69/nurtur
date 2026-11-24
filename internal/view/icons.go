@@ -39,6 +39,7 @@ var icons = map[string]template.HTML{
 	"bottle":       `<path d="M10 3.5h4"/><path d="M9.5 6.5h5l1 2.5v9.5a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V9l1-2.5Z"/><path d="M10.5 3.5v3M13.5 3.5v3"/><path d="M9 12.5h3"/>`,
 	"pump":         `<path d="M10.5 4.5h3v3h-3z"/><path d="M7.5 10.5h9l-1 8.5a1.5 1.5 0 0 1-1.5 1.5h-4A1.5 1.5 0 0 1 8.5 19l-1-8.5Z"/><path d="M9 7.5h6l1.5 3h-9L9 7.5Z"/>`,
 	"solid":        `<path d="M5 12h14a7 7 0 0 1-14 0Z"/><path d="M8.5 19h7"/><path d="M15.5 6.5 19 3"/>`,
+	"growth":       `<rect x="6" y="3.5" width="12" height="17" rx="2.5"/><path d="M6 8h3.5M6 12h2.5M6 16h3.5"/><path d="M12.5 8.5v7"/>`,
 }
 
 const (

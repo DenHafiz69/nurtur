@@ -1,0 +1,94 @@
+{{define "growth-sheet"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Log growth</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <p class="sheet-copy">Record weight, height, or head circumference.</p>
+  <form class="sheet-form" method="post" action="/growth" hx-post="/growth" hx-target="#status-strip" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field">
+      <span class="field-label">Units</span>
+      <div class="chip-options">
+        <a class="chip-option{{if ne .GrowthSheet.Unit "imperial"}} is-active{{end}}" href="/growth/sheet?unit=metric" hx-get="/growth/sheet?unit=metric" hx-target="#action-dialog" hx-swap="innerHTML"><span>kg / cm</span></a>
+        <a class="chip-option{{if eq .GrowthSheet.Unit "imperial"}} is-active{{end}}" href="/growth/sheet?unit=imperial" hx-get="/growth/sheet?unit=imperial" hx-target="#action-dialog" hx-swap="innerHTML"><span>lb / in</span></a>
+      </div>
+      <input type="hidden" name="unit" value="{{.GrowthSheet.Unit}}">
+    </div>
+    <div class="field-pair">
+      <label class="field">
+        <span class="field-label">Weight ({{if eq .GrowthSheet.Unit "imperial"}}lb{{else}}kg{{end}})</span>
+        <input type="number" name="weight" step="0.01" min="0.01" max="250" inputmode="decimal" value="{{.GrowthSheet.WeightInput}}" placeholder="{{if eq .GrowthSheet.Unit "imperial"}}9.35{{else}}4.25{{end}}">
+      </label>
+      <label class="field">
+        <span class="field-label">Height ({{if eq .GrowthSheet.Unit "imperial"}}in{{else}}cm{{end}})</span>
+        <input type="number" name="height" step="0.1" min="1" max="250" inputmode="decimal" value="{{.GrowthSheet.HeightInput}}" placeholder="{{if eq .GrowthSheet.Unit "imperial"}}21.5{{else}}54.5{{end}}">
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">Head circumference ({{if eq .GrowthSheet.Unit "imperial"}}in{{else}}cm{{end}}, optional)</span>
+      <input type="number" name="head" step="0.1" min="1" max="100" inputmode="decimal" value="{{.GrowthSheet.HeadInput}}" placeholder="{{if eq .GrowthSheet.Unit "imperial"}}14.6{{else}}37.2{{end}}">
+    </label>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.GrowthSheet.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <input type="text" name="notes" maxlength="500" value="{{.GrowthSheet.Notes}}" placeholder="Optional (e.g., 2-month checkup)">
+    </label>
+    {{if .GrowthSheet.Error}}<p class="field-error" role="alert">{{.GrowthSheet.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "growth-edit"}}
+<div class="sheet-inner">
+  <div class="sheet-grab" data-sheet-drag aria-hidden="true"><div class="sheet-handle"></div></div>
+  <div class="sheet-head">
+    <h2 id="action-dialog-title">Edit growth</h2>
+    <button type="button" class="icon-btn" data-close-dialog aria-label="Close">{{icon "close"}}</button>
+  </div>
+  <form class="sheet-form" method="post" action="/growth/{{.GrowthEdit.ID}}" hx-patch="/growth/{{.GrowthEdit.ID}}" hx-target="#status-strip" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+    <div class="field">
+      <span class="field-label">Units</span>
+      <div class="chip-options">
+        <a class="chip-option{{if ne .GrowthEdit.Unit "imperial"}} is-active{{end}}" href="/growth/{{.GrowthEdit.ID}}/sheet?unit=metric" hx-get="/growth/{{.GrowthEdit.ID}}/sheet?unit=metric" hx-target="#action-dialog" hx-swap="innerHTML"><span>kg / cm</span></a>
+        <a class="chip-option{{if eq .GrowthEdit.Unit "imperial"}} is-active{{end}}" href="/growth/{{.GrowthEdit.ID}}/sheet?unit=imperial" hx-get="/growth/{{.GrowthEdit.ID}}/sheet?unit=imperial" hx-target="#action-dialog" hx-swap="innerHTML"><span>lb / in</span></a>
+      </div>
+      <input type="hidden" name="unit" value="{{.GrowthEdit.Unit}}">
+    </div>
+    <div class="field-pair">
+      <label class="field">
+        <span class="field-label">Weight ({{if eq .GrowthEdit.Unit "imperial"}}lb{{else}}kg{{end}})</span>
+        <input type="number" name="weight" step="0.01" min="0.01" max="250" inputmode="decimal" value="{{.GrowthEdit.WeightInput}}">
+      </label>
+      <label class="field">
+        <span class="field-label">Height ({{if eq .GrowthEdit.Unit "imperial"}}in{{else}}cm{{end}})</span>
+        <input type="number" name="height" step="0.1" min="1" max="250" inputmode="decimal" value="{{.GrowthEdit.HeightInput}}">
+      </label>
+    </div>
+    <label class="field">
+      <span class="field-label">Head circumference ({{if eq .GrowthEdit.Unit "imperial"}}in{{else}}cm{{end}}, optional)</span>
+      <input type="number" name="head" step="0.1" min="1" max="100" inputmode="decimal" value="{{.GrowthEdit.HeadInput}}">
+    </label>
+    <label class="field">
+      <span class="field-label">Time</span>
+      <input type="datetime-local" name="logged_at" value="{{.GrowthEdit.TimeInput}}" required>
+    </label>
+    <label class="field">
+      <span class="field-label">Notes</span>
+      <input type="text" name="notes" maxlength="500" value="{{.GrowthEdit.Notes}}" placeholder="Optional">
+    </label>
+    {{if .GrowthEdit.Error}}<p class="field-error" role="alert">{{.GrowthEdit.Error}}</p>{{end}}
+    <div class="sheet-actions">
+      <button type="button" class="btn btn-ghost" data-close-dialog>Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{{end}}

@@ -213,6 +213,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /solids/{id}/restore", s.handleRestoreSolid) // undo
 
 	mux.HandleFunc("GET /manual/sheet", s.handleManualSheet)
+	mux.HandleFunc("GET /growth/sheet", s.handleGrowthSheet)
+	mux.HandleFunc("POST /growth", s.handleCreateGrowth)
+	mux.HandleFunc("GET /growth/{id}/sheet", s.handleGrowthEditPage)
+	mux.HandleFunc("PATCH /growth/{id}", s.handleUpdateGrowth)
+	mux.HandleFunc("POST /growth/{id}", s.handleUpdateGrowth) // no-JS fallback
 
 	mux.HandleFunc("GET /album", s.handleAlbumPage)
 	mux.HandleFunc("GET /album/partial", s.handleAlbumPartial)

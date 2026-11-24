@@ -46,9 +46,13 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 			UNION ALL
 			SELECT 'solid', id, logged_at
 			  FROM solids WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
+			UNION ALL
+			SELECT 'growth', id, logged_at
+			  FROM growth WHERE account_id = ? AND deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
 		)
 		ORDER BY anchor DESC, id DESC, kind DESC
 		LIMIT ?`,
+		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
 		AccountID(ctx), encodeTime(from), encodeTime(to),
@@ -67,7 +71,7 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 		anchor time.Time
 	}
 	var anchors []anchor
-	var feedIDs, diaperIDs, sleepIDs, bottleIDs, pumpIDs, solidIDs []int64
+	var feedIDs, diaperIDs, sleepIDs, bottleIDs, pumpIDs, solidIDs, growthIDs []int64
 	for rows.Next() {
 		var (
 			kindRaw string
@@ -96,6 +100,8 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 			pumpIDs = append(pumpIDs, id)
 		case timeline.Solid:
 			solidIDs = append(solidIDs, id)
+		case timeline.Growth:
+			growthIDs = append(growthIDs, id)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -129,6 +135,10 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 	if err != nil {
 		return nil, err
 	}
+	growths, err := s.growthByIDs(ctx, growthIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]timeline.Entry, 0, len(anchors))
 	for _, a := range anchors {
@@ -158,10 +168,15 @@ func (s *Store) TimelineBetween(ctx context.Context, from, to time.Time, limit i
 			if sol, ok := solids[a.id]; ok {
 				entry.Solid = sol
 			}
+		case timeline.Growth:
+			if g, ok := growths[a.id]; ok {
+				m := g
+				entry.Growth = &m
+			}
 		}
 		// A row can disappear between the anchor query and hydration (sync pull,
 		// for example). Skipping it keeps the response honest.
-		if entry.Feed != nil || entry.Diaper != nil || entry.Sleep != nil || entry.Bottle != nil || entry.Pump != nil || entry.Solid != nil {
+		if entry.Feed != nil || entry.Diaper != nil || entry.Sleep != nil || entry.Bottle != nil || entry.Pump != nil || entry.Solid != nil || entry.Growth != nil {
 			out = append(out, entry)
 		}
 	}
@@ -261,8 +276,10 @@ func (s *Store) HasTimelineBefore(ctx context.Context, before time.Time) (bool, 
 			EXISTS (SELECT 1 FROM sleeps  WHERE account_id = ? AND deleted_at IS NULL AND started_at < ?) OR
 			EXISTS (SELECT 1 FROM bottles WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
 			EXISTS (SELECT 1 FROM pumps   WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
-			EXISTS (SELECT 1 FROM solids  WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?)
+			EXISTS (SELECT 1 FROM solids  WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?) OR
+			EXISTS (SELECT 1 FROM growth  WHERE account_id = ? AND deleted_at IS NULL AND logged_at  < ?)
 		THEN 1 ELSE 0 END`,
+		AccountID(ctx), encodeTime(before),
 		AccountID(ctx), encodeTime(before),
 		AccountID(ctx), encodeTime(before),
 		AccountID(ctx), encodeTime(before),

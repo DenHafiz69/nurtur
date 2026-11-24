@@ -12,6 +12,7 @@ import (
 	"nurtur/internal/clock"
 	"nurtur/internal/diaper"
 	"nurtur/internal/feed"
+	"nurtur/internal/growth"
 	"nurtur/internal/intake"
 	"nurtur/internal/sleep"
 	"nurtur/internal/timeline"
@@ -106,6 +107,7 @@ func (s *Server) buildTimeline(ctx context.Context, before time.Time, limit int)
 
 		if len(entries) > 0 {
 			unit := s.volumeUnit(ctx)
+			gUnit := s.growthUnit(ctx)
 			group := view.TimelineDay{
 				Key:   view.DateKey(dayStart, s.loc),
 				Label: view.DayLabelRelative(dayStart, now, s.loc),
@@ -113,7 +115,7 @@ func (s *Server) buildTimeline(ctx context.Context, before time.Time, limit int)
 				Feeds: view.NewFeedSummary(summary.Feeds, summary.FeedLeft, summary.FeedRight),
 			}
 			for _, entry := range entries {
-				group.Rows = append(group.Rows, s.timelineRow(entry, now, unit))
+				group.Rows = append(group.Rows, s.timelineRow(entry, now, unit, gUnit))
 			}
 			if group.Key == view.DateKey(now, s.loc) {
 				page.HasToday = true
@@ -196,7 +198,7 @@ func parseTimelineLimit(raw string) int {
 	return n
 }
 
-func (s *Server) timelineRow(entry timeline.Entry, now time.Time, unit intake.Unit) view.EventRow {
+func (s *Server) timelineRow(entry timeline.Entry, now time.Time, unit intake.Unit, gUnit growth.Unit) view.EventRow {
 	switch {
 	case entry.Feed != nil:
 		f := entry.Feed
@@ -299,6 +301,9 @@ func (s *Server) timelineRow(entry timeline.Entry, now time.Time, unit intake.Un
 
 	case entry.Solid != nil:
 		return s.solidEventRow(*entry.Solid, true)
+
+	case entry.Growth != nil:
+		return formatGrowthEventRow(*entry.Growth, gUnit, s.loc)
 	}
 	return view.EventRow{}
 }
@@ -351,10 +356,17 @@ func (s *Server) timelineRowByID(ctx context.Context, kind timeline.Kind, id int
 		}
 		entry.Solid = &sol
 		entry.Anchor = sol.LoggedAt
+	case timeline.Growth:
+		m, err := s.store.GetGrowth(ctx, id)
+		if err != nil {
+			return view.EventRow{}, err
+		}
+		entry.Growth = &m
+		entry.Anchor = m.LoggedAt
 	default:
 		return view.EventRow{}, fmt.Errorf("server: unknown timeline kind %q", kind)
 	}
-	return s.timelineRow(entry, now, s.volumeUnit(ctx)), nil
+	return s.timelineRow(entry, now, s.volumeUnit(ctx), s.growthUnit(ctx)), nil
 }
 
 func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
@@ -383,18 +395,20 @@ func (s *Server) handleTimelineDelete(w http.ResponseWriter, r *http.Request) {
 		_, err = s.store.DeletePump(r.Context(), id, now)
 	case timeline.Solid:
 		_, err = s.store.DeleteSolid(r.Context(), id, now)
+	case timeline.Growth:
+		_, err = s.store.DeleteGrowth(r.Context(), id, now)
 	}
 
 	key := fmt.Sprintf("%s-%d", kind, id)
 	switch {
 	case err == nil:
-	case errors.Is(err, feed.ErrAlreadyDeleted), errors.Is(err, diaper.ErrAlreadyDeleted), errors.Is(err, sleep.ErrAlreadyDeleted), errors.Is(err, intake.ErrAlreadyDeleted):
+	case errors.Is(err, feed.ErrAlreadyDeleted), errors.Is(err, diaper.ErrAlreadyDeleted), errors.Is(err, sleep.ErrAlreadyDeleted), errors.Is(err, intake.ErrAlreadyDeleted), errors.Is(err, growth.ErrAlreadyDeleted):
 		s.renderMutation(w, r, "status-strip", &view.Toast{
 			Message: "That " + strings.ToLower(kind.Title()) + " was already deleted.",
 			Kind:    "info",
 		})
 		return
-	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound), errors.Is(err, intake.ErrNotFound):
+	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound), errors.Is(err, intake.ErrNotFound), errors.Is(err, growth.ErrNotFound):
 		s.notFound(w)
 		return
 	default:
@@ -461,6 +475,9 @@ func (s *Server) handleTimelineRestore(w http.ResponseWriter, r *http.Request) {
 	case timeline.Solid:
 		_, err = s.store.RestoreSolid(r.Context(), id)
 		restored = err == nil
+	case timeline.Growth:
+		_, err = s.store.RestoreGrowth(r.Context(), id)
+		restored = err == nil
 	}
 
 	switch {
@@ -477,7 +494,7 @@ func (s *Server) handleTimelineRestore(w http.ResponseWriter, r *http.Request) {
 			Kind:    "info",
 		})
 		return
-	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound), errors.Is(err, intake.ErrNotFound):
+	case errors.Is(err, feed.ErrNotFound), errors.Is(err, diaper.ErrNotFound), errors.Is(err, sleep.ErrNotFound), errors.Is(err, intake.ErrNotFound), errors.Is(err, growth.ErrNotFound):
 		s.notFound(w)
 		return
 	default:
